@@ -109,8 +109,14 @@ public class RoadListScreen extends Screen {
         List<Component> lines = buildDetailLines(selectedRoad);
         int textX = rightPanelX + 12;
         int textY = PANEL_TOP + 24;
+        int maxWidth = rightPanelRight - textX - 12;
         for (int i = 0; i < lines.size(); i++) {
-            graphics.drawString(this.font, lines.get(i), textX, textY + i * 13, 11184810, false);
+            Component line = lines.get(i);
+            if (this.font.width(line) > maxWidth) {
+                String truncated = this.font.plainSubstrByWidth(line.getString(), maxWidth - this.font.width("..."));
+                line = Component.literal(truncated + "...");
+            }
+            graphics.drawString(this.font, line, textX, textY + i * 13, 11184810, false);
         }
     }
 
@@ -226,22 +232,19 @@ public class RoadListScreen extends Screen {
             super(minecraft, width, height, top, bottom, itemHeight);
         }
 
-        // 关键点3：减去右侧滚动条所占的宽度（约14像素），让Entry选项不再被滚动条压住
         @Override
         public int getRowWidth() {
-            return this.width - 14;
+            return this.width - 6;
         }
 
-        // 关键点4：必须返回列表本身的左边距，否则点击选中的判定框和渲染框会全面错位
-        @Override
-        public int getRowLeft() {
-            return this.x0;
-        }
-
-        // 关键点5：为右侧滚动条指定正确的渲染X轴位置
         @Override
         protected int getScrollbarPosition() {
             return this.x0 + this.width - 6;
+        }
+
+        @Override
+        protected void renderSelection(GuiGraphics graphics, int top, int width, int height, int outerColor, int innerColor) {
+            // no-op: handled in RoadEntry.render()
         }
 
         void reload(List<RoadPath> roads) {
