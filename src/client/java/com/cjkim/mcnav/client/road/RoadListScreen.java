@@ -79,6 +79,11 @@ public class RoadListScreen extends Screen {
     }
 
     @Override
+    public void renderDirtBackground(GuiGraphics graphics) {
+        // overridden to suppress dirt texture
+    }
+
+    @Override
     public void render(GuiGraphics graphics, int mouseX, int mouseY, float partialTick) {
         graphics.fill(0, 0, this.width, this.height, 0xFF000000);
 
