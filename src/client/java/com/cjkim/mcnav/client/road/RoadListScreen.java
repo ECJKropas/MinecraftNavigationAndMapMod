@@ -80,6 +80,7 @@ public class RoadListScreen extends Screen {
 
     @Override
     public void render(GuiGraphics graphics, int mouseX, int mouseY, float partialTick) {
+        graphics.fill(0, 0, this.width, this.height, 0xFF000000);
 
         int panelBottomY = this.height - PANEL_BOTTOM;
         int leftPanelX = MARGIN;
