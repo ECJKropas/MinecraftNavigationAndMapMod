@@ -1,0 +1,12 @@
+0=java
+1=javax
+2=net.minecraft
+3=com.mojang
+4=net.fabricmc
+5=org.spongepowered
+6=com.llamalad7
+7=carpet
+8=com
+9=net
+10=org
+11=com.cjkim.mcnav;

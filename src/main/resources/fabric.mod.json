@@ -1,19 +1,32 @@
 {
   "schemaVersion": 1,
-  "id": "mcnav",
+  "id": "${id}",
   "version": "${version}",
-  "name": "MC Nav",
-  "description": "A client-side navigation helper for railways and roads.",
+  "name": "${name}",
+  "description": "${description}",
   "authors": ["cjkim"],
   "environment": "client",
   "entrypoints": {
-    "client": [
-      "com.cjkim.mcnav.client.McNavClient"
-    ]
+    "client": ["com.cjkim.mcnav.client.McNavClient"]
+  },
+  "license": "GPL-3.0-only",
+  "contact": {
+    "issues": "${issues}",
+    "sources": "${source}"
   },
   "depends": {
-    "fabricloader": ">=0.19.2",
-    "minecraft": "~1.20.1",
-    "java": ">=17"
+    "fabricloader": "${fabric_loader_dependency}",
+    "minecraft": "${minecraft_dependency}",
+    "fabric-lifecycle-events-v1": "*",
+    "fabric-key-binding-api-v1": "*"
+  },
+  "custom": {
+    "modmenu": {
+      "links": {
+        "modmenu.github_releases": "${source}/releases",
+        "modmenu.issues": "${issues}"
+      },
+      "update_checker": true
+    }
   }
 }
