@@ -20,7 +20,8 @@ public class RoadListScreen extends Screen {
     private static final int PANEL_TOP = 56;
     private static final int PANEL_BOTTOM = 40;
     private static final int LEFT_PANEL_WIDTH = 304;
-    private static final int LIST_ROW_HEIGHT = 28;
+    private static final int LIST_ROW_HEIGHT = 24; // 调整行高使间距更紧凑美观
+
     private final RoadDataStore roadDataStore;
     private final RoadPreviewServer previewServer;
     private RoadEntryList roadList;
@@ -38,15 +39,18 @@ public class RoadListScreen extends Screen {
     @Override
     protected void init() {
         int panelBottomY = this.height - PANEL_BOTTOM;
-        int listTop = PANEL_TOP + 52;
-        int listHeight = panelBottomY - 12 - listTop;
-        this.roadList = new RoadEntryList(this.minecraft, LEFT_PANEL_WIDTH - 16, listHeight, listTop, panelBottomY - 12, LIST_ROW_HEIGHT);
-        this.roadList.setLeftPos(MARGIN + 12);
+        // 关键点1：精确计算List的顶部位置，防止文字和搜索框被列表项遮挡
+        int listTop = PANEL_TOP + 42;
+        int listHeight = panelBottomY - 6 - listTop;
+
+        // 关键点2：将列表宽度完全贴合左侧面板内部
+        this.roadList = new RoadEntryList(this.minecraft, LEFT_PANEL_WIDTH - 12, listHeight, listTop, panelBottomY - 6, LIST_ROW_HEIGHT);
+        this.roadList.setLeftPos(MARGIN + 6); // 居中居左对齐
         this.roadList.setRenderBackground(false);
         this.roadList.setRenderTopAndBottom(false);
         this.addRenderableWidget(this.roadList);
 
-        this.searchBox = new EditBox(this.font, MARGIN + 12, PANEL_TOP + 28, LEFT_PANEL_WIDTH - 24, 20, Component.literal("搜索路线..."));
+        this.searchBox = new EditBox(this.font, MARGIN + 12, PANEL_TOP + 18, LEFT_PANEL_WIDTH - 24, 20, Component.literal("搜索路线..."));
         this.searchBox.setMaxLength(64);
         this.searchBox.setResponder(this::onSearchTextChanged);
         this.addRenderableWidget(this.searchBox);
@@ -56,48 +60,66 @@ public class RoadListScreen extends Screen {
 
     @Override
     public void renderBackground(GuiGraphics graphics) {
-        // no-op: background handled in render()
+        // no-op
     }
 
     @Override
     public void renderDirtBackground(GuiGraphics graphics) {
-        // no-op: suppress dirt texture
+        // no-op
     }
 
     @Override
     public void render(GuiGraphics graphics, int mouseX, int mouseY, float partialTick) {
+        // 1. 绘制全屏半透明底色
         graphics.fill(0, 0, this.width, this.height, 0xCC000000);
 
         int panelBottomY = this.height - PANEL_BOTTOM;
         int leftPanelX = MARGIN;
         int leftPanelRight = leftPanelX + LEFT_PANEL_WIDTH;
         int rightPanelX = leftPanelRight + 12;
+        int rightPanelRight = this.width - MARGIN;
 
+        // 2. 绘制自定义的面板容器背景
+        drawPanel(graphics, leftPanelX, PANEL_TOP, leftPanelRight, panelBottomY, 0xCC1B1F28);
+        drawPanel(graphics, rightPanelX, PANEL_TOP, rightPanelRight, panelBottomY, 0xCC171B22);
+
+        // 3. 核心修复：先调用超级渲染来渲染列表（带有裁剪区），确保文字和页眉最后绘制，从而解决覆盖重叠问题
         super.render(graphics, mouseX, mouseY, partialTick);
 
+        // 4. 绘制所有文本（位于最上层，绝不会被滚动的列表条目遮挡）
         graphics.drawString(this.font, this.title, MARGIN, HEADER_TOP, 16777215, false);
         graphics.drawString(this.font, Component.literal("当前实例: " + roadDataStore.getContextLabel()), MARGIN, HEADER_TOP + 12, 11184810, false);
         graphics.drawString(this.font, statusText, MARGIN, HEADER_TOP + 24, 8947848, false);
 
-        graphics.drawString(this.font, Component.literal("路线列表"), leftPanelX + 12, PANEL_TOP + 10, 16777215, false);
-        graphics.drawString(this.font, Component.literal("详情"), rightPanelX + 12, PANEL_TOP + 10, 16777215, false);
+        // 面板头部小标题（调高了位置，使其不会和列表内容冲突）
+        graphics.drawString(this.font, Component.literal("路线列表"), leftPanelX + 12, PANEL_TOP + 6, 16777215, false);
+        graphics.drawString(this.font, Component.literal("详情"), rightPanelX + 12, PANEL_TOP + 6, 16777215, false);
 
         List<RoadPath> roads = roadDataStore.getRoads();
-        graphics.drawString(this.font, Component.literal("共 " + roads.size() + " 条路线"), leftPanelX + 12, PANEL_TOP + 22, 11184810, false);
+        graphics.drawString(this.font, Component.literal("共 " + roads.size() + " 条路线"), leftPanelX + 120, PANEL_TOP + 6, 11184810, false);
+
         graphics.drawString(this.font, Component.literal("数据文件: " + roadDataStore.getDataFile()), MARGIN, panelBottomY + 4, 8947848, false);
         graphics.drawString(this.font, Component.literal("本地预览: " + previewServer.getUrl()), MARGIN, panelBottomY + 16, 8947848, false);
 
         if (selectedRoad == null) {
-            graphics.drawString(this.font, Component.literal("暂无选中路线"), rightPanelX + 12, PANEL_TOP + 34, 11184810, false);
+            graphics.drawString(this.font, Component.literal("暂无选中路线"), rightPanelX + 12, PANEL_TOP + 24, 11184810, false);
             return;
         }
 
         List<Component> lines = buildDetailLines(selectedRoad);
         int textX = rightPanelX + 12;
-        int textY = PANEL_TOP + 34;
+        int textY = PANEL_TOP + 24;
         for (int i = 0; i < lines.size(); i++) {
             graphics.drawString(this.font, lines.get(i), textX, textY + i * 13, 11184810, false);
         }
+    }
+
+    private void drawPanel(GuiGraphics graphics, int left, int top, int right, int bottom, int fillColor) {
+        graphics.fill(left, top, right, bottom, fillColor);
+        graphics.fill(left, top, right, top + 1, 0xFF4E5768);
+        graphics.fill(left, bottom - 1, right, bottom, 0xFF1A1F27);
+        graphics.fill(left, top, left + 1, bottom, 0xFF1A1F27);
+        graphics.fill(right - 1, top, right, bottom, 0xFF1A1F27);
     }
 
     private List<Component> buildDetailLines(RoadPath road) {
@@ -198,19 +220,28 @@ public class RoadListScreen extends Screen {
         return input == null || input.isBlank() ? "未命名" : input;
     }
 
+    // --- 内部列表组件类优化 ---
     private final class RoadEntryList extends ObjectSelectionList<RoadEntry> {
         RoadEntryList(Minecraft minecraft, int width, int height, int top, int bottom, int itemHeight) {
             super(minecraft, width, height, top, bottom, itemHeight);
         }
 
+        // 关键点3：减去右侧滚动条所占的宽度（约14像素），让Entry选项不再被滚动条压住
         @Override
         public int getRowWidth() {
-            return LEFT_PANEL_WIDTH - 28;
+            return this.width - 14;
         }
 
+        // 关键点4：必须返回列表本身的左边距，否则点击选中的判定框和渲染框会全面错位
         @Override
         public int getRowLeft() {
-            return MARGIN + 4;
+            return this.x0;
+        }
+
+        // 关键点5：为右侧滚动条指定正确的渲染X轴位置
+        @Override
+        protected int getScrollbarPosition() {
+            return this.x0 + this.width - 6;
         }
 
         void reload(List<RoadPath> roads) {
@@ -253,11 +284,13 @@ public class RoadListScreen extends Screen {
             } else {
                 background = index % 2 == 0 ? 0xFF1E2633 : 0xFF161C26;
             }
+
+            // 关键点6：使用传入的真正 left 和 width 进行渲染，保证高亮选区完美贴合
             graphics.fill(left, top, left + width, top + height - 1, background);
 
             int textColor = selected ? 0xFFF7F9FC : hovered ? 0xFFF4F7FF : 0xFFC8CDD6;
             int textY = top + (height - RoadListScreen.this.font.lineHeight) / 2;
-            graphics.drawString(RoadListScreen.this.font, safe(road.name), left + 8, textY, textColor, false);
+            graphics.drawString(RoadListScreen.this.font, safe(road.name), left + 6, textY, textColor, false);
         }
 
         @Override
