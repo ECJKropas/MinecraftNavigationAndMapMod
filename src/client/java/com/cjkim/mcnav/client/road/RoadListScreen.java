@@ -5,6 +5,7 @@ import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.components.Button;
 import net.minecraft.client.gui.components.ObjectSelectionList;
+import net.minecraft.client.gui.components.EditBox;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.network.chat.Component;
 
@@ -12,6 +13,7 @@ import java.awt.Desktop;
 import java.net.URI;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.stream.Collectors;
 
 public class RoadListScreen extends Screen {
     private static final int MARGIN = 16;
@@ -19,7 +21,7 @@ public class RoadListScreen extends Screen {
     private static final int PANEL_TOP = 56;
     private static final int PANEL_BOTTOM = 40;
     private static final int LEFT_PANEL_WIDTH = 304;
-    private static final int LIST_ROW_HEIGHT = 44;
+    private static final int LIST_ROW_HEIGHT = 28;
     private static final int BUTTON_WIDTH = 78;
 
     private final RoadDataStore roadDataStore;
@@ -27,6 +29,8 @@ public class RoadListScreen extends Screen {
     private RoadEntryList roadList;
     private RoadPath selectedRoad;
     private Component statusText = Component.literal("");
+    private EditBox searchBox;
+    private String searchText = "";
 
     public RoadListScreen(RoadDataStore roadDataStore, RoadPreviewServer previewServer) {
         super(Component.literal("路线列表"));
@@ -37,10 +41,17 @@ public class RoadListScreen extends Screen {
     @Override
     protected void init() {
         int panelBottomY = this.height - PANEL_BOTTOM;
-        int listHeight = panelBottomY - PANEL_TOP;
-        this.roadList = new RoadEntryList(this.minecraft, LEFT_PANEL_WIDTH - 16, listHeight, PANEL_TOP + 28, panelBottomY - 12, LIST_ROW_HEIGHT);
+        int listTop = PANEL_TOP + 52;
+        int listHeight = panelBottomY - 12 - listTop;
+        this.roadList = new RoadEntryList(this.minecraft, LEFT_PANEL_WIDTH - 16, listHeight, listTop, panelBottomY - 12, LIST_ROW_HEIGHT);
         this.roadList.setLeftPos(MARGIN + 8);
         this.addRenderableWidget(this.roadList);
+
+        this.searchBox = new EditBox(this.font, MARGIN + 8, PANEL_TOP + 28, LEFT_PANEL_WIDTH - 32, 20, Component.literal("搜索路线..."));
+        this.searchBox.setMaxLength(64);
+        this.searchBox.setResponder(this::onSearchTextChanged);
+        this.addRenderableWidget(this.searchBox);
+
         reloadEntries();
 
         int buttonY = HEADER_TOP - 1;
@@ -64,7 +75,7 @@ public class RoadListScreen extends Screen {
 
     @Override
     public void render(GuiGraphics graphics, int mouseX, int mouseY, float partialTick) {
-        this.renderBackground(graphics);
+        graphics.fill(0, 0, this.width, this.height, 0xCC000000);
 
         int panelBottomY = this.height - PANEL_BOTTOM;
         int leftPanelX = MARGIN;
@@ -76,8 +87,8 @@ public class RoadListScreen extends Screen {
         graphics.drawString(this.font, Component.literal("当前实例: " + roadDataStore.getContextLabel()), MARGIN, HEADER_TOP + 12, 11184810, false);
         graphics.drawString(this.font, statusText, MARGIN, HEADER_TOP + 24, 8947848, false);
 
-        drawPanel(graphics, leftPanelX, PANEL_TOP, leftPanelRight, panelBottomY, 0xE01B1F28);
-        drawPanel(graphics, rightPanelX, PANEL_TOP, rightPanelRight, panelBottomY, 0xE0171B22);
+        drawPanel(graphics, leftPanelX, PANEL_TOP, leftPanelRight, panelBottomY, 0xCC1B1F28);
+        drawPanel(graphics, rightPanelX, PANEL_TOP, rightPanelRight, panelBottomY, 0xCC171B22);
 
         graphics.drawString(this.font, Component.literal("路线列表"), leftPanelX + 12, PANEL_TOP + 10, 16777215, false);
         graphics.drawString(this.font, Component.literal("详情"), rightPanelX + 12, PANEL_TOP + 10, 16777215, false);
@@ -116,6 +127,9 @@ public class RoadListScreen extends Screen {
         lines.add(Component.literal("宽度: " + road.width + " 格"));
         lines.add(Component.literal("轨迹点: " + road.points.size()));
         lines.add(Component.literal("交叉点: " + road.intersections.size()));
+        for (var inter : road.intersections) {
+            lines.add(Component.literal("  └ " + safe(inter.roadName)));
+        }
         lines.add(Component.literal("ID: " + safe(road.id)));
         if (!road.points.isEmpty()) {
             var first = road.points.get(0);
@@ -129,8 +143,22 @@ public class RoadListScreen extends Screen {
     private void reloadEntries() {
         roadDataStore.syncToCurrentContext();
         roadDataStore.reloadFromDisk();
+        reloadFilteredEntries();
+    }
 
+    private void onSearchTextChanged(String text) {
+        this.searchText = text.trim().toLowerCase();
+        reloadFilteredEntries();
+    }
+
+    private void reloadFilteredEntries() {
         List<RoadPath> roads = roadDataStore.getRoads();
+        if (!searchText.isEmpty()) {
+            roads = roads.stream()
+                    .filter(road -> road.name != null && road.name.toLowerCase().contains(searchText))
+                    .collect(Collectors.toList());
+        }
+
         String selectedId = selectedRoad == null ? null : selectedRoad.id;
         if (roadList != null) {
             roadList.reload(roads);
@@ -144,6 +172,30 @@ public class RoadListScreen extends Screen {
             roadList.setSelected(selectedRoad == null ? null : roadList.findEntry(selectedRoad));
         }
         setStatus(roads.isEmpty() ? "没有已保存的路线" : "共 " + roads.size() + " 条路线");
+    }
+
+    @Override
+    public void tick() {
+        super.tick();
+        if (searchBox != null) {
+            searchBox.tick();
+        }
+    }
+
+    @Override
+    public boolean charTyped(char codePoint, int modifiers) {
+        if (searchBox != null && searchBox.isFocused()) {
+            return searchBox.charTyped(codePoint, modifiers);
+        }
+        return super.charTyped(codePoint, modifiers);
+    }
+
+    @Override
+    public boolean keyPressed(int keyCode, int scanCode, int modifiers) {
+        if (searchBox != null && searchBox.isFocused()) {
+            return searchBox.keyPressed(keyCode, scanCode, modifiers);
+        }
+        return super.keyPressed(keyCode, scanCode, modifiers);
     }
 
     private void openPreviewInBrowser() {
@@ -219,15 +271,8 @@ public class RoadListScreen extends Screen {
             graphics.fill(left, top, left + width, top + 1, selected ? 0xFF6A7A91 : 0xFF313847);
 
             int textColor = selected ? 0xFFF7F9FC : hovered ? 0xFFF4F7FF : 0xFFE2E6EE;
-            graphics.drawString(RoadListScreen.this.font, safe(road.name), left + 8, top + 6, textColor, false);
-            graphics.drawString(
-                    RoadListScreen.this.font,
-                    Component.literal("宽度 " + road.width + "  ·  点 " + road.points.size() + "  ·  路口 " + road.intersections.size()),
-                    left + 8,
-                    top + 20,
-                    11184810,
-                    false
-            );
+            int textY = top + (height - RoadListScreen.this.font.lineHeight) / 2;
+            graphics.drawString(RoadListScreen.this.font, safe(road.name), left + 8, textY, textColor, false);
         }
 
         @Override
