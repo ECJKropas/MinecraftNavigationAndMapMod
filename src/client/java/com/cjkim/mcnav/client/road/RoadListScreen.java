@@ -47,7 +47,7 @@ public class RoadListScreen extends Screen {
         this.roadList.setLeftPos(MARGIN + 8);
         this.addRenderableWidget(this.roadList);
 
-        this.searchBox = new EditBox(this.font, MARGIN + 8, PANEL_TOP + 28, LEFT_PANEL_WIDTH - 32, 20, Component.literal("搜索路线..."));
+        this.searchBox = new EditBox(this.font, MARGIN + 12, PANEL_TOP + 28, LEFT_PANEL_WIDTH - 24, 20, Component.literal("搜索路线..."));
         this.searchBox.setMaxLength(64);
         this.searchBox.setResponder(this::onSearchTextChanged);
         this.addRenderableWidget(this.searchBox);
@@ -75,7 +75,7 @@ public class RoadListScreen extends Screen {
 
     @Override
     public void render(GuiGraphics graphics, int mouseX, int mouseY, float partialTick) {
-        graphics.fill(0, 0, this.width, this.height, 0xCC000000);
+        graphics.fill(0, 0, this.width, this.height, 0xFF000000);
 
         int panelBottomY = this.height - PANEL_BOTTOM;
         int leftPanelX = MARGIN;
