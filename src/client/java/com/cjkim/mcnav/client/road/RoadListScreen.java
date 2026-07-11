@@ -44,7 +44,7 @@ public class RoadListScreen extends Screen {
         int listTop = PANEL_TOP + 52;
         int listHeight = panelBottomY - 12 - listTop;
         this.roadList = new RoadEntryList(this.minecraft, LEFT_PANEL_WIDTH - 16, listHeight, listTop, panelBottomY - 12, LIST_ROW_HEIGHT);
-        this.roadList.setLeftPos(MARGIN + 8);
+        this.roadList.setLeftPos(MARGIN + 12);
         this.addRenderableWidget(this.roadList);
 
         this.searchBox = new EditBox(this.font, MARGIN + 12, PANEL_TOP + 28, LEFT_PANEL_WIDTH - 24, 20, Component.literal("搜索路线..."));
@@ -74,8 +74,12 @@ public class RoadListScreen extends Screen {
     }
 
     @Override
-    public void render(GuiGraphics graphics, int mouseX, int mouseY, float partialTick) {
+    public void renderBackground(GuiGraphics graphics) {
         graphics.fill(0, 0, this.width, this.height, 0xFF000000);
+    }
+
+    @Override
+    public void render(GuiGraphics graphics, int mouseX, int mouseY, float partialTick) {
 
         int panelBottomY = this.height - PANEL_BOTTOM;
         int leftPanelX = MARGIN;
