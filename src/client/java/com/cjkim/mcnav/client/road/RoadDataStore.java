@@ -66,7 +66,7 @@ public class RoadDataStore {
 
     public synchronized String toJson() {
         syncToCurrentContext();
-        return GSON.toJson(snapshot());
+        return GSON.toJson(snapshot().roads);
     }
 
     private void syncToContext(RoadStorageContext nextContext) {
