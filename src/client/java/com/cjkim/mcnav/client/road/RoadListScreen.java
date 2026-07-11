@@ -3,7 +3,6 @@ package com.cjkim.mcnav.client.road;
 import com.cjkim.mcnav.client.road.model.RoadPath;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphics;
-import net.minecraft.client.gui.components.Button;
 import net.minecraft.client.gui.components.ObjectSelectionList;
 import net.minecraft.client.gui.components.EditBox;
 import net.minecraft.client.gui.screens.Screen;
@@ -22,8 +21,6 @@ public class RoadListScreen extends Screen {
     private static final int PANEL_BOTTOM = 40;
     private static final int LEFT_PANEL_WIDTH = 304;
     private static final int LIST_ROW_HEIGHT = 28;
-    private static final int BUTTON_WIDTH = 78;
-
     private final RoadDataStore roadDataStore;
     private final RoadPreviewServer previewServer;
     private RoadEntryList roadList;
@@ -55,24 +52,6 @@ public class RoadListScreen extends Screen {
         this.addRenderableWidget(this.searchBox);
 
         reloadEntries();
-
-        int buttonY = HEADER_TOP - 1;
-        int closeX = this.width - MARGIN - BUTTON_WIDTH;
-        int previewX = closeX - 8 - BUTTON_WIDTH;
-        int refreshX = previewX - 8 - BUTTON_WIDTH;
-
-        this.addRenderableWidget(Button.builder(Component.literal("刷新"), button -> {
-            reloadEntries();
-            setStatus("列表已刷新");
-        }).bounds(refreshX, buttonY, BUTTON_WIDTH, 20).build());
-
-        this.addRenderableWidget(Button.builder(Component.literal("打开预览"), button -> openPreviewInBrowser())
-                .bounds(previewX, buttonY, BUTTON_WIDTH, 20)
-                .build());
-
-        this.addRenderableWidget(Button.builder(Component.literal("关闭"), button -> this.minecraft.setScreen(null))
-                .bounds(closeX, buttonY, BUTTON_WIDTH, 20)
-                .build());
     }
 
     @Override
@@ -87,23 +66,15 @@ public class RoadListScreen extends Screen {
 
     @Override
     public void render(GuiGraphics graphics, int mouseX, int mouseY, float partialTick) {
-        // 1. 纯黑背景
-        graphics.fill(0, 0, this.width, this.height, 0xFF000000);
+        graphics.fill(0, 0, this.width, this.height, 0xCC000000);
 
         int panelBottomY = this.height - PANEL_BOTTOM;
         int leftPanelX = MARGIN;
         int leftPanelRight = leftPanelX + LEFT_PANEL_WIDTH;
         int rightPanelX = leftPanelRight + 12;
-        int rightPanelRight = this.width - MARGIN;
 
-        // 2. 面板背景（在控件之后会被覆盖，因此先画）
-        drawPanel(graphics, leftPanelX, PANEL_TOP, leftPanelRight, panelBottomY, 0xCC1B1F28);
-        drawPanel(graphics, rightPanelX, PANEL_TOP, rightPanelRight, panelBottomY, 0xCC171B22);
-
-        // 3. 控件（按钮、搜索框、路线列表）
         super.render(graphics, mouseX, mouseY, partialTick);
 
-        // 4. 文字覆盖层
         graphics.drawString(this.font, this.title, MARGIN, HEADER_TOP, 16777215, false);
         graphics.drawString(this.font, Component.literal("当前实例: " + roadDataStore.getContextLabel()), MARGIN, HEADER_TOP + 12, 11184810, false);
         graphics.drawString(this.font, statusText, MARGIN, HEADER_TOP + 24, 8947848, false);
@@ -127,14 +98,6 @@ public class RoadListScreen extends Screen {
         for (int i = 0; i < lines.size(); i++) {
             graphics.drawString(this.font, lines.get(i), textX, textY + i * 13, 11184810, false);
         }
-    }
-
-    private void drawPanel(GuiGraphics graphics, int left, int top, int right, int bottom, int fillColor) {
-        graphics.fill(left, top, right, bottom, fillColor);
-        graphics.fill(left, top, right, top + 1, 0xFF4E5768);
-        graphics.fill(left, bottom - 1, right, bottom, 0xFF1A1F27);
-        graphics.fill(left, top, left + 1, bottom, 0xFF1A1F27);
-        graphics.fill(right - 1, top, right, bottom, 0xFF1A1F27);
     }
 
     private List<Component> buildDetailLines(RoadPath road) {
@@ -282,11 +245,17 @@ public class RoadListScreen extends Screen {
         @Override
         public void render(GuiGraphics graphics, int index, int top, int left, int width, int height, int mouseX, int mouseY, boolean hovered, float partialTick) {
             boolean selected = selectedRoad != null && selectedRoad.id != null && selectedRoad.id.equals(road.id);
-            int background = selected ? 0xFF2A3342 : hovered ? 0xFF232A37 : 0xFF1B1F28;
+            int background;
+            if (selected) {
+                background = 0xFF3A4560;
+            } else if (hovered) {
+                background = 0xFF2A3345;
+            } else {
+                background = index % 2 == 0 ? 0xFF1E2633 : 0xFF161C26;
+            }
             graphics.fill(left, top, left + width, top + height - 1, background);
-            graphics.fill(left, top, left + width, top + 1, selected ? 0xFF6A7A91 : 0xFF313847);
 
-            int textColor = selected ? 0xFFF7F9FC : hovered ? 0xFFF4F7FF : 0xFFE2E6EE;
+            int textColor = selected ? 0xFFF7F9FC : hovered ? 0xFFF4F7FF : 0xFFC8CDD6;
             int textY = top + (height - RoadListScreen.this.font.lineHeight) / 2;
             graphics.drawString(RoadListScreen.this.font, safe(road.name), left + 8, textY, textColor, false);
         }
