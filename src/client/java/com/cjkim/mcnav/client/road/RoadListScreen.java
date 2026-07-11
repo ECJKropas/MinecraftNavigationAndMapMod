@@ -75,16 +75,17 @@ public class RoadListScreen extends Screen {
 
     @Override
     public void renderBackground(GuiGraphics graphics) {
-        graphics.fill(0, 0, this.width, this.height, 0xFF000000);
+        // no-op: background handled in render()
     }
 
     @Override
     public void renderDirtBackground(GuiGraphics graphics) {
-        // overridden to suppress dirt texture
+        // no-op: suppress dirt texture
     }
 
     @Override
     public void render(GuiGraphics graphics, int mouseX, int mouseY, float partialTick) {
+        // 1. 纯黑背景
         graphics.fill(0, 0, this.width, this.height, 0xFF000000);
 
         int panelBottomY = this.height - PANEL_BOTTOM;
@@ -93,12 +94,17 @@ public class RoadListScreen extends Screen {
         int rightPanelX = leftPanelRight + 12;
         int rightPanelRight = this.width - MARGIN;
 
+        // 2. 面板背景（在控件之后会被覆盖，因此先画）
+        drawPanel(graphics, leftPanelX, PANEL_TOP, leftPanelRight, panelBottomY, 0xCC1B1F28);
+        drawPanel(graphics, rightPanelX, PANEL_TOP, rightPanelRight, panelBottomY, 0xCC171B22);
+
+        // 3. 控件（按钮、搜索框、路线列表）
+        super.render(graphics, mouseX, mouseY, partialTick);
+
+        // 4. 文字覆盖层
         graphics.drawString(this.font, this.title, MARGIN, HEADER_TOP, 16777215, false);
         graphics.drawString(this.font, Component.literal("当前实例: " + roadDataStore.getContextLabel()), MARGIN, HEADER_TOP + 12, 11184810, false);
         graphics.drawString(this.font, statusText, MARGIN, HEADER_TOP + 24, 8947848, false);
-
-        drawPanel(graphics, leftPanelX, PANEL_TOP, leftPanelRight, panelBottomY, 0xCC1B1F28);
-        drawPanel(graphics, rightPanelX, PANEL_TOP, rightPanelRight, panelBottomY, 0xCC171B22);
 
         graphics.drawString(this.font, Component.literal("路线列表"), leftPanelX + 12, PANEL_TOP + 10, 16777215, false);
         graphics.drawString(this.font, Component.literal("详情"), rightPanelX + 12, PANEL_TOP + 10, 16777215, false);
@@ -107,8 +113,6 @@ public class RoadListScreen extends Screen {
         graphics.drawString(this.font, Component.literal("共 " + roads.size() + " 条路线"), leftPanelX + 12, PANEL_TOP + 22, 11184810, false);
         graphics.drawString(this.font, Component.literal("数据文件: " + roadDataStore.getDataFile()), MARGIN, panelBottomY + 4, 8947848, false);
         graphics.drawString(this.font, Component.literal("本地预览: " + previewServer.getUrl()), MARGIN, panelBottomY + 16, 8947848, false);
-
-        super.render(graphics, mouseX, mouseY, partialTick);
 
         if (selectedRoad == null) {
             graphics.drawString(this.font, Component.literal("暂无选中路线"), rightPanelX + 12, PANEL_TOP + 34, 11184810, false);
