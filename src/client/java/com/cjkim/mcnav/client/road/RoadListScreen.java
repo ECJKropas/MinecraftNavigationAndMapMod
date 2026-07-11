@@ -45,6 +45,8 @@ public class RoadListScreen extends Screen {
         int listHeight = panelBottomY - 12 - listTop;
         this.roadList = new RoadEntryList(this.minecraft, LEFT_PANEL_WIDTH - 16, listHeight, listTop, panelBottomY - 12, LIST_ROW_HEIGHT);
         this.roadList.setLeftPos(MARGIN + 12);
+        this.roadList.setRenderBackground(false);
+        this.roadList.setRenderTopAndBottom(false);
         this.addRenderableWidget(this.roadList);
 
         this.searchBox = new EditBox(this.font, MARGIN + 12, PANEL_TOP + 28, LEFT_PANEL_WIDTH - 24, 20, Component.literal("搜索路线..."));
