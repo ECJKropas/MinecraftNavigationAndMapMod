@@ -1,0 +1,25 @@
+[versions]
+fabricLoom = "1.17-SNAPSHOT"
+preprocess = "c5abb4fb12"
+yamlang = "1.5.0"
+spotless = "8.8.0"
+loader = "0.19.3"
+conditionalMixin = "0.6.4"
+prettier = "3.9.4"
+prettierPlugin-toml = "2.0.6"
+prettierPlugin-xml = "3.4.2"
+eclipse = "R-4.40-202606010713"
+ktlint = "1.8.0"
+jspecify = "1.0.0"
+
+[libraries]
+fabric-loader = { module = "net.fabricmc:fabric-loader", version.ref = "loader" }
+conditional-mixin = { module = "me.fallenbreath:conditional-mixin-fabric", version.ref = "conditionalMixin" }
+jspecify = { module = "org.jspecify:jspecify", version.ref = "jspecify" }
+
+[plugins]
+fabric-loom = { id = "net.fabricmc.fabric-loom", version.ref = "fabricLoom" }
+fabric-loom-remap = { id = "net.fabricmc.fabric-loom-remap", version.ref = "fabricLoom" }
+preprocess = { id = "com.replaymod.preprocess", version.ref = "preprocess" }
+yamlang = { id = "me.fallenbreath.yamlang", version.ref = "yamlang" }
+spotless = { id = "com.diffplug.spotless", version.ref = "spotless" }
