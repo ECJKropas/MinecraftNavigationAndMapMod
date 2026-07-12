@@ -1,0 +1,32 @@
+{
+  "schemaVersion": 1,
+  "id": "${id}",
+  "version": "${version}",
+  "name": "${name}",
+  "description": "${description}",
+  "authors": ["cjkim"],
+  "environment": "client",
+  "entrypoints": {
+    "client": ["com.cjkim.mcnav.client.McNavClient"]
+  },
+  "license": "GPL-3.0-only",
+  "contact": {
+    "issues": "${issues}",
+    "sources": "${source}"
+  },
+  "depends": {
+    "fabricloader": "${fabric_loader_dependency}",
+    "minecraft": "${minecraft_dependency}",
+    "fabric-lifecycle-events-v1": "*",
+    "fabric-key-mapping-api-v1": "*"
+  },
+  "custom": {
+    "modmenu": {
+      "links": {
+        "modmenu.github_releases": "${source}/releases",
+        "modmenu.issues": "${issues}"
+      },
+      "update_checker": true
+    }
+  }
+}
