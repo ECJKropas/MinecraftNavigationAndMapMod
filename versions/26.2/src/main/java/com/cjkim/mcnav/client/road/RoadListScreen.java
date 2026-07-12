@@ -251,7 +251,7 @@ public class RoadListScreen extends Screen {
         void reload(List<RoadPath> roads) {
             super.clearEntries();
             for (RoadPath road : roads) {
-                super.addEntry(new RoadEntry(road));
+                super.addEntry(new RoadEntry(road), 24);
             }
         }
 
