@@ -91,25 +91,25 @@ public class RoadListScreen extends Screen {
         super.extractRenderState(graphics, mouseX, mouseY, partialTick);
 
         // 4. 绘制所有文本（位于最上层）
-        graphics.text(this.font, this.title, MARGIN, HEADER_TOP, 16777215, true);
+        graphics.text(this.font, this.title, MARGIN, HEADER_TOP, 0xFFFFFFFF, true);
         graphics.text(this.font, Component.literal("当前实例: " + roadDataStore.getContextLabel()), MARGIN, HEADER_TOP + 12,
-            11184810, true);
-        graphics.text(this.font, statusText, MARGIN, HEADER_TOP + 24, 8947848, true);
+            0xFFAAAAAA, true);
+        graphics.text(this.font, statusText, MARGIN, HEADER_TOP + 24, 0xFF888888, true);
 
-        graphics.text(this.font, Component.literal("路线列表"), leftPanelX + 12, PANEL_TOP + 6, 16777215, true);
-        graphics.text(this.font, Component.literal("详情"), rightPanelX + 12, PANEL_TOP + 6, 16777215, true);
+        graphics.text(this.font, Component.literal("路线列表"), leftPanelX + 12, PANEL_TOP + 6, 0xFFFFFFFF, true);
+        graphics.text(this.font, Component.literal("详情"), rightPanelX + 12, PANEL_TOP + 6, 0xFFFFFFFF, true);
 
         List<RoadPath> roads = roadDataStore.getRoads();
         graphics.text(this.font, Component.literal("共 " + roads.size() + " 条路线"), leftPanelX + 120, PANEL_TOP + 6,
-            11184810, true);
+            0xFFAAAAAA, true);
 
         graphics.text(this.font, Component.literal("数据文件: " + roadDataStore.getDataFile()), MARGIN, panelBottomY + 4,
-            8947848, true);
+            0xFF888888, true);
         graphics.text(this.font, Component.literal("本地预览: " + previewServer.getUrl()), MARGIN, panelBottomY + 16,
-            8947848, true);
+            0xFF888888, true);
 
         if (selectedRoad == null) {
-            graphics.text(this.font, Component.literal("暂无选中路线"), rightPanelX + 12, PANEL_TOP + 24, 11184810, true);
+            graphics.text(this.font, Component.literal("暂无选中路线"), rightPanelX + 12, PANEL_TOP + 24, 0xFFAAAAAA, true);
             return;
         }
 
@@ -123,7 +123,7 @@ public class RoadListScreen extends Screen {
                 String truncated = this.font.plainSubstrByWidth(line.getString(), maxWidth - this.font.width("..."));
                 line = Component.literal(truncated + "...");
             }
-            graphics.text(this.font, line, textX, textY + i * 13, 11184810, true);
+            graphics.text(this.font, line, textX, textY + i * 13, 0xFFAAAAAA, true);
         }
     }
 

@@ -94,13 +94,13 @@ public class RoadMetadataScreen extends Screen {
         graphics.fill(left, top + PANEL_HEIGHT - 1, left + PANEL_WIDTH, top + PANEL_HEIGHT, 0xFF1A1F27);
 
         // 标题和提示
-        graphics.centeredText(this.font, this.title, centerX, top + 14, 16777215);
-        graphics.centeredText(this.font, Component.literal("记录完成后补充名称和宽度"), centerX, top + 28, 11184810);
+        graphics.centeredText(this.font, this.title, centerX, top + 14, 0xFFFFFFFF);
+        graphics.centeredText(this.font, Component.literal("记录完成后补充名称和宽度"), centerX, top + 28, 0xFFAAAAAA);
 
         // 字段标签
-        graphics.text(this.font, Component.literal("道路名"), fieldLeft, top + 40, 11184810, true);
-        graphics.text(this.font, Component.literal("道路宽度"), fieldLeft, top + 82, 11184810, true);
-        graphics.text(this.font, Component.literal("宽度默认 7 格，留空或输错都会自动回退。"), fieldLeft, top + 132, 8947848, true);
+        graphics.text(this.font, Component.literal("道路名"), fieldLeft, top + 40, 0xFFAAAAAA, true);
+        graphics.text(this.font, Component.literal("道路宽度"), fieldLeft, top + 82, 0xFFAAAAAA, true);
+        graphics.text(this.font, Component.literal("宽度默认 7 格，留空或输错都会自动回退。"), fieldLeft, top + 132, 0xFF888888, true);
 
         // 渲染控件（EditBox 和 Button）
         super.extractRenderState(graphics, mouseX, mouseY, partialTick);
