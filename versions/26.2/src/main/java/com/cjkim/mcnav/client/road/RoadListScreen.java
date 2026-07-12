@@ -278,7 +278,7 @@ public class RoadListScreen extends Screen {
         }
 
         @Override
-        public void extractContent(GuiGraphicsExtractor graphics, int index, int top, boolean hovered,
+        public void extractContent(GuiGraphicsExtractor graphics, int mouseX, int mouseY, boolean hovered,
             float partialTick) {
             boolean selected = selectedRoad != null && selectedRoad.id != null && selectedRoad.id.equals(road.id);
             int background;
@@ -287,16 +287,17 @@ public class RoadListScreen extends Screen {
             } else if (hovered) {
                 background = 0xFF2A3345;
             } else {
-                background = index % 2 == 0 ? 0xFF1E2633 : 0xFF161C26;
+                background = (getY() / 24) % 2 == 0 ? 0xFF1E2633 : 0xFF161C26;
             }
 
+            int entryY = getY();
             int left = getContentX();
             int width = getContentWidth();
             int height = getContentHeight();
-            graphics.fill(left, top, left + width, top + height - 1, background);
+            graphics.fill(left, entryY, left + width, entryY + height - 1, background);
 
             int textColor = selected ? 0xFFF7F9FC : hovered ? 0xFFF4F7FF : 0xFFC8CDD6;
-            int textY = top + (height - RoadListScreen.this.font.lineHeight) / 2;
+            int textY = entryY + (height - RoadListScreen.this.font.lineHeight) / 2;
             graphics.text(RoadListScreen.this.font, safe(road.name), left + 6, textY, textColor, true);
         }
 
