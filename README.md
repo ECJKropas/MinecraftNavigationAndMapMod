@@ -1,45 +1,69 @@
-# MinecraftNavigationAndMapMod
+# McNav
 
-这是一个 Fabric 客户端模组的起始工程，目标版本先定为 **Minecraft 1.20.1**。
+McNav 是一个客户端侧 Minecraft Fabric 模组，帮助你在游戏中记录和浏览走过的道路。
 
-## 当前状态
+- 按下按键即可开始/停止记录你走过的轨迹
+- 自动识别道路交叉口
+- 在游戏中随时查看已记录的路线列表
+- 内置本地网页预览服务，在浏览器中查看道路地图
 
-- Java 17 已可用
-- 工程已按 Fabric 1.20.1 客户端模组骨架搭好
-- 入口类会在客户端启动时打印一条日志，方便确认环境正常
-- 已加入一个最小“道路记录”原型：
-  - 按 `R` 开始记录轨迹
-  - 再按 `R` 停止记录并输入道路名、宽度
-  - 记录会保存到本地 `config/mcnav/roads.json`
-  - 会自动做一个简单的交叉判断
-- 已加入游戏内路线列表：
-  - 按 `N` 打开路线列表
-  - 可以查看名称、宽度、轨迹点和交叉点
-  - 可以直接打开本地网页预览
-- 已加入本地网页预览服务：
-  - 游戏运行时自动监听 `http://localhost:7891/`
-  - 页面会绘制全部已保存道路的二维预览图
-  - 同时提供 `http://localhost:7891/api/roads` JSON 数据接口
+## 支持版本
 
-## 本机环境
+| Minecraft | 模组版本 |
+|-----------|----------|
+| 1.20.1   | 0.1.0    |
+| 26.1.1   | 0.1.0    |
+| 26.2     | 0.1.0    |
 
-- `Java 17`: `/Library/Java/JavaVirtualMachines/zulu-17.jdk/Contents/Home`
-- `Java 25`: 也已安装，但这个项目建议使用 Java 17
-- `Gradle`: 目前不在 PATH 上
+## 使用方式
 
-## 下一步
+| 按键 | 功能 |
+|------|------|
+| `R`  | 开始 / 停止记录道路 |
+| `N`  | 打开路线列表 |
 
-1. 用 IntelliJ IDEA 或你习惯的 IDE 打开这个工程
-2. 把项目 JVM 设成 **Java 17**
-3. 连接/补齐 Gradle wrapper 后运行客户端
-4. 游戏里按 `R` 录路，按 `N` 看列表
-5. 用浏览器打开 `http://localhost:7891/`
+### 记录道路
 
-## 依赖来源
+1. 在游戏中按下 `R`，开始记录你的移动轨迹
+2. 再次按下 `R`，输入道路名称和宽度即可保存
+3. 道路数据保存在 `.minecraft/config/mcnav/roads.json`
 
-这个骨架参考了 Fabric 官方示例工程的 1.20.1 配置：
+### 路线列表
 
-- https://fabricmc.net/
-- https://raw.githubusercontent.com/FabricMC/fabric-example-mod/1.20.1/build.gradle
-- https://raw.githubusercontent.com/FabricMC/fabric-example-mod/1.20.1/gradle.properties
-- https://raw.githubusercontent.com/FabricMC/fabric-example-mod/1.20.1/settings.gradle
+- 按 `N` 打开路线列表，查看所有已保存的道路
+- 列表显示道路名称、宽度、轨迹点数量和交叉点信息
+- 点击"在浏览器中预览"可在浏览器中查看二维道路地图
+
+### 网页预览
+
+游戏运行时会自动启动本地 HTTP 服务：
+
+- 地图预览：`http://localhost:7891/`
+- JSON 数据接口：`http://localhost:7891/api/roads`
+
+## 安装
+
+1. 安装 [Fabric Loader](https://fabricmc.net/use/)
+2. 下载对应 Minecraft 版本的模组 JAR
+3. 放入 `.minecraft/mods/` 目录
+4. 启动游戏
+
+## 依赖
+
+- Fabric API（`fabric-lifecycle-events-v1`、`fabric-key-binding-api-v1`）
+
+## 构建
+
+```bash
+# 构建全部版本
+./gradlew build -x spotlessCheck
+
+# 构建并启动指定版本
+./gradlew :1.20.1:runClient
+```
+
+需要 JDK 17 及以上。
+
+## License
+
+GPL-3.0-only
