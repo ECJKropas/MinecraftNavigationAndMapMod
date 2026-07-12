@@ -91,25 +91,25 @@ public class RoadListScreen extends Screen {
         super.extractRenderState(graphics, mouseX, mouseY, partialTick);
 
         // 4. 绘制所有文本（位于最上层）
-        graphics.text(this.font, this.title, MARGIN, HEADER_TOP, 16777215, false);
+        graphics.text(this.font, this.title, MARGIN, HEADER_TOP, 16777215, true);
         graphics.text(this.font, Component.literal("当前实例: " + roadDataStore.getContextLabel()), MARGIN, HEADER_TOP + 12,
-            11184810, false);
-        graphics.text(this.font, statusText, MARGIN, HEADER_TOP + 24, 8947848, false);
+            11184810, true);
+        graphics.text(this.font, statusText, MARGIN, HEADER_TOP + 24, 8947848, true);
 
-        graphics.text(this.font, Component.literal("路线列表"), leftPanelX + 12, PANEL_TOP + 6, 16777215, false);
-        graphics.text(this.font, Component.literal("详情"), rightPanelX + 12, PANEL_TOP + 6, 16777215, false);
+        graphics.text(this.font, Component.literal("路线列表"), leftPanelX + 12, PANEL_TOP + 6, 16777215, true);
+        graphics.text(this.font, Component.literal("详情"), rightPanelX + 12, PANEL_TOP + 6, 16777215, true);
 
         List<RoadPath> roads = roadDataStore.getRoads();
         graphics.text(this.font, Component.literal("共 " + roads.size() + " 条路线"), leftPanelX + 120, PANEL_TOP + 6,
-            11184810, false);
+            11184810, true);
 
         graphics.text(this.font, Component.literal("数据文件: " + roadDataStore.getDataFile()), MARGIN, panelBottomY + 4,
-            8947848, false);
+            8947848, true);
         graphics.text(this.font, Component.literal("本地预览: " + previewServer.getUrl()), MARGIN, panelBottomY + 16,
-            8947848, false);
+            8947848, true);
 
         if (selectedRoad == null) {
-            graphics.text(this.font, Component.literal("暂无选中路线"), rightPanelX + 12, PANEL_TOP + 24, 11184810, false);
+            graphics.text(this.font, Component.literal("暂无选中路线"), rightPanelX + 12, PANEL_TOP + 24, 11184810, true);
             return;
         }
 
@@ -123,7 +123,7 @@ public class RoadListScreen extends Screen {
                 String truncated = this.font.plainSubstrByWidth(line.getString(), maxWidth - this.font.width("..."));
                 line = Component.literal(truncated + "...");
             }
-            graphics.text(this.font, line, textX, textY + i * 13, 11184810, false);
+            graphics.text(this.font, line, textX, textY + i * 13, 11184810, true);
         }
     }
 
@@ -297,7 +297,7 @@ public class RoadListScreen extends Screen {
 
             int textColor = selected ? 0xFFF7F9FC : hovered ? 0xFFF4F7FF : 0xFFC8CDD6;
             int textY = top + (height - RoadListScreen.this.font.lineHeight) / 2;
-            graphics.text(RoadListScreen.this.font, safe(road.name), left + 6, textY, textColor, false);
+            graphics.text(RoadListScreen.this.font, safe(road.name), left + 6, textY, textColor, true);
         }
 
         @Override
