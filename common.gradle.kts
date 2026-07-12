@@ -26,6 +26,11 @@ val issueTrackerUrl: String = "$modSource/issues"
 
 repositories {
     maven {
+        name = "AliyunMavenCentral"
+        url = uri("https://maven.aliyun.com/repository/central")
+    }
+    mavenCentral()
+    maven {
         url = uri("https://maven.parchmentmc.org")
         content { includeGroup("org.parchmentmc.data") }
     }
@@ -94,7 +99,7 @@ dependencies {
     includeDependency(autoImplementation(libs.conditional.mixin.get()))
 
     autoImplementation(fabricApiDependency("fabric-lifecycle-events-v1"))
-    autoImplementation(fabricApiDependency("fabric-key-binding-api-v1"))
+    autoImplementation(fabricApiDependency(if (unobfuscated) "fabric-key-mapping-api-v1" else "fabric-key-binding-api-v1"))
 }
 
 val langDir = "assets/mcnav/lang"

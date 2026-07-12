@@ -13,6 +13,10 @@ plugins {
 }
 
 repositories {
+    maven {
+        name = "AliyunMavenCentral"
+        url = uri("https://maven.aliyun.com/repository/central")
+    }
     mavenCentral()
 }
 
@@ -22,6 +26,11 @@ preprocess {
     strictExtraMappings = false
 
     val mc1201 = createNode("1.20.1", 1_20_01, "")
+    val mc2602 = createNode("26.2", 26_02_00, "")
+    val mc26011 = createNode("26.1.1", 26_01_01, "")
+
+    mc1201.link(mc2602)
+    mc2602.link(mc26011)
 
     // See https://github.com/Fallen-Breath/fabric-mod-template/blob/1d72d77a1c5ce0bf060c2501270298a12adab679/build.gradle#L55-L63
     for (node in getNodes()) {

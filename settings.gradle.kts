@@ -14,6 +14,10 @@ pluginManagement {
             @Suppress("UnstableApiUsage")
             content { includeGroupAndSubgroups("com.github") }
         }
+        maven {
+            name = "AliyunMavenCentral"
+            url = uri("https://maven.aliyun.com/repository/central")
+        }
         mavenCentral()
         gradlePluginPortal()
     }
