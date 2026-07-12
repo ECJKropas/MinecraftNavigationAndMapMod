@@ -248,6 +248,11 @@ public class RoadListScreen extends Screen {
             // no-op
         }
 
+        @Override
+        protected void extractSelection(GuiGraphicsExtractor graphics, RoadEntry entry, int color) {
+            // no-op: handled in RoadEntry.extractContent()
+        }
+
         void reload(List<RoadPath> roads) {
             super.clearEntries();
             for (RoadPath road : roads) {
