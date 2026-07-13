@@ -212,6 +212,12 @@ public class RoadListScreen extends Screen {
     private List<Component> buildDetailLines(RoadPath road) {
         List<Component> lines = new ArrayList<>();
         lines.add(Component.literal("名称: " + safe(road.name)));
+        if (road.classification != null && !road.classification.isEmpty()
+            || road.number != null && !road.number.isEmpty()) {
+            String cn = (road.classification != null ? road.classification : "")
+                + (road.number != null ? road.number : "");
+            lines.add(Component.literal("分级/编号: " + (cn.isEmpty() ? "无" : cn)));
+        }
         lines.add(Component.literal("宽度: " + road.width + " 格"));
         lines.add(Component.literal("轨迹点: " + road.points.size()));
         lines.add(Component.literal("交叉点: " + road.intersections.size()));
@@ -309,8 +315,11 @@ public class RoadListScreen extends Screen {
         String newName = renameBox.getValue().trim();
         if (newName.isEmpty())
             newName = "未命名道路";
+        RoadPath ref = selectedRoad != null && selectedRoad.id.equals(renamingRoadId) ? selectedRoad : null;
         roadDataStore.updateRoad(renamingRoadId, newName,
-            selectedRoad != null && selectedRoad.id.equals(renamingRoadId) ? selectedRoad.width : 7.0D);
+            ref != null ? ref.width : 7.0D,
+            ref != null ? ref.classification : "",
+            ref != null ? ref.number : "");
         setStatus("已重命名: " + newName);
         cancelRename();
         reloadEntries();
@@ -346,12 +355,13 @@ public class RoadListScreen extends Screen {
     }
 
     private void openEditScreen(RoadPath road) {
-        RoadMetadataScreen editScreen = new RoadMetadataScreen(RoadMetadataScreen.Mode.EDIT, (name, width) -> {
-            roadDataStore.updateRoad(road.id, name, width);
-            reloadEntries();
-            setStatus("已修改: " + name);
-        }, () -> {
-        }, road.name, String.valueOf(road.width));
+        RoadMetadataScreen editScreen = new RoadMetadataScreen(RoadMetadataScreen.Mode.EDIT,
+            (name, width, classification, number) -> {
+                roadDataStore.updateRoad(road.id, name, width, classification, number);
+                reloadEntries();
+                setStatus("已修改: " + name);
+            }, () -> {
+            }, road.name, String.valueOf(road.width), road.classification, road.number);
         this.minecraft.setScreen(editScreen);
     }
 

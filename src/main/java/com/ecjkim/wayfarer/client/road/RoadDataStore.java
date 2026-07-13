@@ -81,12 +81,15 @@ public class RoadDataStore {
         persist();
     }
 
-    public synchronized void updateRoad(String roadId, String name, double width) {
+    public synchronized void updateRoad(String roadId, String name, double width,
+        String classification, String number) {
         syncToCurrentContext();
         for (RoadPath road : roadBook.roads) {
             if (road.id != null && road.id.equals(roadId)) {
                 road.name = name;
                 road.width = width;
+                road.classification = classification;
+                road.number = number;
                 persist();
                 return;
             }

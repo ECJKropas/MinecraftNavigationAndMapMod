@@ -86,6 +86,14 @@ public class RoadRecordingManager {
         return appendRoad != null ? appendRoad.width : 7.0;
     }
 
+    public String getAppendRoadClassification() {
+        return appendRoad != null ? appendRoad.classification : "";
+    }
+
+    public String getAppendRoadNumber() {
+        return appendRoad != null ? appendRoad.number : "";
+    }
+
     public void startAppend(RoadPath road, double playerX, double playerY, double playerZ) {
         this.appendMode = true;
         this.recording = true;
@@ -131,7 +139,7 @@ public class RoadRecordingManager {
         }
     }
 
-    public void finishAppend(String name, double width) {
+    public void finishAppend(String name, double width, String classification, String number) {
         if (!appendMode || appendRoad == null)
             return;
 
@@ -141,6 +149,8 @@ public class RoadRecordingManager {
         updated.id = appendRoad.id;
         updated.name = name;
         updated.width = width;
+        updated.classification = classification;
+        updated.number = number;
         updated.points = new ArrayList<>(sessionPoints);
         updated.intersections = detectIntersections(updated);
 
@@ -192,7 +202,7 @@ public class RoadRecordingManager {
         }
     }
 
-    public void saveRecording(String roadName, double width) {
+    public void saveRecording(String roadName, double width, String classification, String number) {
         if (sessionPoints.size() < 2)
             return;
 
@@ -202,6 +212,8 @@ public class RoadRecordingManager {
         road.id = UUID.randomUUID().toString();
         road.name = roadName;
         road.width = width;
+        road.classification = classification;
+        road.number = number;
         road.points = new ArrayList<>(sessionPoints);
         road.intersections = detectIntersections(road);
 

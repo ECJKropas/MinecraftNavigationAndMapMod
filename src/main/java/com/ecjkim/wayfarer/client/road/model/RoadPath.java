@@ -23,6 +23,8 @@ public class RoadPath {
     public String id;
     public String name;
     public double width;
+    public String classification; // G国道|G高速|S省道|S高架|X乡道|Y县道|C村道
+    public String number; // 编号，如 "318"
     public List<RoadPoint> points = new ArrayList<>();
     public List<RoadIntersection> intersections = new ArrayList<>();
 }

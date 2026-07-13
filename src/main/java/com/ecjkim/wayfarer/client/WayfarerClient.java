@@ -70,11 +70,12 @@ public class WayfarerClient implements ClientModInitializer {
                 } else if (ROAD_MANAGER.isAppending()) {
                     client.setScreen(new RoadMetadataScreen(RoadMetadataScreen.Mode.EDIT, ROAD_MANAGER::finishAppend,
                         ROAD_MANAGER::discardRecording, ROAD_MANAGER.getAppendRoadName(),
-                        String.valueOf(ROAD_MANAGER.getAppendRoadWidth())));
+                        String.valueOf(ROAD_MANAGER.getAppendRoadWidth()),
+                        ROAD_MANAGER.getAppendRoadClassification(), ROAD_MANAGER.getAppendRoadNumber()));
                     client.player.displayClientMessage(Component.literal("继续录制已停止，确认后保存。"), false);
                 } else {
                     client.setScreen(new RoadMetadataScreen(RoadMetadataScreen.Mode.CREATE, ROAD_MANAGER::saveRecording,
-                        ROAD_MANAGER::discardRecording, null, null));
+                        ROAD_MANAGER::discardRecording, null, null, null, null));
                     client.player.displayClientMessage(Component.literal("道路记录已停止，填写名称后保存。"), false);
                 }
             } else {
