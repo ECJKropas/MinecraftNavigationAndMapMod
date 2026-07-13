@@ -62,7 +62,7 @@ public class RoadMetadataScreen extends Screen {
         this.prefillWidth = prefillWidth;
         this.prefillClassification = prefillClassification;
         this.prefillNumber = prefillNumber;
-        int idx = CLASSIFICATIONS.indexOf(prefillClassification);
+        int idx = prefillClassification != null ? CLASSIFICATIONS.indexOf(prefillClassification) : -1;
         this.classificationIndex = idx >= 0 ? idx : 0;
     }
 
