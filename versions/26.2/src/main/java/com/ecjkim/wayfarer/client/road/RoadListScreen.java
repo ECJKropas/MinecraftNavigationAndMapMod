@@ -23,13 +23,17 @@ import java.util.List;
 import java.util.function.Consumer;
 import java.util.stream.Collectors;
 
+import net.minecraft.ChatFormatting;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphicsExtractor;
 import net.minecraft.client.gui.components.EditBox;
 import net.minecraft.client.gui.components.ObjectSelectionList;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.client.input.MouseButtonEvent;
+import net.minecraft.network.chat.ClickEvent;
 import net.minecraft.network.chat.Component;
+import net.minecraft.network.chat.HoverEvent;
+import net.minecraft.network.chat.Style;
 
 import com.ecjkim.wayfarer.client.road.model.RoadPath;
 
@@ -379,11 +383,15 @@ public class RoadListScreen extends Screen {
     }
 
     private void clickEndpoint(String roadName, String direction, int x, int z) {
-        String msg = safe(roadName) + "的" + direction + "在[" + x + ", ~, " + z + "]";
-        if (minecraft.player != null) {
-            minecraft.player.sendSystemMessage(Component.literal(msg));
-        }
-        minecraft.setScreenAndShow(new net.minecraft.client.gui.screens.ChatScreen(x + " ~ " + z, false));
+        if (minecraft.player == null) return;
+        String coordStr = "[" + x + ", ~, " + z + "]";
+        Component coord = Component.literal(coordStr)
+            .withStyle(Style.EMPTY
+                .withColor(ChatFormatting.GREEN)
+                .withClickEvent(new ClickEvent.SuggestCommand("/tp " + x + " ~ " + z))
+                .withHoverEvent(new HoverEvent.ShowText(Component.literal("点击填入传送指令"))));
+        Component msg = Component.literal(safe(roadName) + "的" + direction + "在").append(coord);
+        minecraft.player.sendSystemMessage(msg);
     }
 
 
