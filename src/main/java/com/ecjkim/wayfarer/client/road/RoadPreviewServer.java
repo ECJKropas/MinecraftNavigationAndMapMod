@@ -62,6 +62,14 @@ public class RoadPreviewServer {
         }
     }
 
+    public synchronized void stop() {
+        if (server != null) {
+            server.stop(0);
+            server = null;
+            LOGGER.info("MC Nav preview server stopped");
+        }
+    }
+
     public String getUrl() {
         return "http://localhost:" + PORT + "/";
     }
