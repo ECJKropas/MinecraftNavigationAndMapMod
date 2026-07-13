@@ -28,6 +28,7 @@ import net.minecraft.client.gui.GuiGraphicsExtractor;
 import net.minecraft.client.gui.components.EditBox;
 import net.minecraft.client.gui.components.ObjectSelectionList;
 import net.minecraft.client.gui.screens.Screen;
+import net.minecraft.client.input.MouseButtonEvent;
 import net.minecraft.network.chat.Component;
 
 import com.ecjkim.wayfarer.client.road.model.RoadPath;
@@ -50,6 +51,9 @@ public class RoadListScreen extends Screen {
     private String searchText = "";
     private String renamingRoadId = null;
     private EditBox renameBox;
+    private int detailButtonStartX, detailButtonStartY, detailButtonStartW;
+    private int detailButtonEndX, detailButtonEndY, detailButtonEndW;
+    private boolean detailButtonStartHovered, detailButtonEndHovered;
 
     public RoadListScreen(RoadDataStore roadDataStore, RoadPreviewServer previewServer,
             Consumer<RoadPath> onContinueRecording) {
@@ -145,6 +149,36 @@ public class RoadListScreen extends Screen {
             }
             graphics.text(this.font, line, textX, textY + i * 13, 0xFFAAAAAA, true);
         }
+
+        detailButtonStartX = detailButtonStartY = detailButtonStartW = 0;
+        detailButtonEndX = detailButtonEndY = detailButtonEndW = 0;
+        if (!selectedRoad.points.isEmpty()) {
+            var first = selectedRoad.points.get(0);
+            var last = selectedRoad.points.get(selectedRoad.points.size() - 1);
+            int lineCount = lines.size();
+            int btnY = textY + (lineCount + 1) * 13;
+
+            String startLabel = "◎ " + directionTo((float)(first.x - last.x), (float)(first.z - last.z));
+            String endLabel = "◎ " + directionTo((float)(last.x - first.x), (float)(last.z - first.z));
+
+            detailButtonStartX = textX;
+            detailButtonStartY = btnY;
+            detailButtonStartW = this.font.width(startLabel);
+            detailButtonEndX = textX;
+            detailButtonEndY = btnY + 13;
+            detailButtonEndW = this.font.width(endLabel);
+
+            detailButtonStartHovered = mouseX >= detailButtonStartX && mouseX <= detailButtonStartX + detailButtonStartW
+                && mouseY >= detailButtonStartY && mouseY <= detailButtonStartY + this.font.lineHeight;
+            detailButtonEndHovered = mouseX >= detailButtonEndX && mouseX <= detailButtonEndX + detailButtonEndW
+                && mouseY >= detailButtonEndY && mouseY <= detailButtonEndY + this.font.lineHeight;
+
+            int startColor = detailButtonStartHovered ? 0xFF55FFFF : 0xFF6699CC;
+            int endColor = detailButtonEndHovered ? 0xFF55FFFF : 0xFFCC9966;
+
+            graphics.text(this.font, Component.literal(startLabel), textX, btnY, startColor, true);
+            graphics.text(this.font, Component.literal(endLabel), textX, btnY + 13, endColor, true);
+        }
     }
 
     private void drawPanel(GuiGraphicsExtractor graphics, int left, int top, int right, int bottom, int fillColor) {
@@ -165,12 +199,6 @@ public class RoadListScreen extends Screen {
             lines.add(Component.literal("  └ " + safe(inter.roadName)));
         }
         lines.add(Component.literal("ID: " + safe(road.id)));
-        if (!road.points.isEmpty()) {
-            var first = road.points.get(0);
-            var last = road.points.get(road.points.size() - 1);
-            lines.add(Component.literal(String.format("起点: %.1f, %.1f, %.1f", first.x, first.y, first.z)));
-            lines.add(Component.literal(String.format("终点: %.1f, %.1f, %.1f", last.x, last.y, last.z)));
-        }
         return lines;
     }
 
@@ -313,6 +341,51 @@ public class RoadListScreen extends Screen {
         setStatus("已删除: " + roadName);
         reloadEntries();
     }
+
+    @Override
+    public boolean mouseClicked(MouseButtonEvent event, boolean isForwards) {
+        if (event.button() != 0 || selectedRoad == null || selectedRoad.points.isEmpty()) {
+            return super.mouseClicked(event, isForwards);
+        }
+        if (event.x() >= detailButtonStartX && event.x() <= detailButtonStartX + detailButtonStartW
+            && event.y() >= detailButtonStartY && event.y() <= detailButtonStartY + this.font.lineHeight) {
+            var first = selectedRoad.points.get(0);
+            var last = selectedRoad.points.get(selectedRoad.points.size() - 1);
+            clickEndpoint(selectedRoad.name, directionTo((float)(first.x - last.x), (float)(first.z - last.z)), (int)Math.floor(first.x), (int)Math.floor(first.z));
+            return true;
+        }
+        if (event.x() >= detailButtonEndX && event.x() <= detailButtonEndX + detailButtonEndW
+            && event.y() >= detailButtonEndY && event.y() <= detailButtonEndY + this.font.lineHeight) {
+            var last = selectedRoad.points.get(selectedRoad.points.size() - 1);
+            var first = selectedRoad.points.get(0);
+            clickEndpoint(selectedRoad.name, directionTo((float)(last.x - first.x), (float)(last.z - first.z)), (int)Math.floor(last.x), (int)Math.floor(last.z));
+            return true;
+        }
+        return super.mouseClicked(event, isForwards);
+    }
+
+    private static String directionTo(float dx, float dz) {
+        boolean east = dx > 0, west = dx < 0;
+        boolean south = dz > 0, north = dz < 0;
+        if (east && north) return "东北端";
+        if (west && north) return "西北端";
+        if (east && south) return "东南端";
+        if (west && south) return "西南端";
+        if (east) return "东端";
+        if (west) return "西端";
+        if (north) return "北端";
+        if (south) return "南端";
+        return "端点";
+    }
+
+    private void clickEndpoint(String roadName, String direction, int x, int z) {
+        String msg = safe(roadName) + "的" + direction + "在[" + x + ", ~, " + z + "]";
+        if (minecraft.player != null) {
+            minecraft.player.sendSystemMessage(Component.literal(msg));
+        }
+        minecraft.setScreenAndShow(new net.minecraft.client.gui.screens.ChatScreen(x + " ~ " + z, false));
+    }
+
 
     // --- 内部列表组件类 ---
     private final class RoadEntryList extends ObjectSelectionList<RoadEntry> {
