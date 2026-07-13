@@ -1,6 +1,6 @@
-# McNav
+# Wayfarer（越陌度阡）
 
-McNav 是一个客户端侧 Minecraft Fabric 模组，帮助你在游戏中记录和浏览走过的道路。
+Wayfarer（越陌度阡）是一个客户端侧 Minecraft Fabric 模组，帮助你在游戏中记录和浏览走过的道路。
 
 - 按下按键即可开始/停止记录你走过的轨迹
 - 自动识别道路交叉口

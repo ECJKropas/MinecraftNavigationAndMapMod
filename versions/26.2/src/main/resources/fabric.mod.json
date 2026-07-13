@@ -4,7 +4,7 @@
   "version": "${version}",
   "name": "${name}",
   "description": "${description}",
-  "authors": ["cjkim"],
+  "authors": ["ECJKim"],
   "environment": "client",
   "entrypoints": {
     "client": ["com.cjkim.mcnav.client.McNavClient"]
