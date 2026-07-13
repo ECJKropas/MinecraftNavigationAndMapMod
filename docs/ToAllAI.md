@@ -1,3 +1,14 @@
+---
+AIGC:
+    Label: "1"
+    ContentProducer: 001191440300708461136T1XGW3
+    ProduceID: 9402c18aa37537e73c8147051d320866_f88d3d887ea711f195d6525400bff409
+    ReservedCode1: Uj5v3Dl+bmBE+N/wU9xYPrK+9A+elWGH/5nT8U9P2bH7hTCwsEhoHP903AhMge8KyDgUhvG4I6s1P/wRDIShn/521MLbG0QIqpknmnnWB1uwmN8BPWHTsPkR9bZhjm1PIqYNgPsNGczh9fhuAkjG60g0dmd3INWC/ywdhVmZzIBWpR9/4IrSDtRvMH4=
+    ContentPropagator: 001191440300708461136T1XGW3
+    PropagateID: 9402c18aa37537e73c8147051d320866_f88d3d887ea711f195d6525400bff409
+    ReservedCode2: Uj5v3Dl+bmBE+N/wU9xYPrK+9A+elWGH/5nT8U9P2bH7hTCwsEhoHP903AhMge8KyDgUhvG4I6s1P/wRDIShn/521MLbG0QIqpknmnnWB1uwmN8BPWHTsPkR9bZhjm1PIqYNgPsNGczh9fhuAkjG60g0dmd3INWC/ywdhVmZzIBWpR9/4IrSDtRvMH4=
+---
+
 # AI 工作流指引
 
 本项目是 Fabric 多版本模组 Wayfarer，通过 ReplayMod Preprocessor 实现源码覆盖。基座为 1.20.1，26.2 / 26.1.1 在其上覆盖差异文件。
@@ -38,3 +49,4 @@ git add -A && git commit -m "type(scope): description" && git push
 - modId / archivesBaseName：`wayfarer`
 - mavenGroup：`com.ecjkim.wayfarer`
 - 作者：ECJKim
+*（内容由AI生成，仅供参考）*

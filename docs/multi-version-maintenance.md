@@ -1,3 +1,14 @@
+---
+AIGC:
+    Label: "1"
+    ContentProducer: 001191440300708461136T1XGW3
+    ProduceID: 9402c18aa37537e73c8147051d320866_f7dd904d7ea711f181d7525400e6dd8f
+    ReservedCode1: P4rSx4EO7nAobIATZ8PRbwrmF+CSpJWqZFVweOxwC9awwjWw1g5Sqmj0j9LitAwawcuYaLUAjvBSnvlPHq4MjIHszUZJTDpMSquxlzpoTRBZB5ULnV2maU9UewfjBpemdh3LStQw7sGd3ihkGeKS5Zva4P7+ljzMePSQefnLBxTfe2tLTwJ6EyXlSLo=
+    ContentPropagator: 001191440300708461136T1XGW3
+    PropagateID: 9402c18aa37537e73c8147051d320866_f7dd904d7ea711f181d7525400e6dd8f
+    ReservedCode2: P4rSx4EO7nAobIATZ8PRbwrmF+CSpJWqZFVweOxwC9awwjWw1g5Sqmj0j9LitAwawcuYaLUAjvBSnvlPHq4MjIHszUZJTDpMSquxlzpoTRBZB5ULnV2maU9UewfjBpemdh3LStQw7sGd3ihkGeKS5Zva4P7+ljzMePSQefnLBxTfe2tLTwJ6EyXlSLo=
+---
+
 # 多版本维护经验总结
 
 Wayfarer（越陌度阡）从单版本（1.20.1）扩展到三版本（1.20.1 / 26.1.1 / 26.2）期间的踩坑记录与维护工作流。
@@ -309,3 +320,4 @@ gh release create vX.Y.Z \
 2. **grep 残留**：重命名后用 `grep -rn "old_name" --include="*.java" --include="*.json" --include="*.yml"` 检查
 3. **二分定位**：不确定是哪个版本引入的问题时，分别运行 `:1.20.1:runClient` 和 `:26.2:runClient` 对比行为
 4. **优先看构造函数**：跨 MC 大版本时，核心 GUI 类的构造函数参数最易变更
+*（内容由AI生成，仅供参考）*
