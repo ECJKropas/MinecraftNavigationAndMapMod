@@ -31,6 +31,7 @@ import com.ecjkim.wayfarer.client.road.RoadListScreen;
 import com.ecjkim.wayfarer.client.road.RoadMetadataScreen;
 import com.ecjkim.wayfarer.client.road.RoadPreviewServer;
 import com.ecjkim.wayfarer.client.road.RoadRecordingManager;
+import com.ecjkim.wayfarer.client.road.model.RoadPath;
 
 import org.lwjgl.glfw.GLFW;
 
@@ -64,9 +65,20 @@ public class WayfarerClient implements ClientModInitializer {
                 if (ROAD_MANAGER.getRecordedPointCount() < 2) {
                     ROAD_MANAGER.discardRecording();
                     client.player.sendSystemMessage(Component.literal("记录点太少，已取消这次道路记录。"));
+                } else if (ROAD_MANAGER.isAppending()) {
+                    client.setScreenAndShow(new RoadMetadataScreen(
+                        RoadMetadataScreen.Mode.EDIT,
+                        ROAD_MANAGER::finishAppend,
+                        ROAD_MANAGER::discardRecording,
+                        ROAD_MANAGER.getAppendRoadName(),
+                        String.valueOf(ROAD_MANAGER.getAppendRoadWidth())));
+                    client.player.sendSystemMessage(Component.literal("继续录制已停止，确认后保存。"));
                 } else {
-                    client.setScreenAndShow(
-                        new RoadMetadataScreen(RoadMetadataScreen.Mode.CREATE, ROAD_MANAGER::saveRecording, ROAD_MANAGER::discardRecording, null, null));
+                    client.setScreenAndShow(new RoadMetadataScreen(
+                        RoadMetadataScreen.Mode.CREATE,
+                        ROAD_MANAGER::saveRecording,
+                        ROAD_MANAGER::discardRecording,
+                        null, null));
                     client.player.sendSystemMessage(Component.literal("道路记录已停止，填写名称后保存。"));
                 }
             } else {
@@ -76,9 +88,17 @@ public class WayfarerClient implements ClientModInitializer {
         }
 
         while (OPEN_ROAD_LIST_KEY.consumeClick()) {
-            client.setScreenAndShow(new RoadListScreen(ROAD_DATA_STORE, PREVIEW_SERVER));
+            client.setScreenAndShow(new RoadListScreen(ROAD_DATA_STORE, PREVIEW_SERVER, this::startAppendRecording));
         }
 
         ROAD_MANAGER.tick(client);
+    }
+
+    private void startAppendRecording(RoadPath road) {
+        Minecraft client = Minecraft.getInstance();
+        if (client.player == null) return;
+
+        ROAD_MANAGER.startAppend(road, client.player.getX(), client.player.getY(), client.player.getZ());
+        client.player.sendSystemMessage(Component.literal("继续录制道路: " + road.name + "（按 R 结束并保存）"));
     }
 }

@@ -20,6 +20,7 @@ import java.awt.Desktop;
 import java.net.URI;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.function.Consumer;
 import java.util.stream.Collectors;
 
 import net.minecraft.client.Minecraft;
@@ -41,6 +42,7 @@ public class RoadListScreen extends Screen {
 
     private final RoadDataStore roadDataStore;
     private final RoadPreviewServer previewServer;
+    private final Consumer<RoadPath> onContinueRecording;
     private RoadEntryList roadList;
     private RoadPath selectedRoad;
     private Component statusText = Component.literal("");
@@ -49,10 +51,12 @@ public class RoadListScreen extends Screen {
     private String renamingRoadId = null;
     private EditBox renameBox;
 
-    public RoadListScreen(RoadDataStore roadDataStore, RoadPreviewServer previewServer) {
+    public RoadListScreen(RoadDataStore roadDataStore, RoadPreviewServer previewServer,
+            Consumer<RoadPath> onContinueRecording) {
         super(Component.literal("路线列表"));
         this.roadDataStore = roadDataStore;
         this.previewServer = previewServer;
+        this.onContinueRecording = onContinueRecording;
     }
 
     @Override
@@ -133,7 +137,7 @@ public class RoadListScreen extends Screen {
                 int entryY = roadList.getEntryTop(entry);
                 int listLeft = roadList.getRowLeft();
                 int listWidth = roadList.getRowWidth();
-                int iconWidth = 40;
+                int iconWidth = 56;
                 renameBox.setX(listLeft);
                 renameBox.setWidth(listWidth - iconWidth - 2);
                 renameBox.setY(entryY + (LIST_ROW_HEIGHT - 20) / 2);
@@ -396,11 +400,6 @@ public class RoadListScreen extends Screen {
             return Component.literal(safe(road.name));
         }
 
-        private int iconAreaLeft() {
-            // Need to get row width — use roadList.getRowWidth() via the outer class
-            return roadList.getRowLeft() + roadList.getRowWidth() - ICON_RIGHT_MARGIN - ICON_GAP * 2;
-        }
-
         @Override
         public void render(GuiGraphics graphics, int index, int top, int left, int width, int height, int mouseX,
             int mouseY, boolean hovered, float partialTick) {
@@ -417,11 +416,11 @@ public class RoadListScreen extends Screen {
 
             graphics.fill(left, top, left + width, top + height - 1, background);
 
-            // If renaming, skip drawing name and icons (renameBox overlays)
             if (isRenaming) return;
 
             int iconRight = left + width - ICON_RIGHT_MARGIN;
-            int editIconX = iconRight - ICON_GAP * 2 + 2;
+            int editIconX = iconRight - ICON_GAP * 3 + 2;
+            int continueIconX = iconRight - ICON_GAP * 2 + 2;
             int deleteIconX = iconRight - ICON_GAP + 2;
             int iconY = top + (height - RoadListScreen.this.font.lineHeight) / 2;
 
@@ -431,10 +430,13 @@ public class RoadListScreen extends Screen {
             graphics.drawString(RoadListScreen.this.font, displayName, left + 6, iconY, textColor, false);
 
             boolean hoverEdit = mouseX >= editIconX - 1 && mouseX <= editIconX + 13 && mouseY >= iconY - 1 && mouseY <= iconY + 11;
+            boolean hoverContinue = mouseX >= continueIconX - 1 && mouseX <= continueIconX + 13 && mouseY >= iconY - 1 && mouseY <= iconY + 11;
             boolean hoverDelete = mouseX >= deleteIconX - 1 && mouseX <= deleteIconX + 13 && mouseY >= iconY - 1 && mouseY <= iconY + 11;
 
             graphics.drawString(RoadListScreen.this.font, "\u270E", editIconX, iconY,
                 hoverEdit ? 0xFF66BBFF : 0xFF888888, false);
+            graphics.drawString(RoadListScreen.this.font, "\u25B6", continueIconX, iconY,
+                hoverContinue ? 0xFF66FF66 : 0xFF888888, false);
             graphics.drawString(RoadListScreen.this.font, "\u2715", deleteIconX, iconY,
                 hoverDelete ? 0xFFFF6666 : 0xFF888888, false);
         }
@@ -442,14 +444,23 @@ public class RoadListScreen extends Screen {
         @Override
         public boolean mouseClicked(double mouseX, double mouseY, int button) {
             int iconRight = roadList.getRowLeft() + roadList.getRowWidth() - ICON_RIGHT_MARGIN;
-            int editIconX = iconRight - ICON_GAP * 2 + 2;
+            int editIconX = iconRight - ICON_GAP * 3 + 2;
+            int continueIconX = iconRight - ICON_GAP * 2 + 2;
             int deleteIconX = iconRight - ICON_GAP + 2;
 
             boolean clickEdit = mouseX >= editIconX - 1 && mouseX <= editIconX + 13;
+            boolean clickContinue = mouseX >= continueIconX - 1 && mouseX <= continueIconX + 13;
             boolean clickDelete = mouseX >= deleteIconX - 1 && mouseX <= deleteIconX + 13;
 
             if (button == 0 && clickEdit) {
                 openEditScreen(road);
+                return true;
+            }
+            if (button == 0 && clickContinue) {
+                if (onContinueRecording != null) {
+                    onContinueRecording.accept(road);
+                }
+                onClose();
                 return true;
             }
             if (button == 0 && clickDelete) {
@@ -457,7 +468,6 @@ public class RoadListScreen extends Screen {
                 return true;
             }
             if (button == 1) {
-                // Right-click: rename
                 beginRename(this);
                 return true;
             }

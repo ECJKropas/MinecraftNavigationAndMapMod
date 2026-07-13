@@ -20,6 +20,7 @@ import java.awt.Desktop;
 import java.net.URI;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.function.Consumer;
 import java.util.stream.Collectors;
 
 import net.minecraft.client.Minecraft;
@@ -41,6 +42,7 @@ public class RoadListScreen extends Screen {
 
     private final RoadDataStore roadDataStore;
     private final RoadPreviewServer previewServer;
+    private final Consumer<RoadPath> onContinueRecording;
     private RoadEntryList roadList;
     private RoadPath selectedRoad;
     private Component statusText = Component.literal("");
@@ -49,10 +51,12 @@ public class RoadListScreen extends Screen {
     private String renamingRoadId = null;
     private EditBox renameBox;
 
-    public RoadListScreen(RoadDataStore roadDataStore, RoadPreviewServer previewServer) {
+    public RoadListScreen(RoadDataStore roadDataStore, RoadPreviewServer previewServer,
+            Consumer<RoadPath> onContinueRecording) {
         super(Component.literal("路线列表"));
         this.roadDataStore = roadDataStore;
         this.previewServer = previewServer;
+        this.onContinueRecording = onContinueRecording;
     }
 
     @Override
@@ -117,7 +121,7 @@ public class RoadListScreen extends Screen {
                 int entryY = entry.getY();
                 int listLeft = roadList.getX();
                 int listWidth = roadList.getWidth();
-                int iconWidth = 40;
+                int iconWidth = 56;
                 renameBox.setX(listLeft);
                 renameBox.setWidth(listWidth - iconWidth - 2);
                 renameBox.setY(entryY + (LIST_ROW_HEIGHT - 20) / 2);
@@ -399,7 +403,8 @@ public class RoadListScreen extends Screen {
             if (isRenaming) return;
 
             int iconRight = left + width - ICON_RIGHT_MARGIN;
-            int editIconX = iconRight - ICON_GAP * 2 + 2;
+            int editIconX = iconRight - ICON_GAP * 3 + 2;
+            int continueIconX = iconRight - ICON_GAP * 2 + 2;
             int deleteIconX = iconRight - ICON_GAP + 2;
             int iconY = entryY + (height - RoadListScreen.this.font.lineHeight) / 2;
 
@@ -409,10 +414,13 @@ public class RoadListScreen extends Screen {
             graphics.text(RoadListScreen.this.font, displayName, left + 6, iconY, textColor, true);
 
             boolean hoverEdit = mouseX >= editIconX - 1 && mouseX <= editIconX + 13 && mouseY >= iconY - 1 && mouseY <= iconY + 11;
+            boolean hoverContinue = mouseX >= continueIconX - 1 && mouseX <= continueIconX + 13 && mouseY >= iconY - 1 && mouseY <= iconY + 11;
             boolean hoverDelete = mouseX >= deleteIconX - 1 && mouseX <= deleteIconX + 13 && mouseY >= iconY - 1 && mouseY <= iconY + 11;
 
             graphics.text(RoadListScreen.this.font, Component.literal("\u270E"), editIconX, iconY,
                 hoverEdit ? 0xFF66BBFF : 0xFF888888, true);
+            graphics.text(RoadListScreen.this.font, Component.literal("\u25B6"), continueIconX, iconY,
+                hoverContinue ? 0xFF66FF66 : 0xFF888888, true);
             graphics.text(RoadListScreen.this.font, Component.literal("\u2715"), deleteIconX, iconY,
                 hoverDelete ? 0xFFFF6666 : 0xFF888888, true);
         }
@@ -420,7 +428,8 @@ public class RoadListScreen extends Screen {
         @Override
         public boolean mouseClicked(net.minecraft.client.input.MouseButtonEvent event, boolean isForwards) {
             int iconRight = getContentX() + getContentWidth() - ICON_RIGHT_MARGIN;
-            int editIconX = iconRight - ICON_GAP * 2 + 2;
+            int editIconX = iconRight - ICON_GAP * 3 + 2;
+            int continueIconX = iconRight - ICON_GAP * 2 + 2;
             int deleteIconX = iconRight - ICON_GAP + 2;
 
             double mx = event.x();
@@ -428,10 +437,18 @@ public class RoadListScreen extends Screen {
             int button = event.button();
 
             boolean clickEdit = mx >= editIconX - 1 && mx <= editIconX + 13;
+            boolean clickContinue = mx >= continueIconX - 1 && mx <= continueIconX + 13;
             boolean clickDelete = mx >= deleteIconX - 1 && mx <= deleteIconX + 13;
 
             if (button == 0 && clickEdit) {
                 openEditScreen(road);
+                return true;
+            }
+            if (button == 0 && clickContinue) {
+                if (onContinueRecording != null) {
+                    onContinueRecording.accept(road);
+                }
+                onClose();
                 return true;
             }
             if (button == 0 && clickDelete) {
