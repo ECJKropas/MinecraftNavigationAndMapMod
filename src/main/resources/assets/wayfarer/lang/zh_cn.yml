@@ -1,6 +1,6 @@
 key:
-  mcnav:
+  wayfarer:
     toggle_road_recording: 切换道路记录
     open_road_list: 打开路线列表（N）
 category:
-  mcnav: MC 导航
+  wayfarer: Wayfarer

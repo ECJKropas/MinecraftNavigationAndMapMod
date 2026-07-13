@@ -26,7 +26,7 @@ Wayfarer（越陌度阡）是一个客户端侧 Minecraft Fabric 模组，帮助
 
 1. 在游戏中按下 `R`，开始记录你的移动轨迹
 2. 再次按下 `R`，输入道路名称和宽度即可保存
-3. 道路数据保存在 `.minecraft/config/mcnav/roads.json`
+3. 道路数据保存在 `.minecraft/config/wayfarer/roads.json`
 
 ### 路线列表
 

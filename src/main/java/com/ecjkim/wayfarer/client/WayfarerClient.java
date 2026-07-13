@@ -14,7 +14,7 @@
  * You should have received a copy of the GNU General Public License
  * along with MinecraftNavigationAndMapMod.  If not, see <https://www.gnu.org/licenses/>.
  */
-package com.cjkim.mcnav.client;
+package com.ecjkim.wayfarer.client;
 
 import net.minecraft.client.KeyMapping;
 import net.minecraft.client.Minecraft;
@@ -26,23 +26,23 @@ import net.fabricmc.api.ClientModInitializer;
 import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientTickEvents;
 import net.fabricmc.fabric.api.client.keybinding.v1.KeyBindingHelper;
 
-import com.cjkim.mcnav.client.road.RoadDataStore;
-import com.cjkim.mcnav.client.road.RoadListScreen;
-import com.cjkim.mcnav.client.road.RoadMetadataScreen;
-import com.cjkim.mcnav.client.road.RoadPreviewServer;
-import com.cjkim.mcnav.client.road.RoadRecordingManager;
+import com.ecjkim.wayfarer.client.road.RoadDataStore;
+import com.ecjkim.wayfarer.client.road.RoadListScreen;
+import com.ecjkim.wayfarer.client.road.RoadMetadataScreen;
+import com.ecjkim.wayfarer.client.road.RoadPreviewServer;
+import com.ecjkim.wayfarer.client.road.RoadRecordingManager;
 
 import org.lwjgl.glfw.GLFW;
 
-public class McNavClient implements ClientModInitializer {
+public class WayfarerClient implements ClientModInitializer {
     private static final RoadDataStore ROAD_DATA_STORE = new RoadDataStore();
     private static final RoadPreviewServer PREVIEW_SERVER = new RoadPreviewServer(ROAD_DATA_STORE);
     private static final RoadRecordingManager ROAD_MANAGER = new RoadRecordingManager(ROAD_DATA_STORE);
     private static final KeyMapping TOGGLE_RECORDING_KEY =
-        KeyBindingHelper.registerKeyBinding(new KeyMapping("key.mcnav.toggle_road_recording",
-            InputConstants.Type.KEYSYM, GLFW.GLFW_KEY_R, "category.mcnav"));
+        KeyBindingHelper.registerKeyBinding(new KeyMapping("key.wayfarer.toggle_road_recording",
+            InputConstants.Type.KEYSYM, GLFW.GLFW_KEY_R, "category.wayfarer"));
     private static final KeyMapping OPEN_ROAD_LIST_KEY = KeyBindingHelper.registerKeyBinding(
-        new KeyMapping("key.mcnav.open_road_list", InputConstants.Type.KEYSYM, GLFW.GLFW_KEY_N, "category.mcnav"));
+        new KeyMapping("key.wayfarer.open_road_list", InputConstants.Type.KEYSYM, GLFW.GLFW_KEY_N, "category.wayfarer"));
 
     @Override
     public void onInitializeClient() {

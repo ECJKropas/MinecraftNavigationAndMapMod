@@ -14,7 +14,7 @@
  * You should have received a copy of the GNU General Public License
  * along with MinecraftNavigationAndMapMod.  If not, see <https://www.gnu.org/licenses/>.
  */
-package com.cjkim.mcnav.client.road.model;
+package com.ecjkim.wayfarer.client.road.model;
 
 public class RoadPoint {
     public double x;

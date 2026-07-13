@@ -1,6 +1,6 @@
 key:
-  mcnav:
+  wayfarer:
     toggle_road_recording: Toggle road recording
     open_road_list: Open road list (N)
 category:
-  mcnav: MC Nav
+  wayfarer: Wayfarer

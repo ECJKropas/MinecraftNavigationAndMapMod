@@ -14,7 +14,7 @@
  * You should have received a copy of the GNU General Public License
  * along with MinecraftNavigationAndMapMod.  If not, see <https://www.gnu.org/licenses/>.
  */
-package com.cjkim.mcnav.client.road;
+package com.ecjkim.wayfarer.client.road;
 
 import java.io.IOException;
 import java.io.OutputStream;
@@ -24,7 +24,7 @@ import java.util.concurrent.Executors;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
-import com.cjkim.mcnav.client.road.model.RoadPath;
+import com.ecjkim.wayfarer.client.road.model.RoadPath;
 import com.sun.net.httpserver.HttpExchange;
 import com.sun.net.httpserver.HttpServer;
 
@@ -169,7 +169,7 @@ public class RoadPreviewServer {
                   <div id="roads">%s</div>
                 </aside>
               </main>
-              <script>window.__mcnavContextLabel = %s; window.__mcnavDataFile = %s; window.__roads = %s;</script>
+              <script>window.__wayfarerContextLabel = %s; window.__wayfarerDataFile = %s; window.__roads = %s;</script>
               <script>
                 const canvas = document.getElementById('map');
                 const ctx = canvas.getContext('2d');
@@ -209,7 +209,7 @@ public class RoadPreviewServer {
                     ctx.fillStyle = '#b7c0cf';
                     ctx.font = '16px sans-serif';
                     ctx.fillText('暂无道路数据。请在当前实例里按 R 记录一条道路。', 30, 40);
-                    stats.textContent = `0 条道路 · 当前实例：${window.__mcnavContextLabel}`;
+                    stats.textContent = `0 条道路 · 当前实例：${window.__wayfarerContextLabel}`;
                     roadsDiv.innerHTML = '<p class="hint">当前实例还没有保存的道路。</p>';
                     return;
                   }

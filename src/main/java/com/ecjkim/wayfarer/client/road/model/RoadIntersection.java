@@ -14,15 +14,12 @@
  * You should have received a copy of the GNU General Public License
  * along with MinecraftNavigationAndMapMod.  If not, see <https://www.gnu.org/licenses/>.
  */
-package com.cjkim.mcnav.client.road.model;
+package com.ecjkim.wayfarer.client.road.model;
 
-import java.util.ArrayList;
-import java.util.List;
-
-public class RoadPath {
-    public String id;
-    public String name;
-    public double width;
-    public List<RoadPoint> points = new ArrayList<>();
-    public List<RoadIntersection> intersections = new ArrayList<>();
+public class RoadIntersection {
+    public String roadId;
+    public String roadName;
+    public double x;
+    public double y;
+    public double z;
 }

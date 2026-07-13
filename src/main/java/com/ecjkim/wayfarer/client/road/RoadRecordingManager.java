@@ -14,7 +14,7 @@
  * You should have received a copy of the GNU General Public License
  * along with MinecraftNavigationAndMapMod.  If not, see <https://www.gnu.org/licenses/>.
  */
-package com.cjkim.mcnav.client.road;
+package com.ecjkim.wayfarer.client.road;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -23,9 +23,9 @@ import java.util.UUID;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.player.LocalPlayer;
 
-import com.cjkim.mcnav.client.road.model.RoadIntersection;
-import com.cjkim.mcnav.client.road.model.RoadPath;
-import com.cjkim.mcnav.client.road.model.RoadPoint;
+import com.ecjkim.wayfarer.client.road.model.RoadIntersection;
+import com.ecjkim.wayfarer.client.road.model.RoadPath;
+import com.ecjkim.wayfarer.client.road.model.RoadPoint;
 
 public class RoadRecordingManager {
     private static final double SAMPLE_DISTANCE_SQUARED = 0.5D * 0.5D;

@@ -14,7 +14,7 @@
  * You should have received a copy of the GNU General Public License
  * along with MinecraftNavigationAndMapMod.  If not, see <https://www.gnu.org/licenses/>.
  */
-package com.cjkim.mcnav.client.road;
+package com.ecjkim.wayfarer.client.road;
 
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
@@ -26,15 +26,15 @@ import java.util.List;
 
 import net.minecraft.client.Minecraft;
 
-import com.cjkim.mcnav.client.road.model.RoadBook;
-import com.cjkim.mcnav.client.road.model.RoadPath;
+import com.ecjkim.wayfarer.client.road.model.RoadBook;
+import com.ecjkim.wayfarer.client.road.model.RoadPath;
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
 
 public class RoadDataStore {
     private static final Gson GSON = new GsonBuilder().setPrettyPrinting().create();
 
-    private final Path baseDirectory = Path.of(System.getProperty("user.dir"), "config", "mcnav");
+    private final Path baseDirectory = Path.of(System.getProperty("user.dir"), "config", "wayfarer");
     private final Path legacyDataFile = baseDirectory.resolve("roads.json");
     private final Path legacyBackupFile = baseDirectory.resolve("roads.legacy.json");
     private final Path legacyMigrationMarker = baseDirectory.resolve(".legacy-migrated");

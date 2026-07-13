@@ -7,7 +7,7 @@
   "authors": ["ECJKim"],
   "environment": "client",
   "entrypoints": {
-    "client": ["com.cjkim.mcnav.client.McNavClient"]
+    "client": ["com.ecjkim.wayfarer.client.WayfarerClient"]
   },
   "license": "GPL-3.0-only",
   "contact": {
