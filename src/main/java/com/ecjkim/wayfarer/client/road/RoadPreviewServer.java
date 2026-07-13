@@ -53,9 +53,13 @@ public class RoadPreviewServer {
                 thread.setDaemon(true);
                 return thread;
             }));
-            server.start();
-            LOGGER.info(
-                "MC Nav preview server started on http://localhost:" + PORT + "/ and http://127.0.0.1:" + PORT + "/");
+            Thread startThread = new Thread(() -> {
+                server.start();
+                LOGGER.info("MC Nav preview server started on http://localhost:" + PORT
+                    + "/ and http://127.0.0.1:" + PORT + "/");
+            }, "MC Nav Preview Starter");
+            startThread.setDaemon(true);
+            startThread.start();
         } catch (IOException exception) {
             server = null;
             LOGGER.log(Level.WARNING, "Failed to start preview server on port " + PORT, exception);
