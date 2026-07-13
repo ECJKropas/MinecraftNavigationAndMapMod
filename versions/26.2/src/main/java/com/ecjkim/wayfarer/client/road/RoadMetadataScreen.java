@@ -27,19 +27,29 @@ import net.minecraft.network.chat.Component;
 import org.lwjgl.glfw.GLFW;
 
 public class RoadMetadataScreen extends Screen {
+    public enum Mode { CREATE, EDIT }
+
     private static final int PANEL_WIDTH = 280;
     private static final int PANEL_HEIGHT = 184;
 
+    private final Mode mode;
     private final BiConsumer<String, Double> onSave;
     private final Runnable onCancel;
     private EditBox nameBox;
     private EditBox widthBox;
 
-    public RoadMetadataScreen(BiConsumer<String, Double> onSave, Runnable onCancel) {
-        super(Component.literal("保存道路"));
+    public RoadMetadataScreen(Mode mode, BiConsumer<String, Double> onSave, Runnable onCancel,
+        String prefillName, String prefillWidth) {
+        super(Component.literal(mode == Mode.EDIT ? "修改道路" : "保存道路"));
+        this.mode = mode;
         this.onSave = onSave;
         this.onCancel = onCancel;
+        this.prefillName = prefillName;
+        this.prefillWidth = prefillWidth;
     }
+
+    private final String prefillName;
+    private final String prefillWidth;
 
     @Override
     protected void init() {
@@ -54,11 +64,14 @@ public class RoadMetadataScreen extends Screen {
 
         this.nameBox = new EditBox(this.font, fieldLeft, nameBoxY, fieldWidth, 20, Component.literal("道路名"));
         this.nameBox.setMaxLength(64);
+        this.nameBox.setValue(prefillName != null ? prefillName : "");
         this.addRenderableWidget(this.nameBox);
 
         this.widthBox = new EditBox(this.font, fieldLeft, widthBoxY, fieldWidth, 20, Component.literal("道路宽度"));
-        this.widthBox.setValue("7");
+        this.widthBox.setValue(prefillWidth != null ? prefillWidth : "7");
         this.addRenderableWidget(this.widthBox);
+
+        String cancelLabel = mode == Mode.EDIT ? "放弃修改" : "放弃";
 
         this.addRenderableWidget(Button.builder(Component.literal("保存"), button -> {
             String roadName = this.nameBox.getValue().trim();
@@ -70,7 +83,7 @@ public class RoadMetadataScreen extends Screen {
             this.minecraft.setScreenAndShow(null);
         }).bounds(centerX - 116, buttonY, 112, 20).build());
 
-        this.addRenderableWidget(Button.builder(Component.literal("取消"), button -> {
+        this.addRenderableWidget(Button.builder(Component.literal(cancelLabel), button -> {
             this.onCancel.run();
             this.minecraft.setScreenAndShow(null);
         }).bounds(centerX + 4, buttonY, 112, 20).build());

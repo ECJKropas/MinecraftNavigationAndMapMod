@@ -81,6 +81,24 @@ public class RoadDataStore {
         persist();
     }
 
+    public synchronized void updateRoad(String roadId, String name, double width) {
+        syncToCurrentContext();
+        for (RoadPath road : roadBook.roads) {
+            if (road.id != null && road.id.equals(roadId)) {
+                road.name = name;
+                road.width = width;
+                persist();
+                return;
+            }
+        }
+    }
+
+    public synchronized void deleteRoad(String roadId) {
+        syncToCurrentContext();
+        roadBook.roads.removeIf(road -> road.id != null && road.id.equals(roadId));
+        persist();
+    }
+
     public synchronized String toJson() {
         syncToCurrentContext();
         return GSON.toJson(snapshot().roads);

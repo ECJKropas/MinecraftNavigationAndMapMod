@@ -66,7 +66,7 @@ public class WayfarerClient implements ClientModInitializer {
                     client.player.sendSystemMessage(Component.literal("记录点太少，已取消这次道路记录。"));
                 } else {
                     client.setScreenAndShow(
-                        new RoadMetadataScreen(ROAD_MANAGER::saveRecording, ROAD_MANAGER::discardRecording));
+                        new RoadMetadataScreen(RoadMetadataScreen.Mode.CREATE, ROAD_MANAGER::saveRecording, ROAD_MANAGER::discardRecording, null, null));
                     client.player.sendSystemMessage(Component.literal("道路记录已停止，填写名称后保存。"));
                 }
             } else {

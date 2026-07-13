@@ -46,6 +46,8 @@ public class RoadListScreen extends Screen {
     private Component statusText = Component.literal("");
     private EditBox searchBox;
     private String searchText = "";
+    private net.minecraft.client.gui.components.Button editButton;
+    private net.minecraft.client.gui.components.Button deleteButton;
 
     public RoadListScreen(RoadDataStore roadDataStore, RoadPreviewServer previewServer) {
         super(Component.literal("路线列表"));
@@ -73,6 +75,37 @@ public class RoadListScreen extends Screen {
         this.searchBox.setMaxLength(64);
         this.searchBox.setResponder(this::onSearchTextChanged);
         this.addRenderableWidget(this.searchBox);
+
+        int rightPanelX = MARGIN + LEFT_PANEL_WIDTH + 12;
+        int buttonY = panelBottomY - 30;
+        int btnWidth = 84;
+        this.editButton = net.minecraft.client.gui.components.Button.builder(Component.literal("修改"), button -> {
+            if (selectedRoad != null) {
+                RoadMetadataScreen editScreen = new RoadMetadataScreen(
+                    RoadMetadataScreen.Mode.EDIT,
+                    (name, width) -> {
+                        roadDataStore.updateRoad(selectedRoad.id, name, width);
+                        reloadEntries();
+                        setStatus("已修改: " + name);
+                    },
+                    () -> {}, // 放弃修改：仅关闭弹窗
+                    selectedRoad.name,
+                    String.valueOf(selectedRoad.width)
+                );
+                this.minecraft.setScreen(editScreen);
+            }
+        }).bounds(rightPanelX + 12, buttonY, btnWidth, 20).build();
+        this.addRenderableWidget(this.editButton);
+
+        this.deleteButton = net.minecraft.client.gui.components.Button.builder(Component.literal("删除"), button -> {
+            if (selectedRoad != null) {
+                String roadName = selectedRoad.name;
+                roadDataStore.deleteRoad(selectedRoad.id);
+                setStatus("已删除: " + roadName);
+                reloadEntries();
+            }
+        }).bounds(rightPanelX + 12 + btnWidth + 6, buttonY, btnWidth, 20).build();
+        this.addRenderableWidget(this.deleteButton);
 
         reloadEntries();
     }
@@ -123,6 +156,10 @@ public class RoadListScreen extends Screen {
             panelBottomY + 4, 8947848, false);
         graphics.drawString(this.font, Component.literal("本地预览: " + previewServer.getUrl()), MARGIN, panelBottomY + 16,
             8947848, false);
+
+        boolean hasSelection = selectedRoad != null;
+        if (editButton != null) editButton.active = hasSelection;
+        if (deleteButton != null) deleteButton.active = hasSelection;
 
         if (selectedRoad == null) {
             graphics.drawString(this.font, Component.literal("暂无选中路线"), rightPanelX + 12, PANEL_TOP + 24, 11184810,
