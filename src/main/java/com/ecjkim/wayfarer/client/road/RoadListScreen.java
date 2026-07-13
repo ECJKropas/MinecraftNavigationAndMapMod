@@ -46,8 +46,8 @@ public class RoadListScreen extends Screen {
     private Component statusText = Component.literal("");
     private EditBox searchBox;
     private String searchText = "";
-    private net.minecraft.client.gui.components.Button editButton;
-    private net.minecraft.client.gui.components.Button deleteButton;
+    private String renamingRoadId = null;
+    private EditBox renameBox;
 
     public RoadListScreen(RoadDataStore roadDataStore, RoadPreviewServer previewServer) {
         super(Component.literal("路线列表"));
@@ -75,37 +75,6 @@ public class RoadListScreen extends Screen {
         this.searchBox.setMaxLength(64);
         this.searchBox.setResponder(this::onSearchTextChanged);
         this.addRenderableWidget(this.searchBox);
-
-        int rightPanelX = MARGIN + LEFT_PANEL_WIDTH + 12;
-        int buttonY = panelBottomY - 30;
-        int btnWidth = 84;
-        this.editButton = net.minecraft.client.gui.components.Button.builder(Component.literal("修改"), button -> {
-            if (selectedRoad != null) {
-                RoadMetadataScreen editScreen = new RoadMetadataScreen(
-                    RoadMetadataScreen.Mode.EDIT,
-                    (name, width) -> {
-                        roadDataStore.updateRoad(selectedRoad.id, name, width);
-                        reloadEntries();
-                        setStatus("已修改: " + name);
-                    },
-                    () -> {}, // 放弃修改：仅关闭弹窗
-                    selectedRoad.name,
-                    String.valueOf(selectedRoad.width)
-                );
-                this.minecraft.setScreen(editScreen);
-            }
-        }).bounds(rightPanelX + 12, buttonY, btnWidth, 20).build();
-        this.addRenderableWidget(this.editButton);
-
-        this.deleteButton = net.minecraft.client.gui.components.Button.builder(Component.literal("删除"), button -> {
-            if (selectedRoad != null) {
-                String roadName = selectedRoad.name;
-                roadDataStore.deleteRoad(selectedRoad.id);
-                setStatus("已删除: " + roadName);
-                reloadEntries();
-            }
-        }).bounds(rightPanelX + 12 + btnWidth + 6, buttonY, btnWidth, 20).build();
-        this.addRenderableWidget(this.deleteButton);
 
         reloadEntries();
     }
@@ -157,9 +126,19 @@ public class RoadListScreen extends Screen {
         graphics.drawString(this.font, Component.literal("本地预览: " + previewServer.getUrl()), MARGIN, panelBottomY + 16,
             8947848, false);
 
-        boolean hasSelection = selectedRoad != null;
-        if (editButton != null) editButton.active = hasSelection;
-        if (deleteButton != null) deleteButton.active = hasSelection;
+        // 重命名模式下更新 EditBox 位置
+        if (renameBox != null && renamingRoadId != null && roadList != null) {
+            RoadEntry entry = roadList.findEntryById(renamingRoadId);
+            if (entry != null) {
+                int entryY = roadList.getEntryTop(entry);
+                int listLeft = roadList.getRowLeft();
+                int listWidth = roadList.getRowWidth();
+                int iconWidth = 40;
+                renameBox.setX(listLeft);
+                renameBox.setWidth(listWidth - iconWidth - 2);
+                renameBox.setY(entryY + (LIST_ROW_HEIGHT - 20) / 2);
+            }
+        }
 
         if (selectedRoad == null) {
             graphics.drawString(this.font, Component.literal("暂无选中路线"), rightPanelX + 12, PANEL_TOP + 24, 11184810,
@@ -249,6 +228,9 @@ public class RoadListScreen extends Screen {
 
     @Override
     public boolean charTyped(char codePoint, int modifiers) {
+        if (renameBox != null && renameBox.isFocused()) {
+            return renameBox.charTyped(codePoint, modifiers);
+        }
         if (searchBox != null && searchBox.isFocused()) {
             return searchBox.charTyped(codePoint, modifiers);
         }
@@ -257,10 +239,52 @@ public class RoadListScreen extends Screen {
 
     @Override
     public boolean keyPressed(int keyCode, int scanCode, int modifiers) {
+        if (renameBox != null && renameBox.isFocused()) {
+            if (keyCode == org.lwjgl.glfw.GLFW.GLFW_KEY_ENTER || keyCode == org.lwjgl.glfw.GLFW.GLFW_KEY_KP_ENTER) {
+                commitRename();
+                return true;
+            }
+            if (keyCode == org.lwjgl.glfw.GLFW.GLFW_KEY_ESCAPE) {
+                cancelRename();
+                return true;
+            }
+            return renameBox.keyPressed(keyCode, scanCode, modifiers);
+        }
         if (searchBox != null && searchBox.isFocused()) {
             return searchBox.keyPressed(keyCode, scanCode, modifiers);
         }
         return super.keyPressed(keyCode, scanCode, modifiers);
+    }
+
+    private void beginRename(RoadEntry entry) {
+        if (renameBox != null) {
+            this.removeWidget(renameBox);
+        }
+        this.renamingRoadId = entry.road.id;
+        this.renameBox = new EditBox(this.font, 0, 0, 200, 20, Component.empty());
+        this.renameBox.setValue(entry.road.name != null ? entry.road.name : "");
+        this.renameBox.setMaxLength(64);
+        this.renameBox.setFocused(true);
+        this.addRenderableWidget(this.renameBox);
+    }
+
+    private void commitRename() {
+        if (renamingRoadId == null || renameBox == null) return;
+        String newName = renameBox.getValue().trim();
+        if (newName.isEmpty()) newName = "未命名道路";
+        roadDataStore.updateRoad(renamingRoadId, newName,
+            selectedRoad != null && selectedRoad.id.equals(renamingRoadId) ? selectedRoad.width : 7.0D);
+        setStatus("已重命名: " + newName);
+        cancelRename();
+        reloadEntries();
+    }
+
+    private void cancelRename() {
+        if (renameBox != null) {
+            this.removeWidget(renameBox);
+            renameBox = null;
+        }
+        renamingRoadId = null;
     }
 
     private void openPreviewInBrowser() {
@@ -282,6 +306,28 @@ public class RoadListScreen extends Screen {
 
     private String safe(String input) {
         return input == null || input.isBlank() ? "未命名" : input;
+    }
+
+    private void openEditScreen(RoadPath road) {
+        RoadMetadataScreen editScreen = new RoadMetadataScreen(
+            RoadMetadataScreen.Mode.EDIT,
+            (name, width) -> {
+                roadDataStore.updateRoad(road.id, name, width);
+                reloadEntries();
+                setStatus("已修改: " + name);
+            },
+            () -> {},
+            road.name,
+            String.valueOf(road.width)
+        );
+        this.minecraft.setScreen(editScreen);
+    }
+
+    private void deleteSelectedRoad(RoadPath road) {
+        String roadName = road.name;
+        roadDataStore.deleteRoad(road.id);
+        setStatus("已删除: " + roadName);
+        reloadEntries();
     }
 
     // --- 内部列表组件类优化 ---
@@ -321,10 +367,25 @@ public class RoadListScreen extends Screen {
             }
             return null;
         }
+
+        RoadEntry findEntryById(String roadId) {
+            for (RoadEntry entry : this.children()) {
+                if (entry.road.id != null && entry.road.id.equals(roadId)) {
+                    return entry;
+                }
+            }
+            return null;
+        }
+
+        int getEntryTop(RoadEntry entry) {
+            return this.getRowTop(this.children().indexOf(entry));
+        }
     }
 
     private final class RoadEntry extends ObjectSelectionList.Entry<RoadEntry> {
         private final RoadPath road;
+        private static final int ICON_GAP = 18;
+        private static final int ICON_RIGHT_MARGIN = 8;
 
         private RoadEntry(RoadPath road) {
             this.road = road;
@@ -335,9 +396,15 @@ public class RoadListScreen extends Screen {
             return Component.literal(safe(road.name));
         }
 
+        private int iconAreaLeft() {
+            // Need to get row width — use roadList.getRowWidth() via the outer class
+            return roadList.getRowLeft() + roadList.getRowWidth() - ICON_RIGHT_MARGIN - ICON_GAP * 2;
+        }
+
         @Override
         public void render(GuiGraphics graphics, int index, int top, int left, int width, int height, int mouseX,
             int mouseY, boolean hovered, float partialTick) {
+            boolean isRenaming = road.id != null && road.id.equals(renamingRoadId);
             boolean selected = selectedRoad != null && selectedRoad.id != null && selectedRoad.id.equals(road.id);
             int background;
             if (selected) {
@@ -348,16 +415,53 @@ public class RoadListScreen extends Screen {
                 background = index % 2 == 0 ? 0xFF1E2633 : 0xFF161C26;
             }
 
-            // 关键点6：使用传入的真正 left 和 width 进行渲染，保证高亮选区完美贴合
             graphics.fill(left, top, left + width, top + height - 1, background);
 
+            // If renaming, skip drawing name and icons (renameBox overlays)
+            if (isRenaming) return;
+
+            int iconRight = left + width - ICON_RIGHT_MARGIN;
+            int editIconX = iconRight - ICON_GAP * 2 + 2;
+            int deleteIconX = iconRight - ICON_GAP + 2;
+            int iconY = top + (height - RoadListScreen.this.font.lineHeight) / 2;
+
             int textColor = selected ? 0xFFF7F9FC : hovered ? 0xFFF4F7FF : 0xFFC8CDD6;
-            int textY = top + (height - RoadListScreen.this.font.lineHeight) / 2;
-            graphics.drawString(RoadListScreen.this.font, safe(road.name), left + 6, textY, textColor, false);
+            int maxNameWidth = editIconX - left - 10;
+            String displayName = RoadListScreen.this.font.plainSubstrByWidth(safe(road.name), maxNameWidth);
+            graphics.drawString(RoadListScreen.this.font, displayName, left + 6, iconY, textColor, false);
+
+            boolean hoverEdit = mouseX >= editIconX - 1 && mouseX <= editIconX + 13 && mouseY >= iconY - 1 && mouseY <= iconY + 11;
+            boolean hoverDelete = mouseX >= deleteIconX - 1 && mouseX <= deleteIconX + 13 && mouseY >= iconY - 1 && mouseY <= iconY + 11;
+
+            graphics.drawString(RoadListScreen.this.font, "\u270E", editIconX, iconY,
+                hoverEdit ? 0xFF66BBFF : 0xFF888888, false);
+            graphics.drawString(RoadListScreen.this.font, "\u2715", deleteIconX, iconY,
+                hoverDelete ? 0xFFFF6666 : 0xFF888888, false);
         }
 
         @Override
         public boolean mouseClicked(double mouseX, double mouseY, int button) {
+            int iconRight = roadList.getRowLeft() + roadList.getRowWidth() - ICON_RIGHT_MARGIN;
+            int editIconX = iconRight - ICON_GAP * 2 + 2;
+            int deleteIconX = iconRight - ICON_GAP + 2;
+
+            boolean clickEdit = mouseX >= editIconX - 1 && mouseX <= editIconX + 13;
+            boolean clickDelete = mouseX >= deleteIconX - 1 && mouseX <= deleteIconX + 13;
+
+            if (button == 0 && clickEdit) {
+                openEditScreen(road);
+                return true;
+            }
+            if (button == 0 && clickDelete) {
+                deleteSelectedRoad(road);
+                return true;
+            }
+            if (button == 1) {
+                // Right-click: rename
+                beginRename(this);
+                return true;
+            }
+
             selectedRoad = road;
             if (RoadListScreen.this.roadList != null) {
                 RoadListScreen.this.roadList.setSelected(this);
