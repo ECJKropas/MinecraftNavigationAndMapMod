@@ -27,7 +27,9 @@ import net.minecraft.network.chat.Component;
 import org.lwjgl.glfw.GLFW;
 
 public class RoadMetadataScreen extends Screen {
-    public enum Mode { CREATE, EDIT }
+    public enum Mode {
+        CREATE, EDIT
+    }
 
     private static final int PANEL_WIDTH = 280;
     private static final int PANEL_HEIGHT = 184;
@@ -38,8 +40,8 @@ public class RoadMetadataScreen extends Screen {
     private EditBox nameBox;
     private EditBox widthBox;
 
-    public RoadMetadataScreen(Mode mode, BiConsumer<String, Double> onSave, Runnable onCancel,
-        String prefillName, String prefillWidth) {
+    public RoadMetadataScreen(Mode mode, BiConsumer<String, Double> onSave, Runnable onCancel, String prefillName,
+        String prefillWidth) {
         super(Component.literal(mode == Mode.EDIT ? "修改道路" : "保存道路"));
         this.mode = mode;
         this.onSave = onSave;

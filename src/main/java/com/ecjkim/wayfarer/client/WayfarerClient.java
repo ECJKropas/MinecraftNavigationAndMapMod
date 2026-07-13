@@ -43,8 +43,9 @@ public class WayfarerClient implements ClientModInitializer {
     private static final KeyMapping TOGGLE_RECORDING_KEY =
         KeyBindingHelper.registerKeyBinding(new KeyMapping("key.wayfarer.toggle_road_recording",
             InputConstants.Type.KEYSYM, GLFW.GLFW_KEY_R, "category.wayfarer"));
-    private static final KeyMapping OPEN_ROAD_LIST_KEY = KeyBindingHelper.registerKeyBinding(
-        new KeyMapping("key.wayfarer.open_road_list", InputConstants.Type.KEYSYM, GLFW.GLFW_KEY_N, "category.wayfarer"));
+    private static final KeyMapping OPEN_ROAD_LIST_KEY =
+        KeyBindingHelper.registerKeyBinding(new KeyMapping("key.wayfarer.open_road_list", InputConstants.Type.KEYSYM,
+            GLFW.GLFW_KEY_N, "category.wayfarer"));
 
     @Override
     public void onInitializeClient() {
@@ -67,19 +68,13 @@ public class WayfarerClient implements ClientModInitializer {
                     ROAD_MANAGER.discardRecording();
                     client.player.displayClientMessage(Component.literal("记录点太少，已取消这次道路记录。"), false);
                 } else if (ROAD_MANAGER.isAppending()) {
-                    client.setScreen(new RoadMetadataScreen(
-                        RoadMetadataScreen.Mode.EDIT,
-                        ROAD_MANAGER::finishAppend,
-                        ROAD_MANAGER::discardRecording,
-                        ROAD_MANAGER.getAppendRoadName(),
+                    client.setScreen(new RoadMetadataScreen(RoadMetadataScreen.Mode.EDIT, ROAD_MANAGER::finishAppend,
+                        ROAD_MANAGER::discardRecording, ROAD_MANAGER.getAppendRoadName(),
                         String.valueOf(ROAD_MANAGER.getAppendRoadWidth())));
                     client.player.displayClientMessage(Component.literal("继续录制已停止，确认后保存。"), false);
                 } else {
-                    client.setScreen(new RoadMetadataScreen(
-                        RoadMetadataScreen.Mode.CREATE,
-                        ROAD_MANAGER::saveRecording,
-                        ROAD_MANAGER::discardRecording,
-                        null, null));
+                    client.setScreen(new RoadMetadataScreen(RoadMetadataScreen.Mode.CREATE, ROAD_MANAGER::saveRecording,
+                        ROAD_MANAGER::discardRecording, null, null));
                     client.player.displayClientMessage(Component.literal("道路记录已停止，填写名称后保存。"), false);
                 }
             } else {
@@ -97,7 +92,8 @@ public class WayfarerClient implements ClientModInitializer {
 
     private void startAppendRecording(RoadPath road) {
         Minecraft client = Minecraft.getInstance();
-        if (client.player == null) return;
+        if (client.player == null)
+            return;
 
         ROAD_MANAGER.startAppend(road, client.player.getX(), client.player.getY(), client.player.getZ());
         client.player.displayClientMessage(Component.literal("继续录制道路: " + road.name + "（按 R 结束并保存）"), false);

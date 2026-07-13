@@ -60,7 +60,7 @@ public class RoadListScreen extends Screen {
     private boolean detailButtonStartHovered, detailButtonEndHovered;
 
     public RoadListScreen(RoadDataStore roadDataStore, RoadPreviewServer previewServer,
-            Consumer<RoadPath> onContinueRecording) {
+        Consumer<RoadPath> onContinueRecording) {
         super(Component.literal("路线列表"));
         this.roadDataStore = roadDataStore;
         this.previewServer = previewServer;
@@ -256,7 +256,8 @@ public class RoadListScreen extends Screen {
     @Override
     public boolean keyPressed(net.minecraft.client.input.KeyEvent event) {
         if (renameBox != null && renameBox.isFocused()) {
-            if (event.key() == org.lwjgl.glfw.GLFW.GLFW_KEY_ENTER || event.key() == org.lwjgl.glfw.GLFW.GLFW_KEY_KP_ENTER) {
+            if (event.key() == org.lwjgl.glfw.GLFW.GLFW_KEY_ENTER
+                || event.key() == org.lwjgl.glfw.GLFW.GLFW_KEY_KP_ENTER) {
                 commitRename();
                 return true;
             }
@@ -285,9 +286,11 @@ public class RoadListScreen extends Screen {
     }
 
     private void commitRename() {
-        if (renamingRoadId == null || renameBox == null) return;
+        if (renamingRoadId == null || renameBox == null)
+            return;
         String newName = renameBox.getValue().trim();
-        if (newName.isEmpty()) newName = "未命名道路";
+        if (newName.isEmpty())
+            newName = "未命名道路";
         roadDataStore.updateRoad(renamingRoadId, newName,
             selectedRoad != null && selectedRoad.id.equals(renamingRoadId) ? selectedRoad.width : 7.0D);
         setStatus("已重命名: " + newName);
@@ -325,17 +328,12 @@ public class RoadListScreen extends Screen {
     }
 
     private void openEditScreen(RoadPath road) {
-        RoadMetadataScreen editScreen = new RoadMetadataScreen(
-            RoadMetadataScreen.Mode.EDIT,
-            (name, width) -> {
-                roadDataStore.updateRoad(road.id, name, width);
-                reloadEntries();
-                setStatus("已修改: " + name);
-            },
-            () -> {},
-            road.name,
-            String.valueOf(road.width)
-        );
+        RoadMetadataScreen editScreen = new RoadMetadataScreen(RoadMetadataScreen.Mode.EDIT, (name, width) -> {
+            roadDataStore.updateRoad(road.id, name, width);
+            reloadEntries();
+            setStatus("已修改: " + name);
+        }, () -> {
+        }, road.name, String.valueOf(road.width));
         this.minecraft.setScreenAndShow(editScreen);
     }
 
@@ -355,45 +353,55 @@ public class RoadListScreen extends Screen {
             && event.y() >= detailButtonStartY && event.y() <= detailButtonStartY + this.font.lineHeight) {
             var first = selectedRoad.points.get(0);
             var last = selectedRoad.points.get(selectedRoad.points.size() - 1);
-            clickEndpoint(selectedRoad.name, directionTo((float)(first.x - last.x), (float)(first.z - last.z)), (int)Math.floor(first.x), (int)Math.floor(first.z));
+            clickEndpoint(selectedRoad.name, directionTo((float)(first.x - last.x), (float)(first.z - last.z)),
+                (int)Math.floor(first.x), (int)Math.floor(first.z));
             return true;
         }
         if (event.x() >= detailButtonEndX && event.x() <= detailButtonEndX + detailButtonEndW
             && event.y() >= detailButtonEndY && event.y() <= detailButtonEndY + this.font.lineHeight) {
             var last = selectedRoad.points.get(selectedRoad.points.size() - 1);
             var first = selectedRoad.points.get(0);
-            clickEndpoint(selectedRoad.name, directionTo((float)(last.x - first.x), (float)(last.z - first.z)), (int)Math.floor(last.x), (int)Math.floor(last.z));
+            clickEndpoint(selectedRoad.name, directionTo((float)(last.x - first.x), (float)(last.z - first.z)),
+                (int)Math.floor(last.x), (int)Math.floor(last.z));
             return true;
         }
         return super.mouseClicked(event, isForwards);
     }
 
     private static String directionTo(float dx, float dz) {
-        boolean east = dx > 0, west = dx < 0;
-        boolean south = dz > 0, north = dz < 0;
-        if (east && north) return "东北端";
-        if (west && north) return "西北端";
-        if (east && south) return "东南端";
-        if (west && south) return "西南端";
-        if (east) return "东端";
-        if (west) return "西端";
-        if (north) return "北端";
-        if (south) return "南端";
+        double angle = Math.toDegrees(Math.atan2(dz, dx));
+        if (angle < 0)
+            angle += 360;
+        if (angle <= 15 || angle >= 345)
+            return "东端";
+        if (angle >= 75 && angle <= 105)
+            return "南端";
+        if (angle >= 165 && angle <= 195)
+            return "西端";
+        if (angle >= 255 && angle <= 285)
+            return "北端";
+        if (angle > 15 && angle < 75)
+            return "东南端";
+        if (angle > 105 && angle < 165)
+            return "西南端";
+        if (angle > 195 && angle < 255)
+            return "西北端";
+        if (angle > 285 && angle < 345)
+            return "东北端";
         return "端点";
     }
 
     private void clickEndpoint(String roadName, String direction, int x, int z) {
-        if (minecraft.player == null) return;
+        if (minecraft.player == null)
+            return;
         String coordStr = "[" + x + ", ~, " + z + "]";
         Component coord = Component.literal(coordStr)
-            .withStyle(Style.EMPTY
-                .withColor(ChatFormatting.GREEN)
+            .withStyle(Style.EMPTY.withColor(ChatFormatting.GREEN)
                 .withClickEvent(new ClickEvent.SuggestCommand("/tp " + x + " ~ " + z))
                 .withHoverEvent(new HoverEvent.ShowText(Component.literal("点击填入传送指令"))));
         Component msg = Component.literal(safe(roadName) + "的" + direction + "在").append(coord);
         minecraft.player.sendSystemMessage(msg);
     }
-
 
     // --- 内部列表组件类 ---
     private final class RoadEntryList extends ObjectSelectionList<RoadEntry> {
@@ -481,7 +489,8 @@ public class RoadListScreen extends Screen {
             int height = getContentHeight();
             graphics.fill(left, entryY, left + width, entryY + height - 1, background);
 
-            if (isRenaming) return;
+            if (isRenaming)
+                return;
 
             int iconRight = left + width - ICON_RIGHT_MARGIN;
             int editIconX = iconRight - ICON_GAP * 3 + 2;
@@ -494,9 +503,12 @@ public class RoadListScreen extends Screen {
             String displayName = RoadListScreen.this.font.plainSubstrByWidth(safe(road.name), maxNameWidth);
             graphics.text(RoadListScreen.this.font, displayName, left + 6, iconY, textColor, true);
 
-            boolean hoverEdit = mouseX >= editIconX - 1 && mouseX <= editIconX + 13 && mouseY >= iconY - 1 && mouseY <= iconY + 11;
-            boolean hoverContinue = mouseX >= continueIconX - 1 && mouseX <= continueIconX + 13 && mouseY >= iconY - 1 && mouseY <= iconY + 11;
-            boolean hoverDelete = mouseX >= deleteIconX - 1 && mouseX <= deleteIconX + 13 && mouseY >= iconY - 1 && mouseY <= iconY + 11;
+            boolean hoverEdit =
+                mouseX >= editIconX - 1 && mouseX <= editIconX + 13 && mouseY >= iconY - 1 && mouseY <= iconY + 11;
+            boolean hoverContinue = mouseX >= continueIconX - 1 && mouseX <= continueIconX + 13 && mouseY >= iconY - 1
+                && mouseY <= iconY + 11;
+            boolean hoverDelete =
+                mouseX >= deleteIconX - 1 && mouseX <= deleteIconX + 13 && mouseY >= iconY - 1 && mouseY <= iconY + 11;
 
             graphics.text(RoadListScreen.this.font, Component.literal("\u270E"), editIconX, iconY,
                 hoverEdit ? 0xFF66BBFF : 0xFF888888, true);

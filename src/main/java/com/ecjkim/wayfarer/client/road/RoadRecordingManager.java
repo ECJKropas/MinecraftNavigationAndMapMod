@@ -132,7 +132,8 @@ public class RoadRecordingManager {
     }
 
     public void finishAppend(String name, double width) {
-        if (!appendMode || appendRoad == null) return;
+        if (!appendMode || appendRoad == null)
+            return;
 
         roadDataStore.deleteRoad(appendRoad.id);
 
@@ -153,10 +154,12 @@ public class RoadRecordingManager {
     }
 
     public void tick(Minecraft client) {
-        if (!recording) return;
+        if (!recording)
+            return;
 
         LocalPlayer player = client.player;
-        if (player == null) return;
+        if (player == null)
+            return;
 
         double x = player.getX();
         double y = player.getY();
@@ -177,7 +180,8 @@ public class RoadRecordingManager {
             double dx = x - anchor.x;
             double dy = y - anchor.y;
             double dz = z - anchor.z;
-            if (dx * dx + dy * dy + dz * dz < SAMPLE_DISTANCE_SQUARED) return;
+            if (dx * dx + dy * dy + dz * dz < SAMPLE_DISTANCE_SQUARED)
+                return;
         }
 
         RoadPoint newPoint = new RoadPoint(x, y, z, System.currentTimeMillis() - sessionStartedAt);
@@ -189,7 +193,8 @@ public class RoadRecordingManager {
     }
 
     public void saveRecording(String roadName, double width) {
-        if (sessionPoints.size() < 2) return;
+        if (sessionPoints.size() < 2)
+            return;
 
         roadDataStore.syncToCurrentContext();
 
@@ -207,8 +212,10 @@ public class RoadRecordingManager {
     // --- append helpers ---
 
     private void checkAngleAndMaybeStart(double px, double py, double pz) {
-        if (appendEndpoint == 0 && sessionPoints.size() < 2) return;
-        if (appendEndpoint == 1 && sessionPoints.size() < 2) return;
+        if (appendEndpoint == 0 && sessionPoints.size() < 2)
+            return;
+        if (appendEndpoint == 1 && sessionPoints.size() < 2)
+            return;
 
         RoadPoint endpoint;
         RoadPoint secondToLast;
@@ -231,13 +238,15 @@ public class RoadRecordingManager {
         double iz = endpoint.z - secondToLast.z;
         double iLen = Math.sqrt(ix * ix + iy * iy + iz * iz);
 
-        if (vLen < 0.001 || iLen < 0.001) return;
+        if (vLen < 0.001 || iLen < 0.001)
+            return;
 
         double dot = vx * ix + vy * iy + vz * iz;
         double cosAngle = dot / (vLen * iLen);
         double angleDeg = Math.toDegrees(Math.acos(Math.max(-1.0, Math.min(1.0, cosAngle))));
 
-        if (angleDeg < MIN_ANGLE_DEGREES) return;
+        if (angleDeg < MIN_ANGLE_DEGREES)
+            return;
 
         appendWaitingForAngle = false;
         RoadPoint newPoint = new RoadPoint(px, py, pz, System.currentTimeMillis() - sessionStartedAt);
@@ -253,8 +262,7 @@ public class RoadRecordingManager {
         for (int i = 0; i < road.points.size() - 1; i++) {
             RoadPoint a = road.points.get(i);
             RoadPoint b = road.points.get(i + 1);
-            RoadPoint closest = Geometry.closestPointOnSegment(
-                new RoadPoint(px, py, pz, 0L), a, b);
+            RoadPoint closest = Geometry.closestPointOnSegment(new RoadPoint(px, py, pz, 0L), a, b);
             double dx = px - closest.x;
             double dy = py - closest.y;
             double dz = pz - closest.z;
