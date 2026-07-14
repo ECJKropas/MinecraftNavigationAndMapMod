@@ -37,6 +37,7 @@ public class SettingsScreen extends Screen {
     private static final int LABEL_W = 160;
     private static final int VALUE_W = 140;
     private static final int PAGE_W = LABEL_W + VALUE_W + 24;
+    private static final int CONTENT_TOP = 58;
 
     private final Screen parent;
     private final WayfarerConfig config;
@@ -44,6 +45,7 @@ public class SettingsScreen extends Screen {
     // 默认值
     private EditBox defaultWidthBox;
     private int classificationIdx;
+    private Button classifBtn;
 
     // 分级开关
     private boolean useClassificationWidth;
@@ -66,6 +68,12 @@ public class SettingsScreen extends Screen {
     private int labelX;
     private int valueX;
 
+    // 滚动 & 搜索
+    private int scrollOffset;
+    private int totalContentHeight;
+    private EditBox searchBox;
+    private String searchText = "";
+
     public SettingsScreen(Screen parent) {
         super(Component.literal("越陌度阡 · 设置"));
         this.parent = parent;
@@ -85,8 +93,21 @@ public class SettingsScreen extends Screen {
 
         // 重置状态
         classifBoxes.clear();
+        recHotkeyBtn = null;
+        menuHotkeyBtn = null;
 
-        int y = 34;
+        // === 搜索框 ===
+        searchBox = new EditBox(this.font, cx - 60, 30, 120, 20, Component.literal("搜索设置项..."));
+        searchBox.setMaxLength(50);
+        searchBox.setValue(searchText);
+        searchBox.setResponder(text -> {
+            searchText = text;
+            scrollOffset = 0;
+            updateWidgetVisibility();
+        });
+        addRenderableWidget(searchBox);
+
+        int y = CONTENT_TOP;
 
         // === 默认值 section ===
         defaultWidthBox = new EditBox(this.font, valueX, y + 24, VALUE_W, 20, Component.literal("默认道路宽度"));
@@ -96,11 +117,12 @@ public class SettingsScreen extends Screen {
 
         // 默认分级按钮
         String clsText = CLASSIFICATIONS.get(classificationIdx);
-        addRenderableWidget(Button.builder(Component.literal(clsText.isEmpty() ? "无" : clsText), btn -> {
+        classifBtn = Button.builder(Component.literal(clsText.isEmpty() ? "无" : clsText), btn -> {
             classificationIdx = (classificationIdx + 1) % CLASSIFICATIONS.size();
             String s = CLASSIFICATIONS.get(classificationIdx);
             btn.setMessage(Component.literal(s.isEmpty() ? "无" : s));
-        }).bounds(valueX, y + ROW_H + GAP + 24, VALUE_W, 20).build());
+        }).bounds(valueX, y + ROW_H + GAP + 24, VALUE_W, 20).build();
+        addRenderableWidget(classifBtn);
 
         // === 分级宽度 section ===
         int sectionY = y + (ROW_H + GAP) * 2 + 24 + 8;
@@ -125,13 +147,13 @@ public class SettingsScreen extends Screen {
 
         buildHotkeyButtons(hotkeySectionY);
 
-        // === 底部按钮 ===
-        int btnW = 100;
-        int btnY = this.height - 28;
-        addRenderableWidget(
-            Button.builder(Component.literal("保存"), b -> saveAndClose()).bounds(cx - btnW - 2, btnY, btnW, 20).build());
-        addRenderableWidget(
-            Button.builder(Component.literal("取消"), b -> onClose()).bounds(cx + 2, btnY, btnW, 20).build());
+        // 计算总内容高度
+        computeTotalContentHeight();
+
+        // 应用搜索过滤
+        if (!searchText.isEmpty()) {
+            updateWidgetVisibility();
+        }
     }
 
     private void buildClassifBoxes(int startY) {
@@ -144,6 +166,26 @@ public class SettingsScreen extends Screen {
             classifBoxes.put(e.getKey(), box);
             y += ROW_H + GAP;
         }
+    }
+
+    private void rebuildHotkeyButtons() {
+        if (recHotkeyBtn != null) {
+            removeWidget(recHotkeyBtn);
+            recHotkeyBtn = null;
+        }
+        if (menuHotkeyBtn != null) {
+            removeWidget(menuHotkeyBtn);
+            menuHotkeyBtn = null;
+        }
+
+        int sectionY = CONTENT_TOP + (ROW_H + GAP) * 2 + 24 + 8;
+        int hotkeySectionY = sectionY + 14 + ROW_H + 4;
+        if (useClassificationWidth) {
+            hotkeySectionY = sectionY + 14 + ROW_H + 4 + config.classificationWidths.size() * (ROW_H + GAP) + 8;
+        }
+
+        buildHotkeyButtons(hotkeySectionY);
+        computeTotalContentHeight();
     }
 
     private void buildHotkeyButtons(int startY) {
@@ -177,13 +219,78 @@ public class SettingsScreen extends Screen {
     }
 
     private void rebuildClassificationWidgets() {
-        // 删除旧的分类编辑框
         classifBoxes.values().forEach(this::removeWidget);
         classifBoxes.clear();
+
         if (useClassificationWidth) {
-            int sectionY = 34 + (ROW_H + GAP) * 2 + 24 + 8;
+            int sectionY = CONTENT_TOP + (ROW_H + GAP) * 2 + 24 + 8;
             buildClassifBoxes(sectionY + 14 + ROW_H + 4);
         }
+
+        // 重建热键按钮（修复重叠问题）
+        rebuildHotkeyButtons();
+
+        if (!searchText.isEmpty()) {
+            updateWidgetVisibility();
+        }
+    }
+
+    private void computeTotalContentHeight() {
+        int sectionY = CONTENT_TOP + (ROW_H + GAP) * 2 + 24 + 8;
+        int hotkeySectionY = sectionY + 14 + ROW_H + 4;
+        if (useClassificationWidth) {
+            hotkeySectionY = sectionY + 14 + ROW_H + 4 + config.classificationWidths.size() * (ROW_H + GAP) + 8;
+        }
+
+        int lastY = hotkeySectionY + 14;
+
+        List<WayfarerConfig.HotkeyBind> recBinds = config.getHotkeysForAction("toggle_recording");
+        if (!recBinds.isEmpty()) {
+            lastY += ROW_H + GAP;
+        }
+        List<WayfarerConfig.HotkeyBind> menuBinds = config.getHotkeysForAction("open_menu");
+        if (!menuBinds.isEmpty()) {
+            lastY += ROW_H + GAP;
+        }
+
+        this.totalContentHeight = lastY + 20 - CONTENT_TOP;
+    }
+
+    // === 搜索过滤 ===
+
+    private boolean matchesSearch(String... texts) {
+        if (searchText.isEmpty())
+            return true;
+        String lower = searchText.toLowerCase();
+        for (String t : texts) {
+            if (t != null && t.toLowerCase().contains(lower))
+                return true;
+        }
+        return false;
+    }
+
+    private void updateWidgetVisibility() {
+        boolean filtering = !searchText.isEmpty();
+
+        defaultWidthBox.visible = !filtering || matchesSearch("默认道路宽度", defaultWidthBox.getValue());
+
+        classifBtn.visible = !filtering || matchesSearch("默认分级", classifBtn.getMessage().getString());
+
+        classifToggleBtn.visible = !filtering
+            || matchesSearch("使用分级宽度替代手动输入", classifToggleBtn.getMessage().getString());
+
+        for (Map.Entry<String, EditBox> e : classifBoxes.entrySet()) {
+            e.getValue().visible = !filtering || matchesSearch(e.getKey(), e.getValue().getValue());
+        }
+
+        if (recHotkeyBtn != null) {
+            recHotkeyBtn.visible = !filtering || matchesSearch("开始/停止录制", recHotkeyBtn.getMessage().getString());
+        }
+        if (menuHotkeyBtn != null) {
+            menuHotkeyBtn.visible = !filtering || matchesSearch("打开主菜单", menuHotkeyBtn.getMessage().getString());
+        }
+
+        computeTotalContentHeight();
     }
 
     // === 渲染 ===
@@ -195,41 +302,86 @@ public class SettingsScreen extends Screen {
         // 标题
         g.drawCenteredString(this.font, this.title, this.width / 2, 12, 0xFFFFFFFF);
 
-        // 分节标签 + 行标签
-        int y = 34;
-        g.drawString(this.font, Component.literal("默认值"), labelX, y, 0xFFAAAAAA, false);
-        y += 24;
-        g.drawString(this.font, Component.literal("默认道路宽度"), labelX, y + 1, 0xFFCCCCCC, false);
-        y += ROW_H + GAP;
-        g.drawString(this.font, Component.literal("默认分级"), labelX, y + 1, 0xFFCCCCCC, false);
+        // 可见区域
+        int contentBottom = this.height - (capturing ? 36 : 8);
+        int visibleHeight = contentBottom - CONTENT_TOP;
 
-        // 分级宽度区域
-        y += ROW_H + GAP + 8;
-        g.drawString(this.font, Component.literal("分级宽度"), labelX, y, 0xFFAAAAAA, false);
+        g.enableScissor(0, CONTENT_TOP, this.width, visibleHeight);
 
-        int classifLabelY = y + 14 + ROW_H + 4;
+        boolean filtering = !searchText.isEmpty();
+        int drawY = CONTENT_TOP - scrollOffset;
+
+        // 默认值 section header
+        if (!filtering || matchesSearch("默认值")) {
+            g.drawString(this.font, Component.literal("默认值"), labelX, drawY, 0xFFAAAAAA, false);
+        }
+        drawY += 24;
+
+        // 默认道路宽度
+        if (!filtering || matchesSearch("默认道路宽度", defaultWidthBox.getValue())) {
+            g.drawString(this.font, Component.literal("默认道路宽度"), labelX, drawY + 1, 0xFFCCCCCC, false);
+        }
+        drawY += ROW_H + GAP;
+
+        // 默认分级
+        if (!filtering || matchesSearch("默认分级", classifBtn.getMessage().getString())) {
+            g.drawString(this.font, Component.literal("默认分级"), labelX, drawY + 1, 0xFFCCCCCC, false);
+        }
+        drawY += ROW_H + GAP;
+
+        // 分级宽度 section header
+        drawY += 8;
+        if (!filtering || matchesSearch("分级宽度", "使用分级宽度替代手动输入")) {
+            g.drawString(this.font, Component.literal("分级宽度"), labelX, drawY, 0xFFAAAAAA, false);
+        }
+        drawY += 14 + ROW_H + 4;
+
+        // 分级宽度条目
         if (useClassificationWidth) {
             for (Map.Entry<String, Double> e : config.classificationWidths.entrySet()) {
-                g.drawString(this.font, Component.literal(e.getKey()), labelX, classifLabelY + 1, 0xFFCCCCCC, false);
-                classifLabelY += ROW_H + GAP;
+                EditBox box = classifBoxes.get(e.getKey());
+                String val = box != null ? box.getValue() : "";
+                if (!filtering || matchesSearch(e.getKey(), val)) {
+                    g.drawString(this.font, Component.literal(e.getKey()), labelX, drawY + 1, 0xFFCCCCCC, false);
+                }
+                drawY += ROW_H + GAP;
             }
         } else {
-            classifLabelY += ROW_H;
+            drawY += ROW_H;
         }
 
-        // 按键区域
-        int hotkeyY = classifLabelY + 8;
-        g.drawString(this.font, Component.literal("按键"), labelX, hotkeyY, 0xFFAAAAAA, false);
-        hotkeyY += 14;
+        // 按键 section
+        drawY += 8;
+        if (!filtering || matchesSearch("按键", "开始/停止录制", "打开主菜单")) {
+            g.drawString(this.font, Component.literal("按键"), labelX, drawY, 0xFFAAAAAA, false);
+        }
+        drawY += 14;
 
         List<WayfarerConfig.HotkeyBind> recBinds = config.getHotkeysForAction("toggle_recording");
         if (!recBinds.isEmpty()) {
-            g.drawString(this.font, Component.literal("开始/停止录制"), labelX, hotkeyY + 8 + 1, 0xFFCCCCCC, false);
-            hotkeyY += ROW_H + GAP;
+            String btnText = recHotkeyBtn != null ? recHotkeyBtn.getMessage().getString() : "";
+            if (!filtering || matchesSearch("开始/停止录制", btnText)) {
+                g.drawString(this.font, Component.literal("开始/停止录制"), labelX, drawY + 8 + 1, 0xFFCCCCCC, false);
+            }
+            drawY += ROW_H + GAP;
         }
         List<WayfarerConfig.HotkeyBind> menuBinds = config.getHotkeysForAction("open_menu");
         if (!menuBinds.isEmpty()) {
-            g.drawString(this.font, Component.literal("打开主菜单"), labelX, hotkeyY + 8 + 1, 0xFFCCCCCC, false);
+            String btnText = menuHotkeyBtn != null ? menuHotkeyBtn.getMessage().getString() : "";
+            if (!filtering || matchesSearch("打开主菜单", btnText)) {
+                g.drawString(this.font, Component.literal("打开主菜单"), labelX, drawY + 8 + 1, 0xFFCCCCCC, false);
+            }
+        }
+
+        g.disableScissor();
+
+        // 滚动条指示器
+        int maxScroll = Math.max(0, totalContentHeight - visibleHeight);
+        if (maxScroll > 0) {
+            int barHeight = Math.max(20, (int) ((double) visibleHeight / totalContentHeight * visibleHeight));
+            int barY = CONTENT_TOP + (int) ((double) scrollOffset / maxScroll * (visibleHeight - barHeight));
+            int barX = this.width - 4;
+            g.fill(barX, barY, barX + 3, barY + barHeight, 0x66FFFFFF);
         }
 
         // 捕获提示
@@ -241,10 +393,25 @@ public class SettingsScreen extends Screen {
         super.render(g, mouseX, mouseY, partial);
     }
 
+    // === 滚动 ===
+
+    @Override
+    public boolean mouseScrolled(double mouseX, double mouseY, double scrollX, double scrollY) {
+        int contentBottom = this.height - (capturing ? 36 : 8);
+        int visibleHeight = contentBottom - CONTENT_TOP;
+        int maxScroll = Math.max(0, totalContentHeight - visibleHeight);
+        scrollOffset = Math.max(0, Math.min(scrollOffset - (int) (scrollY * 20), maxScroll));
+        return true;
+    }
+
     // === 键盘输入 ===
 
     @Override
     public boolean keyPressed(int key, int scan, int mods) {
+        if (searchBox.isFocused() && key != GLFW.GLFW_KEY_ESCAPE) {
+            return super.keyPressed(key, scan, mods);
+        }
+
         if (capturing && capturingAction != null) {
             if (key == GLFW.GLFW_KEY_ESCAPE) {
                 cancelCapture();
@@ -294,10 +461,13 @@ public class SettingsScreen extends Screen {
 
     @Override
     public void onClose() {
+        saveConfig();
+        config.save();
+        WayfarerClient.reloadHotkeys();
         this.minecraft.setScreen(parent);
     }
 
-    private void saveAndClose() {
+    private void saveConfig() {
         config.defaultWidth = parseWidth(defaultWidthBox.getValue());
         config.defaultClassification = CLASSIFICATIONS.get(classificationIdx);
         config.useClassificationWidth = useClassificationWidth;
@@ -310,10 +480,6 @@ public class SettingsScreen extends Screen {
             } catch (NumberFormatException ignored) {
             }
         }
-
-        config.save();
-        WayfarerClient.reloadHotkeys();
-        this.minecraft.setScreen(parent);
     }
 
     private double parseWidth(String s) {
