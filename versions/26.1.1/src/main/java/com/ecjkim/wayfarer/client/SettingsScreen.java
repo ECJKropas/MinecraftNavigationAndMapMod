@@ -25,27 +25,19 @@ public class SettingsScreen extends Screen {
     private final Screen parent;
     private final WayfarerConfig config;
 
-    // 默认值
     private EditBox defaultWidthBox;
     private int classificationIdx;
-
-    // 分级开关
     private boolean useClassificationWidth;
-
-    // 分级宽度编辑框
     private final Map<String, EditBox> classifBoxes = new LinkedHashMap<>();
     private Button classifToggleBtn;
 
-    // 热键按钮
     private Button recHotkeyBtn;
     private Button menuHotkeyBtn;
 
-    // 捕获状态
     private boolean capturing;
     private String capturingAction;
     private Button capturingBtn;
 
-    // 布局
     private int leftX;
     private int labelX;
     private int valueX;
@@ -169,16 +161,12 @@ public class SettingsScreen extends Screen {
         }
     }
 
-    // === 渲染 ===
-
     @Override
     public void extractRenderState(GuiGraphicsExtractor ex, int mouseX, int mouseY, float partial) {
         ex.fill(0, 0, this.width, this.height, 0xCC000000);
 
-        // 标题
         ex.centeredText(this.font, this.title, this.width / 2, 12, 0xFFFFFFFF);
 
-        // 分节标签
         int y = 34;
         ex.text(this.font, Component.literal("默认值"), labelX, y, 0xFFAAAAAA, false);
         y += 24;
@@ -223,8 +211,6 @@ public class SettingsScreen extends Screen {
 
         super.extractRenderState(ex, mouseX, mouseY, partial);
     }
-
-    // === 输入 ===
 
     @Override
     public boolean keyPressed(KeyEvent event) {
@@ -276,8 +262,6 @@ public class SettingsScreen extends Screen {
         capturingAction = null;
         capturingBtn = null;
     }
-
-    // === 保存 / 关闭 ===
 
     @Override
     public void onClose() {
