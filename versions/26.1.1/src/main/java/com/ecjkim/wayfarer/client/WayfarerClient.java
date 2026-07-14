@@ -5,8 +5,6 @@ import net.minecraft.client.player.LocalPlayer;
 import net.minecraft.network.chat.Component;
 
 import net.fabricmc.api.ClientModInitializer;
-import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientLifecycleEvents;
-import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientTickEvents;
 
 import com.ecjkim.wayfarer.client.road.RoadDataStore;
 import com.ecjkim.wayfarer.client.road.RoadMetadataScreen;
@@ -29,8 +27,10 @@ public class WayfarerClient implements ClientModInitializer {
     @Override
     public void onInitializeClient() {
         PREVIEW_SERVER.start();
-        ClientLifecycleEvents.CLIENT_STOPPING.register(client -> PREVIEW_SERVER.stop());
-        ClientTickEvents.END_CLIENT_TICK.register(this::handleClientTick);
+        var lifecycles = net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientLifecycleEvents.CLIENT_STOPPING;
+        lifecycles.register(client -> PREVIEW_SERVER.stop());
+        var ticks = net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientTickEvents.END_CLIENT_TICK;
+        ticks.register(this::handleClientTick);
     }
 
     public static void reloadHotkeys() {}
@@ -38,13 +38,12 @@ public class WayfarerClient implements ClientModInitializer {
     private void handleClientTick(Minecraft client) {
         ROAD_DATA_STORE.syncToCurrentContext();
 
-        if (client.screen != null) {
-            keysDownLastTick.clear();
-            ROAD_MANAGER.tick(client);
-            return;
-        }
+        ROAD_MANAGER.tick(client);
 
-        long window = client.getWindow().getWindow();
+        if (client.player == null)
+            return;
+
+        long window = client.getWindow().handle();
         WayfarerConfig config = WayfarerConfig.getInstance();
 
         for (WayfarerConfig.HotkeyBind bind : config.getHotkeysForAction("toggle_recording")) {
@@ -56,7 +55,8 @@ public class WayfarerClient implements ClientModInitializer {
 
         for (WayfarerConfig.HotkeyBind bind : config.getHotkeysForAction("open_menu")) {
             if (consumeHotkey(window, bind)) {
-                client.setScreen(new MainMenuScreen(ROAD_DATA_STORE, PREVIEW_SERVER, this::startAppendRecording));
+                client.setScreenAndShow(new MainMenuScreen(ROAD_DATA_STORE, PREVIEW_SERVER,
+                    this::startAppendRecording));
                 break;
             }
         }
@@ -93,24 +93,24 @@ public class WayfarerClient implements ClientModInitializer {
             ROAD_MANAGER.stopRecording();
             if (ROAD_MANAGER.getRecordedPointCount() < 2) {
                 ROAD_MANAGER.discardRecording();
-                player.displayClientMessage(Component.literal("记录点太少，已取消这次道路记录。"), false);
+                player.sendSystemMessage(Component.literal("记录点太少，已取消这次道路记录。"));
             } else if (ROAD_MANAGER.isAppending()) {
-                client.setScreen(new RoadMetadataScreen(RoadMetadataScreen.Mode.EDIT,
+                client.setScreenAndShow(new RoadMetadataScreen(RoadMetadataScreen.Mode.EDIT,
                     ROAD_MANAGER::finishAppend, ROAD_MANAGER::discardRecording,
                     ROAD_MANAGER.getAppendRoadName(),
                     String.valueOf(ROAD_MANAGER.getAppendRoadWidth()),
                     ROAD_MANAGER.getAppendRoadClassification(),
                     ROAD_MANAGER.getAppendRoadNumber()));
-                player.displayClientMessage(Component.literal("继续录制已停止，确认后保存。"), false);
+                player.sendSystemMessage(Component.literal("继续录制已停止，确认后保存。"));
             } else {
-                client.setScreen(new RoadMetadataScreen(RoadMetadataScreen.Mode.CREATE,
+                client.setScreenAndShow(new RoadMetadataScreen(RoadMetadataScreen.Mode.CREATE,
                     ROAD_MANAGER::saveRecording, ROAD_MANAGER::discardRecording,
                     null, null, null, null));
-                player.displayClientMessage(Component.literal("道路记录已停止，填写名称后保存。"), false);
+                player.sendSystemMessage(Component.literal("道路记录已停止，填写名称后保存。"));
             }
         } else {
             ROAD_MANAGER.startRecording();
-            player.displayClientMessage(Component.literal("道路记录已开始。"), false);
+            player.sendSystemMessage(Component.literal("道路记录已开始。"));
         }
     }
 
@@ -120,6 +120,6 @@ public class WayfarerClient implements ClientModInitializer {
             return;
 
         ROAD_MANAGER.startAppend(road, client.player.getX(), client.player.getY(), client.player.getZ());
-        client.player.displayClientMessage(Component.literal("继续录制道路: " + road.name + "（按 R 结束并保存）"), false);
+        client.player.sendSystemMessage(Component.literal("继续录制道路: " + road.name + "（按 R 结束并保存）"));
     }
 }

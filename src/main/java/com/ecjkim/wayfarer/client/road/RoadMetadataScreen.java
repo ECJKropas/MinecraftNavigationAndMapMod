@@ -24,6 +24,8 @@ import net.minecraft.client.gui.components.EditBox;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.network.chat.Component;
 
+import com.ecjkim.wayfarer.client.WayfarerConfig;
+
 public class RoadMetadataScreen extends Screen {
     public enum Mode {
         CREATE, EDIT
@@ -70,26 +72,33 @@ public class RoadMetadataScreen extends Screen {
     protected void init() {
         int centerX = this.width / 2;
         int left = centerX - PANEL_WIDTH / 2;
-        int top = this.height / 2 - PANEL_HEIGHT / 2;
+        boolean useClassify = WayfarerConfig.getInstance().useClassificationWidth;
+
+        // 使用分级宽度时面板矮一些
+        int panelHeight = useClassify ? PANEL_HEIGHT - 42 : PANEL_HEIGHT;
+        int top = this.height / 2 - panelHeight / 2;
         int fieldLeft = left + 20;
         int fieldWidth = PANEL_WIDTH - 40;
+
         int nameLabelY = top + 40;
         int nameBoxY = nameLabelY + 12;
-        int widthLabelY = top + 82;
-        int widthBoxY = widthLabelY + 12;
-        int classifLabelY = top + 124;
+        int classifLabelY = useClassify ? top + 82 : top + 124;
         int classifRowY = classifLabelY + 12;
-        int hintY = top + 170;
-        int buttonY = top + PANEL_HEIGHT - 30;
+        int hintY = classifLabelY + 46;
+        int buttonY = top + panelHeight - 30;
 
         this.nameBox = new EditBox(this.font, fieldLeft, nameBoxY, fieldWidth, 20, Component.literal("道路名"));
         this.nameBox.setMaxLength(64);
         this.nameBox.setValue(prefillName != null ? prefillName : "");
         this.addRenderableWidget(this.nameBox);
 
-        this.widthBox = new EditBox(this.font, fieldLeft, widthBoxY, fieldWidth, 20, Component.literal("道路宽度"));
-        this.widthBox.setValue(prefillWidth != null ? prefillWidth : "7");
-        this.addRenderableWidget(this.widthBox);
+        if (!useClassify) {
+            int widthLabelY = top + 82;
+            int widthBoxY = widthLabelY + 12;
+            this.widthBox = new EditBox(this.font, fieldLeft, widthBoxY, fieldWidth, 20, Component.literal("道路宽度"));
+            this.widthBox.setValue(prefillWidth != null ? prefillWidth : "7");
+            this.addRenderableWidget(this.widthBox);
+        }
 
         int halfGap = 8;
         int cycleButtonWidth = 110;
@@ -119,7 +128,12 @@ public class RoadMetadataScreen extends Screen {
                 roadName = "未命名道路";
             }
 
-            double roadWidth = parseWidth(this.widthBox.getValue());
+            double roadWidth;
+            if (useClassify && !classification.isEmpty()) {
+                roadWidth = WayfarerConfig.getInstance().getWidthForClassification(classification);
+            } else {
+                roadWidth = widthBox != null ? parseWidth(widthBox.getValue()) : 7.0D;
+            }
             this.onSave.accept(roadName, roadWidth, classification, number);
             this.minecraft.setScreen(null);
         }).bounds(centerX - 116, buttonY, 112, 20).build());
@@ -137,20 +151,28 @@ public class RoadMetadataScreen extends Screen {
         this.renderBackground(graphics);
         int centerX = this.width / 2;
         int left = centerX - PANEL_WIDTH / 2;
-        int top = this.height / 2 - PANEL_HEIGHT / 2;
+        boolean useClassify = WayfarerConfig.getInstance().useClassificationWidth;
+        int panelHeight = useClassify ? PANEL_HEIGHT - 42 : PANEL_HEIGHT;
+        int top = this.height / 2 - panelHeight / 2;
 
-        graphics.fill(left, top, left + PANEL_WIDTH, top + PANEL_HEIGHT, 0xE01B1F28);
+        graphics.fill(left, top, left + PANEL_WIDTH, top + panelHeight, 0xE01B1F28);
         graphics.fill(left, top, left + PANEL_WIDTH, top + 1, 0xFF4E5768);
-        graphics.fill(left, top + PANEL_HEIGHT - 1, left + PANEL_WIDTH, top + PANEL_HEIGHT, 0xFF1A1F27);
+        graphics.fill(left, top + panelHeight - 1, left + PANEL_WIDTH, top + panelHeight, 0xFF1A1F27);
         graphics.drawCenteredString(this.font, this.title, centerX, top + 8, 16777215);
         graphics.drawCenteredString(this.font, Component.literal("记录完成后补充名称和宽度"), centerX, top + 22, 11184810);
 
         int fieldLeft = left + 20;
         graphics.drawString(this.font, Component.literal("道路名"), fieldLeft, top + 40, 11184810, false);
-        graphics.drawString(this.font, Component.literal("道路宽度"), fieldLeft, top + 82, 11184810, false);
-        graphics.drawString(this.font, Component.literal("道路分级 / 编号"), fieldLeft, top + 124, 11184810, false);
+
+        if (!useClassify) {
+            graphics.drawString(this.font, Component.literal("道路宽度"), fieldLeft, top + 82, 11184810, false);
+        }
+
+        int classifLabelY = useClassify ? top + 82 : top + 124;
+        int hintY = classifLabelY + 46;
+        graphics.drawString(this.font, Component.literal("道路分级 / 编号"), fieldLeft, classifLabelY, 11184810, false);
         graphics.drawString(this.font, Component.literal("分级与编号非必填；若名称留空则默认用「分级+编号」组合。"),
-            fieldLeft, top + 170, 8947848, false);
+            fieldLeft, hintY, 8947848, false);
         super.render(graphics, mouseX, mouseY, partialTick);
     }
 
