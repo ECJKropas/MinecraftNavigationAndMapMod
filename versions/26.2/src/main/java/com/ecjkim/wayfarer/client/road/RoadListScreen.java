@@ -196,8 +196,9 @@ public class RoadListScreen extends Screen {
     private List<Component> buildDetailLines(RoadPath road) {
         List<Component> lines = new ArrayList<>();
         lines.add(Component.literal("名称: " + safe(road.name)));
-        String cn = (road.classification != null ? road.classification : "")
-            + (road.number != null ? road.number : "");
+        String cls = road.classification != null && !road.classification.isEmpty()
+            ? road.classification.substring(0, 1) : "";
+        String cn = cls + (road.number != null ? road.number : "");
         lines.add(Component.literal("号: " + (cn.isEmpty() ? "无" : cn)));
         lines.add(Component.literal("宽度: " + road.width + " 格"));
         lines.add(Component.literal("轨迹点: " + road.points.size()));

@@ -214,8 +214,9 @@ public class RoadListScreen extends Screen {
         lines.add(Component.literal("名称: " + safe(road.name)));
         if (road.classification != null && !road.classification.isEmpty()
             || road.number != null && !road.number.isEmpty()) {
-            String cn = (road.classification != null ? road.classification : "")
-                + (road.number != null ? road.number : "");
+            String cls = road.classification != null && !road.classification.isEmpty()
+                ? road.classification.substring(0, 1) : "";
+            String cn = cls + (road.number != null ? road.number : "");
             lines.add(Component.literal("号: " + (cn.isEmpty() ? "无" : cn)));
         }
         lines.add(Component.literal("宽度: " + road.width + " 格"));

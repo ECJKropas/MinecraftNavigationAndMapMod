@@ -110,7 +110,7 @@ public class RoadMetadataScreen extends Screen {
             String number = this.numberBox.getValue().trim();
 
             if (roadName.isEmpty() && !classification.isEmpty() && !number.isEmpty()) {
-                roadName = classification + number;
+                roadName = classification.substring(0, 1) + number;
             }
             if (roadName.isEmpty()) {
                 roadName = "未命名道路";
