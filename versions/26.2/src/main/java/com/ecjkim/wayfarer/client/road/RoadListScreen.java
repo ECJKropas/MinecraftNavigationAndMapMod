@@ -196,12 +196,9 @@ public class RoadListScreen extends Screen {
     private List<Component> buildDetailLines(RoadPath road) {
         List<Component> lines = new ArrayList<>();
         lines.add(Component.literal("名称: " + safe(road.name)));
-        if (road.classification != null && !road.classification.isEmpty()
-            || road.number != null && !road.number.isEmpty()) {
-            String cn = (road.classification != null ? road.classification : "")
-                + (road.number != null ? road.number : "");
-            lines.add(Component.literal("分级/编号: " + (cn.isEmpty() ? "无" : cn)));
-        }
+        String cn = (road.classification != null ? road.classification : "")
+            + (road.number != null ? road.number : "");
+        lines.add(Component.literal("分级/编号: " + (cn.isEmpty() ? "无" : cn)));
         lines.add(Component.literal("宽度: " + road.width + " 格"));
         lines.add(Component.literal("轨迹点: " + road.points.size()));
         lines.add(Component.literal("交叉点: " + road.intersections.size()));
@@ -411,6 +408,7 @@ public class RoadListScreen extends Screen {
                 .withHoverEvent(new HoverEvent.ShowText(Component.literal("点击填入传送指令"))));
         Component msg = Component.literal(safe(roadName) + "的" + direction + "在").append(coord);
         minecraft.player.sendSystemMessage(msg);
+        this.minecraft.setScreenAndShow(null);
     }
 
     // --- 内部列表组件类 ---

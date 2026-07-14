@@ -429,6 +429,7 @@ public class RoadListScreen extends Screen {
                 .withHoverEvent(new HoverEvent(HoverEvent.Action.SHOW_TEXT, Component.literal("点击填入传送指令"))));
         Component msg = Component.literal(safe(roadName) + "的" + direction + "在").append(coord);
         minecraft.player.displayClientMessage(msg, false);
+        this.minecraft.setScreen(null);
     }
 
     // --- 内部列表组件类优化 ---
