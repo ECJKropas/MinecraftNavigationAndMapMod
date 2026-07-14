@@ -396,11 +396,11 @@ public class SettingsScreen extends Screen {
     // === 滚动 ===
 
     @Override
-    public boolean mouseScrolled(double mouseX, double mouseY, double scrollX, double scrollY) {
+    public boolean mouseScrolled(double mouseX, double mouseY, double amount) {
         int contentBottom = this.height - (capturing ? 36 : 8);
         int visibleHeight = contentBottom - CONTENT_TOP;
         int maxScroll = Math.max(0, totalContentHeight - visibleHeight);
-        scrollOffset = Math.max(0, Math.min(scrollOffset - (int) (scrollY * 20), maxScroll));
+        scrollOffset = Math.max(0, Math.min(scrollOffset - (int) (amount * 20), maxScroll));
         return true;
     }
 
