@@ -181,7 +181,7 @@ public class SettingsScreen extends Screen {
 
     @Override
     public void render(GuiGraphics g, int mouseX, int mouseY, float partial) {
-        this.renderBackground(g);
+        g.fill(0, 0, this.width, this.height, 0xFF1B1F28);
 
         // 标题
         g.drawCenteredString(this.font, this.title, this.width / 2, 12, 0xFFFFFFFF);
