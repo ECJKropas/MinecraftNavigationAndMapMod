@@ -198,7 +198,7 @@ public class RoadListScreen extends Screen {
         lines.add(Component.literal("名称: " + safe(road.name)));
         String cn = (road.classification != null ? road.classification : "")
             + (road.number != null ? road.number : "");
-        lines.add(Component.literal("分级/编号: " + (cn.isEmpty() ? "无" : cn)));
+        lines.add(Component.literal("号: " + (cn.isEmpty() ? "无" : cn)));
         lines.add(Component.literal("宽度: " + road.width + " 格"));
         lines.add(Component.literal("轨迹点: " + road.points.size()));
         lines.add(Component.literal("交叉点: " + road.intersections.size()));
