@@ -1,8 +1,23 @@
+/*
+ * Copyright (C) 2025  MinecraftNavigationAndMapMod contributors
+ * https://github.com/ECJKropas/MinecraftNavigationAndMapMod
+
+ * MinecraftNavigationAndMapMod is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, version 3 of the License.
+
+ * MinecraftNavigationAndMapMod is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+
+ * You should have received a copy of the GNU General Public License
+ * along with MinecraftNavigationAndMapMod.  If not, see <https://www.gnu.org/licenses/>.
+ */
 package com.ecjkim.wayfarer.client;
 
 import java.util.function.Consumer;
 
-import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.components.Button;
 import net.minecraft.client.gui.screens.Screen;
@@ -41,8 +56,7 @@ public class MainMenuScreen extends Screen {
         int y = panelTop + 36;
 
         addRenderableWidget(Button.builder(Component.literal("道路管理"), btn -> {
-            this.minecraft.setScreen(
-                new RoadListScreen(roadDataStore, previewServer, onContinueRecording));
+            this.minecraft.setScreen(new RoadListScreen(roadDataStore, previewServer, onContinueRecording));
         }).bounds(btnX, y, BUTTON_WIDTH, BUTTON_HEIGHT).build());
         y += BUTTON_HEIGHT + BUTTON_GAP;
 
@@ -60,7 +74,8 @@ public class MainMenuScreen extends Screen {
 
         graphics.fill(panelLeft, panelTop, panelLeft + PANEL_WIDTH, panelTop + PANEL_HEIGHT, 0xE01B1F28);
         graphics.fill(panelLeft, panelTop, panelLeft + PANEL_WIDTH, panelTop + 1, 0xFF4E5768);
-        graphics.fill(panelLeft, panelTop + PANEL_HEIGHT - 1, panelLeft + PANEL_WIDTH, panelTop + PANEL_HEIGHT, 0xFF1A1F27);
+        graphics.fill(panelLeft, panelTop + PANEL_HEIGHT - 1, panelLeft + PANEL_WIDTH, panelTop + PANEL_HEIGHT,
+            0xFF1A1F27);
 
         graphics.drawCenteredString(this.font, this.title, this.width / 2, panelTop + 10, 0xFFFFFFFF);
 

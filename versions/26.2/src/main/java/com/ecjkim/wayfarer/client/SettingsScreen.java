@@ -1,20 +1,37 @@
+/*
+ * Copyright (C) 2025  MinecraftNavigationAndMapMod contributors
+ * https://github.com/ECJKropas/MinecraftNavigationAndMapMod
+
+ * MinecraftNavigationAndMapMod is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, version 3 of the License.
+
+ * MinecraftNavigationAndMapMod is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+
+ * You should have received a copy of the GNU General Public License
+ * along with MinecraftNavigationAndMapMod.  If not, see <https://www.gnu.org/licenses/>.
+ */
 package com.ecjkim.wayfarer.client;
 
-import java.util.*;
+import java.util.ArrayList;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
 
 import net.minecraft.client.gui.GuiGraphicsExtractor;
 import net.minecraft.client.gui.components.Button;
 import net.minecraft.client.gui.components.EditBox;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.client.input.KeyEvent;
-import net.minecraft.client.input.MouseButtonEvent;
 import net.minecraft.network.chat.Component;
 
 import org.lwjgl.glfw.GLFW;
 
 public class SettingsScreen extends Screen {
-    private static final List<String> CLASSIFICATIONS = List.of(
-        "", "G国道", "G高速", "S省道", "S高架", "X乡道", "Y县道", "C村道");
+    private static final List<String> CLASSIFICATIONS = List.of("", "G国道", "G高速", "S省道", "S高架", "X乡道", "Y县道", "C村道");
 
     private static final int ROW_H = 24;
     private static final int GAP = 2;
@@ -71,29 +88,24 @@ public class SettingsScreen extends Screen {
 
         int y = 34;
 
-        defaultWidthBox = new EditBox(this.font, valueX, y + 24, VALUE_W, 20,
-            Component.literal("默认道路宽度"));
+        defaultWidthBox = new EditBox(this.font, valueX, y + 24, VALUE_W, 20, Component.literal("默认道路宽度"));
         defaultWidthBox.setMaxLength(8);
         defaultWidthBox.setValue(String.valueOf(config.defaultWidth));
         addRenderableWidget(defaultWidthBox);
 
         String clsText = CLASSIFICATIONS.get(classificationIdx);
-        addRenderableWidget(Button.builder(
-            Component.literal(clsText.isEmpty() ? "无" : clsText),
-            btn -> {
-                classificationIdx = (classificationIdx + 1) % CLASSIFICATIONS.size();
-                String s = CLASSIFICATIONS.get(classificationIdx);
-                btn.setMessage(Component.literal(s.isEmpty() ? "无" : s));
-            }).bounds(valueX, y + ROW_H + GAP + 24, VALUE_W, 20).build());
+        addRenderableWidget(Button.builder(Component.literal(clsText.isEmpty() ? "无" : clsText), btn -> {
+            classificationIdx = (classificationIdx + 1) % CLASSIFICATIONS.size();
+            String s = CLASSIFICATIONS.get(classificationIdx);
+            btn.setMessage(Component.literal(s.isEmpty() ? "无" : s));
+        }).bounds(valueX, y + ROW_H + GAP + 24, VALUE_W, 20).build());
 
         int sectionY = y + (ROW_H + GAP) * 2 + 24 + 8;
 
-        classifToggleBtn = Button.builder(
-            Component.literal((useClassificationWidth ? "✓ " : "   ") + "使用分级宽度替代手动输入"),
-            btn -> {
+        classifToggleBtn =
+            Button.builder(Component.literal((useClassificationWidth ? "✓ " : "   ") + "使用分级宽度替代手动输入"), btn -> {
                 useClassificationWidth = !useClassificationWidth;
-                btn.setMessage(Component.literal(
-                    (useClassificationWidth ? "✓ " : "   ") + "使用分级宽度替代手动输入"));
+                btn.setMessage(Component.literal((useClassificationWidth ? "✓ " : "   ") + "使用分级宽度替代手动输入"));
                 rebuildClassificationWidgets();
             }).bounds(leftX + 8, sectionY + 14, PAGE_W - 16, 20).build();
         addRenderableWidget(classifToggleBtn);
@@ -104,18 +116,17 @@ public class SettingsScreen extends Screen {
 
         int hotkeySectionY = sectionY + 14 + ROW_H + 4;
         if (useClassificationWidth) {
-            hotkeySectionY = sectionY + 14 + ROW_H + 4
-                + config.classificationWidths.size() * (ROW_H + GAP) + 8;
+            hotkeySectionY = sectionY + 14 + ROW_H + 4 + config.classificationWidths.size() * (ROW_H + GAP) + 8;
         }
 
         buildHotkeyButtons(hotkeySectionY);
 
         int btnW = 100;
         int btnY = this.height - 28;
-        addRenderableWidget(Button.builder(Component.literal("保存"), b -> saveAndClose())
-            .bounds(cx - btnW - 2, btnY, btnW, 20).build());
-        addRenderableWidget(Button.builder(Component.literal("取消"), b -> onClose())
-            .bounds(cx + 2, btnY, btnW, 20).build());
+        addRenderableWidget(
+            Button.builder(Component.literal("保存"), b -> saveAndClose()).bounds(cx - btnW - 2, btnY, btnW, 20).build());
+        addRenderableWidget(
+            Button.builder(Component.literal("取消"), b -> onClose()).bounds(cx + 2, btnY, btnW, 20).build());
     }
 
     private void buildClassifBoxes(int startY) {
@@ -205,20 +216,17 @@ public class SettingsScreen extends Screen {
 
         List<WayfarerConfig.HotkeyBind> recBinds = config.getHotkeysForAction("toggle_recording");
         if (!recBinds.isEmpty()) {
-            ex.text(this.font, Component.literal("开始/停止录制"), labelX,
-                hotkeyY + 8 + 1, 0xFFCCCCCC, false);
+            ex.text(this.font, Component.literal("开始/停止录制"), labelX, hotkeyY + 8 + 1, 0xFFCCCCCC, false);
             hotkeyY += ROW_H + GAP;
         }
         List<WayfarerConfig.HotkeyBind> menuBinds = config.getHotkeysForAction("open_menu");
         if (!menuBinds.isEmpty()) {
-            ex.text(this.font, Component.literal("打开主菜单"), labelX,
-                hotkeyY + 8 + 1, 0xFFCCCCCC, false);
+            ex.text(this.font, Component.literal("打开主菜单"), labelX, hotkeyY + 8 + 1, 0xFFCCCCCC, false);
         }
 
         if (capturing) {
-            ex.centeredText(this.font,
-                Component.literal("按下按键进行绑定，ESC 取消"),
-                this.width / 2, this.height - 36, 0xFFFFFF55);
+            ex.centeredText(this.font, Component.literal("按下按键进行绑定，ESC 取消"), this.width / 2, this.height - 36,
+                0xFFFFFF55);
         }
 
         super.extractRenderState(ex, mouseX, mouseY, partial);
@@ -253,11 +261,8 @@ public class SettingsScreen extends Screen {
 
     private int detectModifier(int excludeKey) {
         long w = this.minecraft.getWindow().handle();
-        for (int c : new int[] {
-            GLFW.GLFW_KEY_LEFT_SHIFT, GLFW.GLFW_KEY_RIGHT_SHIFT,
-            GLFW.GLFW_KEY_LEFT_CONTROL, GLFW.GLFW_KEY_RIGHT_CONTROL,
-            GLFW.GLFW_KEY_LEFT_ALT, GLFW.GLFW_KEY_RIGHT_ALT
-        }) {
+        for (int c : new int[] {GLFW.GLFW_KEY_LEFT_SHIFT, GLFW.GLFW_KEY_RIGHT_SHIFT, GLFW.GLFW_KEY_LEFT_CONTROL,
+            GLFW.GLFW_KEY_RIGHT_CONTROL, GLFW.GLFW_KEY_LEFT_ALT, GLFW.GLFW_KEY_RIGHT_ALT}) {
             if (c != excludeKey && GLFW.glfwGetKey(w, c) == GLFW.GLFW_PRESS) {
                 return c;
             }

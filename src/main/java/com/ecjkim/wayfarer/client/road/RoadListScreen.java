@@ -317,10 +317,8 @@ public class RoadListScreen extends Screen {
         if (newName.isEmpty())
             newName = "未命名道路";
         RoadPath ref = selectedRoad != null && selectedRoad.id.equals(renamingRoadId) ? selectedRoad : null;
-        roadDataStore.updateRoad(renamingRoadId, newName,
-            ref != null ? ref.width : 7.0D,
-            ref != null ? ref.classification : "",
-            ref != null ? ref.number : "");
+        roadDataStore.updateRoad(renamingRoadId, newName, ref != null ? ref.width : 7.0D,
+            ref != null ? ref.classification : "", ref != null ? ref.number : "");
         setStatus("已重命名: " + newName);
         cancelRename();
         reloadEntries();
@@ -356,8 +354,8 @@ public class RoadListScreen extends Screen {
     }
 
     private void openEditScreen(RoadPath road) {
-        RoadMetadataScreen editScreen = new RoadMetadataScreen(RoadMetadataScreen.Mode.EDIT,
-            (name, width, classification, number) -> {
+        RoadMetadataScreen editScreen =
+            new RoadMetadataScreen(RoadMetadataScreen.Mode.EDIT, (name, width, classification, number) -> {
                 roadDataStore.updateRoad(road.id, name, width, classification, number);
                 reloadEntries();
                 setStatus("已修改: " + name);

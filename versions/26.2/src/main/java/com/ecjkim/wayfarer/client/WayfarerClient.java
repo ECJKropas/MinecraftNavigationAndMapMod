@@ -1,3 +1,19 @@
+/*
+ * Copyright (C) 2025  MinecraftNavigationAndMapMod contributors
+ * https://github.com/ECJKropas/MinecraftNavigationAndMapMod
+
+ * MinecraftNavigationAndMapMod is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, version 3 of the License.
+
+ * MinecraftNavigationAndMapMod is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+
+ * You should have received a copy of the GNU General Public License
+ * along with MinecraftNavigationAndMapMod.  If not, see <https://www.gnu.org/licenses/>.
+ */
 package com.ecjkim.wayfarer.client;
 
 import net.minecraft.client.Minecraft;
@@ -55,8 +71,8 @@ public class WayfarerClient implements ClientModInitializer {
 
         for (WayfarerConfig.HotkeyBind bind : config.getHotkeysForAction("open_menu")) {
             if (consumeHotkey(window, bind)) {
-                client.setScreenAndShow(new MainMenuScreen(ROAD_DATA_STORE, PREVIEW_SERVER,
-                    this::startAppendRecording));
+                client
+                    .setScreenAndShow(new MainMenuScreen(ROAD_DATA_STORE, PREVIEW_SERVER, this::startAppendRecording));
                 break;
             }
         }
@@ -95,17 +111,14 @@ public class WayfarerClient implements ClientModInitializer {
                 ROAD_MANAGER.discardRecording();
                 player.sendSystemMessage(Component.literal("记录点太少，已取消这次道路记录。"));
             } else if (ROAD_MANAGER.isAppending()) {
-                client.setScreenAndShow(new RoadMetadataScreen(RoadMetadataScreen.Mode.EDIT,
-                    ROAD_MANAGER::finishAppend, ROAD_MANAGER::discardRecording,
-                    ROAD_MANAGER.getAppendRoadName(),
-                    String.valueOf(ROAD_MANAGER.getAppendRoadWidth()),
-                    ROAD_MANAGER.getAppendRoadClassification(),
+                client.setScreenAndShow(new RoadMetadataScreen(RoadMetadataScreen.Mode.EDIT, ROAD_MANAGER::finishAppend,
+                    ROAD_MANAGER::discardRecording, ROAD_MANAGER.getAppendRoadName(),
+                    String.valueOf(ROAD_MANAGER.getAppendRoadWidth()), ROAD_MANAGER.getAppendRoadClassification(),
                     ROAD_MANAGER.getAppendRoadNumber()));
                 player.sendSystemMessage(Component.literal("继续录制已停止，确认后保存。"));
             } else {
                 client.setScreenAndShow(new RoadMetadataScreen(RoadMetadataScreen.Mode.CREATE,
-                    ROAD_MANAGER::saveRecording, ROAD_MANAGER::discardRecording,
-                    null, null, null, null));
+                    ROAD_MANAGER::saveRecording, ROAD_MANAGER::discardRecording, null, null, null, null));
                 player.sendSystemMessage(Component.literal("道路记录已停止，填写名称后保存。"));
             }
         } else {

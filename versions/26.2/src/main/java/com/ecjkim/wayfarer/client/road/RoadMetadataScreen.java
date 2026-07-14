@@ -17,22 +17,23 @@
 package com.ecjkim.wayfarer.client.road;
 
 import java.util.List;
+
 import net.minecraft.client.gui.GuiGraphicsExtractor;
 import net.minecraft.client.gui.components.Button;
 import net.minecraft.client.gui.components.EditBox;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.network.chat.Component;
-import org.lwjgl.glfw.GLFW;
 
 import com.ecjkim.wayfarer.client.WayfarerConfig;
+
+import org.lwjgl.glfw.GLFW;
 
 public class RoadMetadataScreen extends Screen {
     public enum Mode {
         CREATE, EDIT
     }
 
-    private static final List<String> CLASSIFICATIONS = List.of(
-        "", "G国道", "G高速", "S省道", "S高架", "X乡道", "Y县道", "C村道");
+    private static final List<String> CLASSIFICATIONS = List.of("", "G国道", "G高速", "S省道", "S高架", "X乡道", "Y县道", "C村道");
     private static final int PANEL_WIDTH = 280;
     private static final int PANEL_HEIGHT = 230;
 
@@ -54,8 +55,8 @@ public class RoadMetadataScreen extends Screen {
     private final String prefillClassification;
     private final String prefillNumber;
 
-    public RoadMetadataScreen(Mode mode, OnSaveCallback onSave, Runnable onCancel,
-        String prefillName, String prefillWidth, String prefillClassification, String prefillNumber) {
+    public RoadMetadataScreen(Mode mode, OnSaveCallback onSave, Runnable onCancel, String prefillName,
+        String prefillWidth, String prefillClassification, String prefillNumber) {
         super(Component.literal(mode == Mode.EDIT ? "修改道路" : "保存道路"));
         this.mode = mode;
         this.onSave = onSave;
@@ -162,12 +163,12 @@ public class RoadMetadataScreen extends Screen {
         if (!useClassify) {
             graphics.text(this.font, Component.literal("道路宽度"), fieldLeft, top + 82, 0xFFAAAAAA, true);
             graphics.text(this.font, Component.literal("道路分级 / 编号"), fieldLeft, top + 124, 0xFFAAAAAA, true);
-            graphics.text(this.font, Component.literal("分级与编号非必填；若名称留空则默认用「分级+编号」组合。"),
-                fieldLeft, top + 170, 0xFF888888, true);
+            graphics.text(this.font, Component.literal("分级与编号非必填；若名称留空则默认用「分级+编号」组合。"), fieldLeft, top + 170,
+                0xFF888888, true);
         } else {
             graphics.text(this.font, Component.literal("道路分级 / 编号"), fieldLeft, top + 82, 0xFFAAAAAA, true);
-            graphics.text(this.font, Component.literal("分级与编号非必填；若名称留空则默认用「分级+编号」组合。"),
-                fieldLeft, top + 128, 0xFF888888, true);
+            graphics.text(this.font, Component.literal("分级与编号非必填；若名称留空则默认用「分级+编号」组合。"), fieldLeft, top + 128,
+                0xFF888888, true);
         }
 
         super.extractRenderState(graphics, mouseX, mouseY, partialTick);

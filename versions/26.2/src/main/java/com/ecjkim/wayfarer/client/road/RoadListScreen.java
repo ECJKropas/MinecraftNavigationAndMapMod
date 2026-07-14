@@ -196,8 +196,8 @@ public class RoadListScreen extends Screen {
     private List<Component> buildDetailLines(RoadPath road) {
         List<Component> lines = new ArrayList<>();
         lines.add(Component.literal("名称: " + safe(road.name)));
-        String cls = road.classification != null && !road.classification.isEmpty()
-            ? road.classification.substring(0, 1) : "";
+        String cls =
+            road.classification != null && !road.classification.isEmpty() ? road.classification.substring(0, 1) : "";
         String cn = cls + (road.number != null ? road.number : "");
         lines.add(Component.literal("号: " + (cn.isEmpty() ? "无" : cn)));
         lines.add(Component.literal("宽度: " + road.width + " 格"));
@@ -296,10 +296,8 @@ public class RoadListScreen extends Screen {
         if (newName.isEmpty())
             newName = "未命名道路";
         RoadPath ref = selectedRoad != null && selectedRoad.id.equals(renamingRoadId) ? selectedRoad : null;
-        roadDataStore.updateRoad(renamingRoadId, newName,
-            ref != null ? ref.width : 7.0D,
-            ref != null ? ref.classification : "",
-            ref != null ? ref.number : "");
+        roadDataStore.updateRoad(renamingRoadId, newName, ref != null ? ref.width : 7.0D,
+            ref != null ? ref.classification : "", ref != null ? ref.number : "");
         setStatus("已重命名: " + newName);
         cancelRename();
         reloadEntries();
@@ -335,8 +333,8 @@ public class RoadListScreen extends Screen {
     }
 
     private void openEditScreen(RoadPath road) {
-        RoadMetadataScreen editScreen = new RoadMetadataScreen(RoadMetadataScreen.Mode.EDIT,
-            (name, width, classification, number) -> {
+        RoadMetadataScreen editScreen =
+            new RoadMetadataScreen(RoadMetadataScreen.Mode.EDIT, (name, width, classification, number) -> {
                 roadDataStore.updateRoad(road.id, name, width, classification, number);
                 reloadEntries();
                 setStatus("已修改: " + name);
