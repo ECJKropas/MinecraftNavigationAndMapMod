@@ -35,10 +35,6 @@ public class RoadRecordingManager {
     private static final double MIN_ANGLE_DEGREES = 60.0;
     /** Threshold (blocks) for snapping a road endpoint to a nearby other road path. */
     private static final double SNAP_THRESHOLD = 2.0;
-    /** When projecting an endpoint onto another road, ignore projections that land within
-     *  this fraction of the segment length from either endpoint of the other road (avoids
-     *  snapping endpoint-to-endpoint, which is a proper cross-intersection, not a T-junction). */
-    private static final double SNAP_EDGE_EXCLUSION = 0.15;
 
     private final RoadDataStore roadDataStore;
 
@@ -368,6 +364,9 @@ public class RoadRecordingManager {
         double bestDistance = Double.MAX_VALUE;
 
         for (RoadPath other : others) {
+            RoadPoint otherStart = other.points.get(0);
+            RoadPoint otherEnd = other.points.get(other.points.size() - 1);
+
             for (int i = 0; i < other.points.size() - 1; i++) {
                 RoadPoint a = other.points.get(i);
                 RoadPoint b = other.points.get(i + 1);
@@ -383,13 +382,6 @@ public class RoadRecordingManager {
                 double projection = ((endpoint.x - a.x) * segmentX + (endpoint.y - a.y) * segmentY
                     + (endpoint.z - a.z) * segmentZ) / lengthSquared;
 
-                // Ignore projections that land on (or very near) the other road's own endpoints:
-                // those are proper cross-intersections, not T-junctions, and are handled by
-                // detectIntersections instead.
-                if (projection <= SNAP_EDGE_EXCLUSION || projection >= 1.0D - SNAP_EDGE_EXCLUSION) {
-                    continue;
-                }
-
                 RoadPoint projected = new RoadPoint(a.x + projection * segmentX, a.y + projection * segmentY,
                     a.z + projection * segmentZ, endpoint.tick);
 
@@ -398,10 +390,23 @@ public class RoadRecordingManager {
                 double dz = endpoint.z - projected.z;
                 double distance = Math.sqrt(dx * dx + dy * dy + dz * dz);
 
-                if (distance <= SNAP_THRESHOLD && distance < bestDistance) {
-                    bestDistance = distance;
-                    bestProjection = projected;
+                if (distance > SNAP_THRESHOLD || distance >= bestDistance) {
+                    continue;
                 }
+
+                // Skip if the projected point lands near the other road's actual
+                // start/end endpoint — that's a proper cross-intersection, not a
+                // T-junction, and is handled by detectIntersections instead.
+                double distToStart = dist3D(projected.x, projected.y, projected.z,
+                    otherStart.x, otherStart.y, otherStart.z);
+                double distToEnd = dist3D(projected.x, projected.y, projected.z,
+                    otherEnd.x, otherEnd.y, otherEnd.z);
+                if (distToStart < SNAP_THRESHOLD || distToEnd < SNAP_THRESHOLD) {
+                    continue;
+                }
+
+                bestDistance = distance;
+                bestProjection = projected;
             }
         }
 
