@@ -105,6 +105,11 @@ public class RoadDataStore {
     public synchronized void deleteRoad(String roadId) {
         syncToCurrentContext();
         roadBook.roads.removeIf(road -> road.id != null && road.id.equals(roadId));
+        for (RoadPath road : roadBook.roads) {
+            if (road.intersections != null) {
+                road.intersections.removeIf(isect -> roadId.equals(isect.roadId));
+            }
+        }
         persist();
     }
 
