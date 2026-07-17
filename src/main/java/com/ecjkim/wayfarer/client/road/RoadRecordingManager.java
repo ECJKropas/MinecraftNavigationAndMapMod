@@ -19,6 +19,8 @@ package com.ecjkim.wayfarer.client.road;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.player.LocalPlayer;
@@ -28,6 +30,7 @@ import com.ecjkim.wayfarer.client.road.model.RoadPath;
 import com.ecjkim.wayfarer.client.road.model.RoadPoint;
 
 public class RoadRecordingManager {
+    private static final Logger LOGGER = Logger.getLogger("Wayfarer|RoadRecording");
     private static final double SAMPLE_DISTANCE_SQUARED = 0.5D * 0.5D;
     private static final double MIN_ANGLE_DEGREES = 60.0;
 
@@ -203,9 +206,15 @@ public class RoadRecordingManager {
     }
 
     public void saveRecording(String roadName, double width, String classification, String number) {
-        if (sessionPoints.size() < 2)
+        if (sessionPoints.size() < 2) {
+            LOGGER.log(Level.WARNING,
+                "saveRecording called with only {0} point(s), need at least 2 — save aborted",
+                sessionPoints.size());
             return;
+        }
 
+        LOGGER.log(Level.INFO, "Saving road \"{0}\" with {1} points (width={2}, class={3}, number={4})",
+            new Object[] {roadName, sessionPoints.size(), width, classification, number});
         roadDataStore.syncToCurrentContext();
 
         RoadPath road = new RoadPath();

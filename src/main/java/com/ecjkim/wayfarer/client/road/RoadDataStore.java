@@ -23,6 +23,8 @@ import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 
 import net.minecraft.client.Minecraft;
 
@@ -32,6 +34,7 @@ import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
 
 public class RoadDataStore {
+    private static final Logger LOGGER = Logger.getLogger("Wayfarer|RoadData");
     private static final Gson GSON = new GsonBuilder().setPrettyPrinting().create();
 
     private final Path baseDirectory = Path.of(System.getProperty("user.dir"), "config", "wayfarer");
@@ -148,6 +151,8 @@ public class RoadDataStore {
             RoadBook loaded = GSON.fromJson(json, RoadBook.class);
             return normalize(loaded);
         } catch (IOException exception) {
+            LOGGER.log(Level.WARNING, "Failed to read road data from {0}: {1}",
+                new Object[] {dataFile, exception.getMessage()});
             return new RoadBook();
         }
     }
@@ -174,7 +179,10 @@ public class RoadDataStore {
             Path dataFile = currentContext.resolveDataFile(baseDirectory);
             Files.createDirectories(dataFile.getParent());
             Files.writeString(dataFile, GSON.toJson(roadBook), StandardCharsets.UTF_8);
+            LOGGER.log(Level.INFO, "Persisted {0} road(s) to {1}",
+                new Object[] {roadBook.roads.size(), dataFile});
         } catch (IOException exception) {
+            LOGGER.log(Level.SEVERE, "Failed to persist roads: {0}", exception.getMessage());
             throw new IllegalStateException("Failed to save road data", exception);
         }
     }
