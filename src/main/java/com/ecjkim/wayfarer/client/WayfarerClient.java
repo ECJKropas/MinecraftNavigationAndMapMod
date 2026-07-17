@@ -28,6 +28,7 @@ import com.ecjkim.wayfarer.client.road.RoadDataStore;
 import com.ecjkim.wayfarer.client.road.RoadMetadataScreen;
 import com.ecjkim.wayfarer.client.road.RoadPreviewServer;
 import com.ecjkim.wayfarer.client.road.RoadRecordingManager;
+import com.ecjkim.wayfarer.client.road.XaeroMapOverlay;
 import com.ecjkim.wayfarer.client.road.model.RoadPath;
 
 import org.lwjgl.glfw.GLFW;
@@ -45,8 +46,13 @@ public class WayfarerClient implements ClientModInitializer {
     @Override
     public void onInitializeClient() {
         PREVIEW_SERVER.start();
+        XaeroMapOverlay.register();
         ClientLifecycleEvents.CLIENT_STOPPING.register(client -> PREVIEW_SERVER.stop());
         ClientTickEvents.END_CLIENT_TICK.register(this::handleClientTick);
+    }
+
+    public static RoadDataStore getRoadDataStore() {
+        return ROAD_DATA_STORE;
     }
 
     public static void reloadHotkeys() {}

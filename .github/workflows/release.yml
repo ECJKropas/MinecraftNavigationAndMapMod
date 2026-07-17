@@ -1,202 +1,104 @@
-name: Release
-
-# release: <default> (release title)
-# dispatch (all): Manual release for $target_release_tag
-# dispatch (specified): Manual release for $target_release_tag (subproject: $target_subproject)
-run-name: |-
-  ${{ github.event_name == 'workflow_dispatch' && format('Manual release for {0}{1}', inputs.target_release_tag, inputs.target_subproject && format(' (subproject: {0})', inputs.target_subproject) || '') || '' }}
+name: Auto Release
 
 on:
-  release:
-    types:
-      - published
-  workflow_dispatch:
-    inputs:
-      target_subproject:
-        description: |-
-          The subproject name(s) of the specified Minecraft version to be released, seperated with ",".
-          By default all subprojects will be released
-        type: string
-        required: false
-        default: ""
-      target_release_tag:
-        description: The tag of the release you want to append the artifact to
-        type: string
-        required: true
+  push:
+    branches:
+      - master
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
-  show_action_parameters:
-    runs-on: ubuntu-latest
-    steps:
-      - name: Show action parameters
-        run: |
-          cat <<EOF > $GITHUB_STEP_SUMMARY
-          ## Action Parameters
-          - target_subproject: \`${{ github.event.inputs.target_subproject }}\`
-          - target_release_tag: \`${{ github.event.inputs.target_release_tag }}\`
-          EOF
-
-  matrix_prep:
-    uses: ./.github/workflows/matrix_prep.yml
-    with:
-      target_subproject: ${{ github.event.inputs.target_subproject }}
-
-  # ensure the input release tag is valid
-  validate_release:
-    runs-on: ubuntu-latest
-    steps:
-      - name: Get github release information
-        uses: cardinalby/git-get-release-action@1.2.5
-        env:
-          GITHUB_TOKEN: ${{ github.token }}
-        with:
-          tag: ${{ github.event.inputs.target_release_tag }}
-
-  build:
-    uses: ./.github/workflows/build.yml
-    secrets: inherit
-    needs:
-      - validate_release
-    with:
-      target_subproject: ${{ github.event.inputs.target_subproject }}
-      release: true
-
   release:
-    needs:
-      - matrix_prep
-      - build
     runs-on: ubuntu-latest
-
-    # allow the mod publish step to add assets to release
-    # https://docs.github.com/en/actions/security-guides/automatic-token-authentication#permissions-for-the-github_token
-    permissions:
-      contents: write
-
-    strategy:
-      matrix: ${{ fromJson(needs.matrix_prep.outputs.matrix) }}
-      fail-fast: false
-      max-parallel: 4
-
+    if: ${{ ! contains(github.event.head_commit.message, 'no release') && ! contains(github.event.head_commit.message, 'NO RELEASE') && ! contains(github.event.head_commit.message, 'No Release') }}
     steps:
-      - uses: actions/checkout@v6
+      - name: Checkout
+        uses: actions/checkout@v4
 
-      - name: Display context
-        run: |
-          echo ref_name = ${{ github.ref_name }}
-          echo target_subproject = ${{ github.event.inputs.target_subproject }}
-          echo target_release_tag = ${{ github.event.inputs.target_release_tag }}
-
-      - name: Download build artifacts
-        uses: actions/download-artifact@v7
+      - name: Set up JDK 21
+        uses: actions/setup-java@v4
         with:
-          name: build-artifacts
-          path: build-artifacts
+          java-version: '21'
+          distribution: 'temurin'
 
-      - name: Get github release information
-        id: get_release
-        uses: cardinalby/git-get-release-action@1.2.5
-        env:
-          GITHUB_TOKEN: ${{ github.token }}
-        with:
-          tag: ${{ github.event.inputs.target_release_tag }}
-
-      - name: Generate publish related information
-        id: release_info
+      - name: Determine new version
+        id: version
         run: |
-          if [ $GITHUB_EVENT_NAME == 'release' ]
-          then
-              # Leave an empty value here, so Kir-Antipov/mc-publish will infer the tag from the action context
-              echo "tag_name=" >> $GITHUB_OUTPUT
-          elif [ $GITHUB_EVENT_NAME == 'workflow_dispatch' ]
-          then
-              echo "tag_name=${{ github.event.inputs.target_release_tag }}" >> $GITHUB_OUTPUT
+          COMMIT_MSG="${{ github.event.head_commit.message }}"
+
+          CURRENT_VERSION=$(grep 'modVersion' gradle.properties | sed 's/modVersion *= *//')
+          echo "Current version: $CURRENT_VERSION"
+
+          IFS='.' read -r MAJOR MINOR PATCH <<< "$CURRENT_VERSION"
+
+          if echo "$COMMIT_MSG" | grep -qE '^feat(\(.*\))?:'; then
+            MINOR=$((MINOR + 1))
+            PATCH=0
+            SKIP=false
+            echo "Bumping minor: feat detected"
+          elif echo "$COMMIT_MSG" | grep -qE '^fix(\(.*\))?:'; then
+            PATCH=$((PATCH + 1))
+            SKIP=false
+            echo "Bumping patch: fix detected"
           else
-              echo Unknown github event name $GITHUB_EVENT_NAME
-              exit 1
+            SKIP=true
+            echo "No feat/fix prefix found, skipping release"
           fi
 
-      - name: Read common properties
-        id: properties_g
-        uses: BrycensRanch/read-properties-action@v1
-        with:
-          file: gradle.properties
-          all: true
+          NEW_VERSION="${MAJOR}.${MINOR}.${PATCH}"
+          echo "new_version=${NEW_VERSION}" >> $GITHUB_OUTPUT
+          echo "skip=${SKIP}" >> $GITHUB_OUTPUT
+          echo "current_version=${CURRENT_VERSION}" >> $GITHUB_OUTPUT
 
-      - name: Read version-specific properties
-        id: properties_v
-        uses: BrycensRanch/read-properties-action@v1
-        with:
-          file: ${{ format('versions/{0}/gradle.properties', matrix.subproject) }}
-          all: true
-
-      - name: Prepare file information
-        id: file_info
+      - name: Bump version in gradle.properties
+        if: steps.version.outputs.skip != 'true'
         run: |
-          shopt -s extglob
-          FILE_PATHS=$(ls ${{ format('build-artifacts/{0}/build/libs/!(*-@(dev|sources|shadow)).jar', matrix.subproject) }})
-          if (( ${#FILE_PATHS[@]} != 1 )); then
-              echo "Error: Found ${#FILE_PATHS[@]} files, expected exactly 1"
-              exit 1
-          else
-              FILE_PATH=${FILE_PATHS[0]}
+          NEW_VERSION="${{ steps.version.outputs.new_version }}"
+          sed -i "s/modVersion *= *.*/modVersion = ${NEW_VERSION}/" gradle.properties
+          echo "Updated gradle.properties:"
+          grep 'modVersion' gradle.properties
+
+      - name: Commit and push version bump
+        if: steps.version.outputs.skip != 'true'
+        run: |
+          git config user.name "github-actions"
+          git config user.email "github-actions@github.com"
+          git add gradle.properties
+          git commit -m "chore(release): bump version to v${{ steps.version.outputs.new_version }}"
+          git push
+
+      - name: Build
+        if: steps.version.outputs.skip != 'true'
+        run: ./gradlew build -x spotlessCheck
+
+      - name: Generate release notes
+        if: steps.version.outputs.skip != 'true'
+        id: notes
+        run: |
+          VERSION="${{ steps.version.outputs.new_version }}"
+
+          # Get tag of previous version, fallback to first commit
+          PREV_TAG=$(git tag --sort=-creatordate | head -1)
+          if [ -z "$PREV_TAG" ]; then
+            PREV_TAG=$(git rev-list --max-parents=0 HEAD)
           fi
 
-          FILE_NAME=$(basename $FILE_PATH)
-          FILE_HASH=$(sha256sum $FILE_PATH | awk '{ print $1 }')
-          echo "path=$FILE_PATH" >> $GITHUB_OUTPUT
-          echo "name=$FILE_NAME" >> $GITHUB_OUTPUT
-          echo "hash=$FILE_HASH" >> $GITHUB_OUTPUT
-          cat $GITHUB_OUTPUT
+          NOTES=$(git log "${PREV_TAG}..HEAD" --pretty=format:'- %s (%an)')
+          echo "notes<<EOF" >> $GITHUB_OUTPUT
+          echo "$NOTES" >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
 
-      - name: Prepare changelog
-        uses: actions/github-script@v8
-        id: changelog
-        with:
-          script: return process.env.CHANGELOG
-          result-encoding: string
+      - name: Create Release
+        if: steps.version.outputs.skip != 'true'
         env:
-          CHANGELOG: |-
-            ${{ steps.get_release.outputs.body }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          VERSION="${{ steps.version.outputs.new_version }}"
 
-            -------
-
-            Build Information
-
-            - File name: `${{ steps.file_info.outputs.name }}`
-            - SHA-256: `${{ steps.file_info.outputs.hash }}`
-            - Built from: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
-
-      - name: Publish Minecraft Mods
-        uses: Kira-NT/mc-publish@v3.3
-        with:
-          # # https://modrinth.com/settings/pats
-          # modrinth-id: aabbccdd
-          # modrinth-token: ${{ secrets.MODRINTH_API_TOKEN }}
-
-          # # https://legacy.curseforge.com/account/api-tokens
-          # curseforge-id: 000000
-          # curseforge-token: ${{ secrets.CF_API_TOKEN }}
-
-          github-tag: ${{ steps.release_info.outputs.tag_name }}
-          github-token: ${{ secrets.GITHUB_TOKEN }}
-
-          files: ${{ steps.file_info.outputs.path }}
-
-          name: ${{ format('{0} v{1} for mc{2}', steps.properties_g.outputs.modName, steps.properties_g.outputs.modVersion, steps.properties_v.outputs.minecraftVersion) }}
-          version: ${{ format('v{1}-mc{0}', steps.properties_v.outputs.minecraftVersion, steps.properties_g.outputs.modVersion) }}
-          version-type: release
-
-          loaders: fabric
-          game-versions: ${{ steps.properties_v.outputs.gameVersions }}
-          game-version-filter: any
-          dependencies: |-
-            fabric(required){modrinth:P7dR8mSH}{curseforge:306612}
-          github-changelog: ${{ steps.get_release.outputs.body }}
-          modrinth-changelog: ${{ steps.changelog.outputs.result }}
-          curseforge-changelog: ${{ steps.changelog.outputs.result }}
-
-          retry-attempts: 3
-          retry-delay: 10000
+          gh release create "v${VERSION}" \
+            "versions/1.20.1/build/libs/wayfarer-v${VERSION}-mc1.20.1-SNAPSHOT.jar" \
+            "versions/26.2/build/libs/wayfarer-v${VERSION}-mc26.2-SNAPSHOT.jar" \
+            "versions/26.1.1/build/libs/wayfarer-v${VERSION}-mc26.1.1-SNAPSHOT.jar" \
+            --title "v${VERSION}" \
+            --notes "${{ steps.notes.outputs.notes }}"
