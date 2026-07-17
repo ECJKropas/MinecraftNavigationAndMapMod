@@ -146,24 +146,24 @@ public class RoadPreviewServer {
               <meta name="viewport" content="width=device-width, initial-scale=1" />
               <title>MC Nav Preview</title>
               <style>
-                :root { color-scheme: dark; }
-                body { margin: 0; font-family: system-ui, -apple-system, BlinkMacSystemFont, sans-serif; background: #0f1115; color: #e6e6e6; }
-                header { padding: 14px 20px; border-bottom: 1px solid #2a2f3a; display: flex; gap: 14px; align-items: center; flex-wrap: wrap; background: #131720; }
-                header strong { font-size: 18px; }
-                header .meta { color: #9ca6b5; font-size: 13px; }
+                :root { color-scheme: light; }
+                body { margin: 0; font-family: system-ui, -apple-system, BlinkMacSystemFont, sans-serif; background: #f8f9fa; color: #1a1a2e; }
+                header { padding: 14px 20px; border-bottom: 1px solid #dee2e6; display: flex; gap: 14px; align-items: center; flex-wrap: wrap; background: #fff; }
+                header strong { font-size: 18px; color: #16213e; }
+                header .meta { color: #495057; font-size: 13px; }
                 main { display: grid; grid-template-columns: 1fr 320px; height: calc(100vh - 65px); }
                 #canvasWrap { position: relative; min-width: 0; }
-                canvas { width: 100%%; height: 100%%; display: block; background: #11151d; }
-                aside { border-left: 1px solid #2a2f3a; padding: 16px; overflow: auto; }
-                .hint { color: #99a3b3; font-size: 13px; }
-                .chip { display: inline-block; padding: 3px 8px; border-radius: 999px; background: #202635; margin-right: 6px; margin-bottom: 6px; font-size: 12px; }
+                canvas { width: 100%%; height: 100%%; display: block; background: #ffffff; }
+                aside { border-left: 1px solid #dee2e6; padding: 16px; overflow: auto; background: #fff; }
+                .hint { color: #6c757d; font-size: 13px; }
+                .chip { display: inline-block; padding: 3px 8px; border-radius: 999px; background: #e9ecef; margin-right: 6px; margin-bottom: 6px; font-size: 12px; color: #0d6efd; }
                 ul { padding-left: 18px; }
                 .road { margin: 0 0 14px 0; }
-                .road h3 { margin: 0 0 4px 0; font-size: 15px; }
-                .road p { margin: 2px 0; color: #b7c0cf; font-size: 13px; }
-                a { color: #7db7ff; }
-                button { background: #1f2430; color: #e6e6e6; border: 1px solid #343b4c; border-radius: 6px; padding: 7px 10px; cursor: pointer; }
-                button:hover { background: #283041; }
+                .road h3 { margin: 0 0 4px 0; font-size: 15px; color: #16213e; }
+                .road p { margin: 2px 0; color: #6c757d; font-size: 13px; }
+                a { color: #0d6efd; }
+                button { background: #0d6efd; color: #fff; border: 1px solid #0b5ed7; border-radius: 6px; padding: 7px 10px; cursor: pointer; }
+                button:hover { background: #0b5ed7; }
               </style>
             </head>
             <body>
@@ -187,7 +187,24 @@ public class RoadPreviewServer {
                 const ctx = canvas.getContext('2d');
                 const stats = document.getElementById('stats');
                 const roadsDiv = document.getElementById('roads');
-                const palette = ['#66d9ef','#a6e22e','#fd971f','#f92672','#ae81ff','#e6db74','#6fcf97','#56ccf2'];
+                // --- Road styling by classification ---
+                function getRoadStyle(classification) {
+                  if (!classification) return { stroke: '#adb5bd', fill: '#ffffff', edgeWidth: 3, bodyWidth: 1, textColor: '#6c757d', labelBg: '#ffffff', labelColor: '#495057', labelBorder: '#adb5bd' };
+                  const cls = classification.charAt(0).toUpperCase();
+                  if (cls === 'G') return { stroke: '#D9432B', fill: '#D9432B', edgeWidth: 0, bodyWidth: 1, textColor: '#ffffff', labelBg: '#D9432B', labelColor: '#ffffff', labelBorder: '#ffffff' };
+                  if (cls === 'S') return { stroke: '#F0A030', fill: '#F0A030', edgeWidth: 0, bodyWidth: 1, textColor: '#000000', labelBg: '#FFE066', labelColor: '#000000', labelBorder: '#F0A030' };
+                  return { stroke: '#adb5bd', fill: '#ffffff', edgeWidth: 3, bodyWidth: 1, textColor: '#6c757d', labelBg: '#ffffff', labelColor: '#495057', labelBorder: '#adb5bd' };
+                }
+
+                function shouldDimName(road) {
+                  if (!road.classification || !road.name) return false;
+                  const cls = road.classification.charAt(0).toUpperCase();
+                  return cls === 'G' && /^[Gg]\\d+$/.test(road.name.trim());
+                }
+
+                function getDisplayName(road) {
+                  return road.name || road.number || '';
+                }
 
                 function resizeCanvas() {
                   const rect = canvas.getBoundingClientRect();
@@ -214,11 +231,11 @@ public class RoadPreviewServer {
                   const width = canvas.width;
                   const height = canvas.height;
                   ctx.clearRect(0, 0, width, height);
-                  ctx.fillStyle = '#11151d';
+                  ctx.fillStyle = '#ffffff';
                   ctx.fillRect(0, 0, width, height);
 
                   if (!roads.length) {
-                    ctx.fillStyle = '#b7c0cf';
+                    ctx.fillStyle = '#495057';
                     ctx.font = '16px sans-serif';
                     ctx.fillText('暂无道路数据。请在当前实例里按 R 记录一条道路。', 30, 40);
                     stats.textContent = `0 条道路 · 当前实例：${window.__wayfarerContextLabel}`;
@@ -244,17 +261,91 @@ public class RoadPreviewServer {
                     const points = road.points || [];
                     if (points.length < 2) return;
 
-                    const color = palette[index %% palette.length];
-                    ctx.strokeStyle = color;
-                    ctx.lineWidth = Math.max(2, (road.width || 7) * scale / 3);
-                    ctx.beginPath();
-                    ctx.moveTo(tx(points[0].x), ty(points[0].z));
-                    for (let i = 1; i < points.length; i++) {
-                      ctx.lineTo(tx(points[i].x), ty(points[i].z));
-                    }
-                    ctx.stroke();
+                    const style = getRoadStyle(road.classification);
+                    const roadWidth = Math.max(2, (road.width || 7) * scale / 3);
 
-                    ctx.fillStyle = color;
+                    // Draw road body
+                    if (style.edgeWidth > 0) {
+                      // X/Y/C/普通: grey edge + white fill
+                      ctx.strokeStyle = '#adb5bd';
+                      ctx.lineWidth = roadWidth + style.edgeWidth;
+                      ctx.beginPath();
+                      ctx.moveTo(tx(points[0].x), ty(points[0].z));
+                      for (let i = 1; i < points.length; i++) {
+                        ctx.lineTo(tx(points[i].x), ty(points[i].z));
+                      }
+                      ctx.stroke();
+                      ctx.strokeStyle = '#ffffff';
+                      ctx.lineWidth = roadWidth;
+                      ctx.beginPath();
+                      ctx.moveTo(tx(points[0].x), ty(points[0].z));
+                      for (let i = 1; i < points.length; i++) {
+                        ctx.lineTo(tx(points[i].x), ty(points[i].z));
+                      }
+                      ctx.stroke();
+                    } else {
+                      // G/S roads: solid thick line
+                      ctx.strokeStyle = style.fill;
+                      ctx.lineWidth = roadWidth * 1.8;
+                      ctx.beginPath();
+                      ctx.moveTo(tx(points[0].x), ty(points[0].z));
+                      for (let i = 1; i < points.length; i++) {
+                        ctx.lineTo(tx(points[i].x), ty(points[i].z));
+                      }
+                      ctx.stroke();
+                    }
+
+                    // Draw road name label at midpoint
+                    const displayName = getDisplayName(road);
+                    if (displayName) {
+                      const midIdx = Math.floor(points.length / 2);
+                      const midX = tx(points[midIdx].x);
+                      const midY = ty(points[midIdx].z);
+                      const fontSize = Math.max(10, Math.min(16, roadWidth * 1.2));
+                      ctx.font = `${fontSize}px system-ui, sans-serif`;
+                      const metrics = ctx.measureText(displayName);
+                      const textW = metrics.width;
+                      const textH = fontSize;
+
+                      if (shouldDimName(road)) {
+                        // Gxxx format: dim grey text on road center
+                        ctx.fillStyle = 'rgba(180,180,180,0.55)';
+                        ctx.fillText(displayName, midX - textW / 2, midY + textH / 3);
+                      } else {
+                        // Standard label: colored pill with border
+                        const padX = 6;
+                        const padY = 3;
+                        const rx = midX - textW / 2 - padX;
+                        const ry = midY - textH / 2 - padY;
+                        const rw = textW + padX * 2;
+                        const rh = textH + padY * 2;
+                        const radius = 4;
+
+                        ctx.fillStyle = style.labelBg;
+                        ctx.beginPath();
+                        ctx.moveTo(rx + radius, ry);
+                        ctx.lineTo(rx + rw - radius, ry);
+                        ctx.arcTo(rx + rw, ry, rx + rw, ry + radius, radius);
+                        ctx.lineTo(rx + rw, ry + rh - radius);
+                        ctx.arcTo(rx + rw, ry + rh, rx + rw - radius, ry + rh, radius);
+                        ctx.lineTo(rx + radius, ry + rh);
+                        ctx.arcTo(rx, ry + rh, rx, ry + rh - radius, radius);
+                        ctx.lineTo(rx, ry + radius);
+                        ctx.arcTo(rx, ry, rx + radius, ry, radius);
+                        ctx.closePath();
+                        ctx.fill();
+
+                        ctx.strokeStyle = style.labelBorder;
+                        ctx.lineWidth = 1.5;
+                        ctx.stroke();
+
+                        ctx.fillStyle = style.labelColor;
+                        ctx.fillText(displayName, midX - textW / 2, midY + textH / 3);
+                      }
+                    }
+
+                    // Start point marker
+                    ctx.fillStyle = style.fill;
                     const first = points[0];
                     ctx.beginPath();
                     ctx.arc(tx(first.x), ty(first.z), 4 * (window.devicePixelRatio || 1), 0, Math.PI * 2);
