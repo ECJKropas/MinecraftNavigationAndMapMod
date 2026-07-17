@@ -54,7 +54,11 @@ public class WayfarerClient implements ClientModInitializer {
     private void handleClientTick(Minecraft client) {
         ROAD_DATA_STORE.syncToCurrentContext();
 
-        ROAD_MANAGER.tick(client);
+        if (client.screen != null) {
+            keysDownLastTick.clear();
+            ROAD_MANAGER.tick(client);
+            return;
+        }
 
         if (client.player == null)
             return;
