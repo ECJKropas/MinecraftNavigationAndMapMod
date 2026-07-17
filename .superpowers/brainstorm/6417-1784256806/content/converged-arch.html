@@ -1,0 +1,88 @@
+<h2>收敛架构：双端路网图层方案</h2>
+<p class="subtitle">核心思路：统一路网数据模型 + 两套渲染前端（Xaero Mixin + Leaflet Web）</p>
+
+<div class="section">
+  <div class="mockup">
+    <div class="mockup-header">三层架构</div>
+    <div class="mockup-body" style="background:#1a1a2e;padding:24px;font-family:monospace;font-size:11px;line-height:1.9;color:#e9ecef;">
+<span style="color:#adb5bd;">╔══════════════════════════════════════════════╗</span><br>
+<span style="color:#adb5bd;">║</span>  <span style="color:#0d6efd;">【数据层】RoadLayerModel</span>                    <span style="color:#adb5bd;">║</span><br>
+<span style="color:#adb5bd;">║</span>  · RoadPath + RoadSegment + Classification   <span style="color:#adb5bd;">║</span><br>
+<span style="color:#adb5bd;">║</span>  · 交叉口拓扑 · 道路等级 · 宽度 · 名称标签    <span style="color:#adb5bd;">║</span><br>
+<span style="color:#adb5bd;">╠══════════════════════════════════════════════╣</span><br>
+<span style="color:#adb5bd;">║</span>  <span style="color:#F0A030;">【服务层】RenderDataExporter</span>                <span style="color:#adb5bd;">║</span><br>
+<span style="color:#adb5bd;">║</span>  · GeoJSON 序列化（Web 端）                   <span style="color:#adb5bd;">║</span><br>
+<span style="color:#adb5bd;">║</span>  · 屏幕坐标投影（Xaero 端）                   <span style="color:#adb5bd;">║</span><br>
+<span style="color:#adb5bd;">║</span>  · 视口裁剪 + LOD 简化                        <span style="color:#adb5bd;">║</span><br>
+<span style="color:#adb5bd;">╠══════════════════════════════════════════════╣</span><br>
+<span style="color:#adb5bd;">║</span>  <span style="color:#20c997;">【渲染层】双前端</span>                             <span style="color:#adb5bd;">║</span><br>
+<span style="color:#adb5bd;">║</span>                                             <span style="color:#adb5bd;">║</span><br>
+<span style="color:#adb5bd;">║</span>  <span style="color:#F0A030;">┌─ 游戏内 ────────────────────┐</span>              <span style="color:#adb5bd;">║</span><br>
+<span style="color:#adb5bd;">║</span>  <span style="color:#F0A030;">│ Xaero Mixin 渲染钩子       │</span>              <span style="color:#adb5bd;">║</span><br>
+<span style="color:#adb5bd;">║</span>  <span style="color:#F0A030;">│ · 参考 XaeroPlus 源码      │</span>              <span style="color:#adb5bd;">║</span><br>
+<span style="color:#adb5bd;">║</span>  <span style="color:#F0A030;">│ · 在 Xaero 渲染循环中注入  │</span>              <span style="color:#adb5bd;">║</span><br>
+<span style="color:#adb5bd;">║</span>  <span style="color:#F0A030;">│ · 道路线宽/颜色/标签分层   │</span>              <span style="color:#adb5bd;">║</span><br>
+<span style="color:#adb5bd;">║</span>  <span style="color:#F0A030;">└────────────────────────────┘</span>              <span style="color:#adb5bd;">║</span><br>
+<span style="color:#adb5bd;">║</span>                                             <span style="color:#adb5bd;">║</span><br>
+<span style="color:#adb5bd;">║</span>  <span style="color:#20c997;">┌─ 浏览器 ────────────────────┐</span>              <span style="color:#adb5bd;">║</span><br>
+<span style="color:#adb5bd;">║</span>  <span style="color:#20c997;">│ Leaflet / MapLibre GL       │</span>              <span style="color:#adb5bd;">║</span><br>
+<span style="color:#adb5bd;">║</span>  <span style="color:#20c997;">│ · GeoJSON 路网图层          │</span>              <span style="color:#adb5bd;">║</span><br>
+<span style="color:#adb5bd;">║</span>  <span style="color:#20c997;">│ · MC 地形底图瓦片（种子渲染）│</span>              <span style="color:#adb5bd;">║</span><br>
+<span style="color:#adb5bd;">║</span>  <span style="color:#20c997;">│ · 缩放/平移/点选/搜索       │</span>              <span style="color:#adb5bd;">║</span><br>
+<span style="color:#adb5bd;">║</span>  <span style="color:#20c997;">└────────────────────────────┘</span>              <span style="color:#adb5bd;">║</span><br>
+<span style="color:#adb5bd;">╚══════════════════════════════════════════════╝</span>
+    </div>
+  </div>
+</div>
+
+<div class="section">
+  <h3>两个渲染端的差异与互补</h3>
+  <table style="width:100%;border-collapse:collapse;font-size:12px;">
+    <thead>
+      <tr style="background:#f1f3f5;">
+        <th style="padding:8px;text-align:left;border:1px solid #dee2e6;"></th>
+        <th style="padding:8px;text-align:center;border:1px solid #dee2e6;">Xaero 游戏内</th>
+        <th style="padding:8px;text-align:center;border:1px solid #dee2e6;">Leaflet 浏览器</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td style="padding:8px;border:1px solid #dee2e6;">底图来源</td>
+        <td style="padding:8px;border:1px solid #dee2e6;text-align:center;">Xaero 已渲染的 MC 地形</td>
+        <td style="padding:8px;border:1px solid #dee2e6;text-align:center;">种子离线渲染瓦片 / 空白网格</td>
+      </tr>
+      <tr style="background:#f8f9fa;">
+        <td style="padding:8px;border:1px solid #dee2e6;">渲染方式</td>
+        <td style="padding:8px;border:1px solid #dee2e6;text-align:center;">OpenGL 即时模式（Mixin GL）</td>
+        <td style="padding:8px;border:1px solid #dee2e6;text-align:center;">Canvas/SVG（Leaflet 矢量图层）</td>
+      </tr>
+      <tr>
+        <td style="padding:8px;border:1px solid #dee2e6;">交互</td>
+        <td style="padding:8px;border:1px solid #dee2e6;text-align:center;">跟随 Xaero 地图交互</td>
+        <td style="padding:8px;border:1px solid #dee2e6;text-align:center;">完整 Web 交互（点选/筛选/导出）</td>
+      </tr>
+      <tr style="background:#f8f9fa;">
+        <td style="padding:8px;border:1px solid #dee2e6;">开发难度</td>
+        <td style="padding:8px;border:1px solid #dee2e6;text-align:center;">高（Mixin + OpenGL + 逆向）</td>
+        <td style="padding:8px;border:1px solid #dee2e6;text-align:center;">中（Web 前端，AI 友好）</td>
+      </tr>
+      <tr>
+        <td style="padding:8px;border:1px solid #dee2e6;">风险</td>
+        <td style="padding:8px;border:1px solid #dee2e6;text-align:center;">Xaero 更新导致 Mixin 失效</td>
+        <td style="padding:8px;border:1px solid #dee2e6;text-align:center;">底图瓦片生成复杂度</td>
+      </tr>
+    </tbody>
+  </table>
+</div>
+
+<div class="section">
+  <div class="pros-cons">
+    <div class="pros"><h4>推荐 MVP 顺序</h4>
+      <ol>
+        <li><strong>第一期：Leaflet Web 预览升级</strong> — 风险最低、AI 辅助开发最友好、立即解决"路网展示不尽如人意"的核心痛点。用 GeoJSON + Leaflet + 路网样式配置替代现有 Canvas 手绘。</li>
+        <li><strong>第二期：Xaero Mixin 路网叠加</strong> — 参考 XaeroPlus 源码，在 Xaero 大地图渲染循环中注入路网绘制。先做只读展示，后加交互。</li>
+        <li><strong>第三期：MC 种子地形底图</strong> — 为浏览器端生成地形瓦片，替代空白背景。可参考 Cubiomes Viewer 等开源项目。</li>
+      </ol>
+    </div>
+  </div>
+</div>

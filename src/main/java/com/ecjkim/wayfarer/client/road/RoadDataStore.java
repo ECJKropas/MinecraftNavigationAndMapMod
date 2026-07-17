@@ -29,7 +29,10 @@ import java.util.logging.Logger;
 import net.minecraft.client.Minecraft;
 
 import com.ecjkim.wayfarer.client.road.model.RoadBook;
+import com.ecjkim.wayfarer.client.road.model.RoadIntersection;
 import com.ecjkim.wayfarer.client.road.model.RoadPath;
+import com.ecjkim.wayfarer.client.road.model.RoadPoint;
+import com.ecjkim.wayfarer.client.road.model.RoadSegment;
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
 
@@ -108,6 +111,234 @@ public class RoadDataStore {
     public synchronized String toJson() {
         syncToCurrentContext();
         return GSON.toJson(snapshot().roads);
+    }
+
+    /**
+     * Export all roads as a GeoJSON FeatureCollection.
+     *
+     * <p>Each road is a Feature with a LineString geometry (x → longitude,
+     * z → latitude). Properties include id, name, number, classification,
+     * width, length, and intersection count.</p>
+     */
+    public synchronized String toGeoJson() {
+        syncToCurrentContext();
+        List<RoadPath> roads = getRoads();
+
+        StringBuilder sb = new StringBuilder(65536);
+        sb.append("{\"type\":\"FeatureCollection\",\"features\":[");
+        boolean first = true;
+        for (RoadPath road : roads) {
+            if (road.points == null || road.points.size() < 2) continue;
+            if (!first) sb.append(',');
+            first = false;
+
+            // classification defaults to C
+            String cls = road.classification != null ? road.classification : "C";
+
+            // compute length
+            double length = 0.0;
+            RoadPoint prev = null;
+            for (RoadPoint pt : road.points) {
+                if (prev != null) {
+                    double dx = pt.x - prev.x;
+                    double dz = pt.z - prev.z;
+                    length += Math.sqrt(dx * dx + dz * dz);
+                }
+                prev = pt;
+            }
+
+            sb.append("{\"type\":\"Feature\",\"properties\":{");
+            appendJsonProperty(sb, "id", road.id);
+            sb.append(',');
+            appendJsonProperty(sb, "name", road.name);
+            sb.append(',');
+            appendJsonProperty(sb, "number", road.number);
+            sb.append(',');
+            appendJsonProperty(sb, "classification", cls);
+            sb.append(',');
+            sb.append("\"width\":").append(road.width);
+            sb.append(',');
+            sb.append("\"length\":").append(Math.round(length * 10.0) / 10.0);
+            int intersectionCount = road.intersections != null ? road.intersections.size() : 0;
+            sb.append(",\"intersectionCount\":").append(intersectionCount);
+            // style override
+            if (road.style != null) {
+                sb.append(",\"style\":{");
+                boolean styleFirst = true;
+                if (road.style.color != null) {
+                    appendJsonProperty(sb, "color", road.style.color);
+                    styleFirst = false;
+                }
+                if (road.style.lineWidth != null) {
+                    if (!styleFirst) sb.append(',');
+                    sb.append("\"lineWidth\":").append(road.style.lineWidth);
+                    styleFirst = false;
+                }
+                if (road.style.dashPattern != null) {
+                    if (!styleFirst) sb.append(',');
+                    appendJsonProperty(sb, "dashPattern", road.style.dashPattern);
+                }
+                sb.append('}');
+            }
+            sb.append("},\"geometry\":{\"type\":\"LineString\",\"coordinates\":[");
+            boolean ptFirst = true;
+            for (RoadPoint pt : road.points) {
+                if (!ptFirst) sb.append(',');
+                ptFirst = false;
+                sb.append('[').append(pt.x).append(',').append(pt.z).append(']');
+            }
+            sb.append("]}}");
+        }
+        sb.append("]}");
+        return sb.toString();
+    }
+
+    /**
+     * Export a single road as a GeoJSON Feature, or {@code null} if not found.
+     */
+    public synchronized String toGeoJsonFeature(String roadId) {
+        syncToCurrentContext();
+        for (RoadPath road : getRoads()) {
+            if (road.id != null && road.id.equals(roadId)) {
+                return toGeoJsonFeature(road);
+            }
+        }
+        return null;
+    }
+
+    private String toGeoJsonFeature(RoadPath road) {
+        String cls = road.classification != null ? road.classification : "C";
+        double length = 0.0;
+        RoadPoint prev = null;
+        for (RoadPoint pt : road.points) {
+            if (prev != null) {
+                double dx = pt.x - prev.x;
+                double dz = pt.z - prev.z;
+                length += Math.sqrt(dx * dx + dz * dz);
+            }
+            prev = pt;
+        }
+
+        StringBuilder sb = new StringBuilder(8192);
+        sb.append("{\"type\":\"Feature\",\"properties\":{");
+        appendJsonProperty(sb, "id", road.id);
+        sb.append(',');
+        appendJsonProperty(sb, "name", road.name);
+        sb.append(',');
+        appendJsonProperty(sb, "number", road.number);
+        sb.append(',');
+        appendJsonProperty(sb, "classification", cls);
+        sb.append(',');
+        sb.append("\"width\":").append(road.width);
+        sb.append(',');
+        sb.append("\"length\":").append(Math.round(length * 10.0) / 10.0);
+        int intersectionCount = road.intersections != null ? road.intersections.size() : 0;
+        sb.append(",\"intersectionCount\":").append(intersectionCount);
+        // segments
+        if (road.segments != null && !road.segments.isEmpty()) {
+            sb.append(",\"segments\":[");
+            boolean segFirst = true;
+            for (RoadSegment seg : road.segments) {
+                if (!segFirst) sb.append(',');
+                segFirst = false;
+                appendJsonProperty(sb, null, seg.id);
+            }
+            sb.append(']');
+        }
+        // intersections detail
+        if (road.intersections != null && !road.intersections.isEmpty()) {
+            sb.append(",\"intersectionDetails\":[");
+            boolean intFirst = true;
+            for (RoadIntersection isect : road.intersections) {
+                if (!intFirst) sb.append(',');
+                intFirst = false;
+                sb.append('{');
+                if (isect.id != null) {
+                    appendJsonProperty(sb, "id", isect.id);
+                    sb.append(',');
+                }
+                if (isect.position != null) {
+                    sb.append("\"position\":{\"x\":").append(isect.position.x)
+                        .append(",\"y\":").append(isect.position.y)
+                        .append(",\"z\":").append(isect.position.z)
+                        .append('}');
+                } else {
+                    // fallback to legacy fields
+                    sb.append("\"position\":{\"x\":").append(isect.x)
+                        .append(",\"y\":").append(isect.y)
+                        .append(",\"z\":").append(isect.z)
+                        .append('}');
+                }
+                if (isect.type != null) {
+                    sb.append(',');
+                    appendJsonProperty(sb, "type", isect.type);
+                }
+                if (isect.name != null) {
+                    sb.append(',');
+                    appendJsonProperty(sb, "name", isect.name);
+                }
+                sb.append('}');
+            }
+            sb.append(']');
+        }
+        // style
+        if (road.style != null) {
+            sb.append(",\"style\":{");
+            boolean styleFirst = true;
+            if (road.style.color != null) {
+                appendJsonProperty(sb, "color", road.style.color);
+                styleFirst = false;
+            }
+            if (road.style.lineWidth != null) {
+                if (!styleFirst) sb.append(',');
+                sb.append("\"lineWidth\":").append(road.style.lineWidth);
+                styleFirst = false;
+            }
+            if (road.style.dashPattern != null) {
+                if (!styleFirst) sb.append(',');
+                appendJsonProperty(sb, "dashPattern", road.style.dashPattern);
+            }
+            sb.append('}');
+        }
+        sb.append("},\"geometry\":{\"type\":\"LineString\",\"coordinates\":[");
+        boolean ptFirst = true;
+        for (RoadPoint pt : road.points) {
+            if (!ptFirst) sb.append(',');
+            ptFirst = false;
+            sb.append('[').append(pt.x).append(',').append(pt.z).append(']');
+        }
+        sb.append("]}}");
+        return sb.toString();
+    }
+
+    private static void appendJsonProperty(StringBuilder sb, String key, String value) {
+        sb.append('"').append(key).append("\":");
+        if (value == null) {
+            sb.append("null");
+        } else {
+            sb.append('"').append(escapeJson(value)).append('"');
+        }
+    }
+
+    private static String escapeJson(String s) {
+        StringBuilder sb = new StringBuilder(s.length() + 16);
+        for (int i = 0; i < s.length(); i++) {
+            char c = s.charAt(i);
+            switch (c) {
+                case '"': sb.append("\\\""); break;
+                case '\\': sb.append("\\\\"); break;
+                case '\n': sb.append("\\n"); break;
+                case '\r': sb.append("\\r"); break;
+                case '\t': sb.append("\\t"); break;
+                default:
+                    if (c < 0x20) {
+                        sb.append(String.format("\\u%04x", (int) c));
+                    } else {
+                        sb.append(c);
+                    }
+            }
+        }
+        return sb.toString();
     }
 
     private void syncToContext(RoadStorageContext nextContext) {

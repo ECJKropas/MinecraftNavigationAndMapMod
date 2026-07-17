@@ -1,0 +1,133 @@
+<h2>Wayfarer 路网展示升级：三条技术路线</h2>
+<p class="subtitle">当前瓶颈：纯 Canvas 手绘 → 无底图 · 无缩放平移 · 无可视化图层 · 无外部工具互通</p>
+
+<div class="section">
+  <h3>路线对比概览</h3>
+  <table style="width:100%;border-collapse:collapse;font-size:13px;">
+    <thead>
+      <tr style="background:#f1f3f5;">
+        <th style="padding:8px;text-align:left;border:1px solid #dee2e6;">维度</th>
+        <th style="padding:8px;text-align:center;border:1px solid #dee2e6;">A · QGIS 集成</th>
+        <th style="padding:8px;text-align:center;border:1px solid #dee2e6;">B · Xaero 联动</th>
+        <th style="padding:8px;text-align:center;border:1px solid #dee2e6;">C · 自建轻量地图引擎</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td style="padding:8px;border:1px solid #dee2e6;"><strong>底图</strong></td>
+        <td style="padding:8px;border:1px solid #dee2e6;text-align:center;">OSM / 自定义瓦片</td>
+        <td style="padding:8px;border:1px solid #dee2e6;text-align:center;">MC 世界地形（区块级）</td>
+        <td style="padding:8px;border:1px solid #dee2e6;text-align:center;">MC 种子生成瓦片</td>
+      </tr>
+      <tr style="background:#f8f9fa;">
+        <td style="padding:8px;border:1px solid #dee2e6;"><strong>缩放/平移</strong></td>
+        <td style="padding:8px;border:1px solid #dee2e6;text-align:center;">原生支持（GIS 引擎）</td>
+        <td style="padding:8px;border:1px solid #dee2e6;text-align:center;">原生支持（游戏内小地图/大地图）</td>
+        <td style="padding:8px;border:1px solid #dee2e6;text-align:center;">需自建（Leaflet/OpenLayers）</td>
+      </tr>
+      <tr>
+        <td style="padding:8px;border:1px solid #dee2e6;"><strong>路网渲染</strong></td>
+        <td style="padding:8px;border:1px solid #dee2e6;text-align:center;">GeoJSON 叠加层</td>
+        <td style="padding:8px;border:1px solid #dee2e6;text-align:center;">Waypoint/路径注入 Xaero</td>
+        <td style="padding:8px;border:1px solid #dee2e6;text-align:center;">完全自主可控</td>
+      </tr>
+      <tr style="background:#f8f9fa;">
+        <td style="padding:8px;border:1px solid #dee2e6;"><strong>使用场景</strong></td>
+        <td style="padding:8px;border:1px solid #dee2e6;text-align:center;">浏览器 / 外部 GIS 工具</td>
+        <td style="padding:8px;border:1px solid #dee2e6;text-align:center;">游戏内 HUD + 全屏大地图</td>
+        <td style="padding:8px;border:1px solid #dee2e6;text-align:center;">浏览器（当前 Web 预览升级）</td>
+      </tr>
+      <tr>
+        <td style="padding:8px;border:1px solid #dee2e6;"><strong>开发量</strong></td>
+        <td style="padding:8px;border:1px solid #dee2e6;text-align:center;">中高（需 GIS 知识 + 坐标映射）</td>
+        <td style="padding:8px;border:1px solid #dee2e6;text-align:center;">中（需逆向/兼容 Xaero API）</td>
+        <td style="padding:8px;border:1px solid #dee2e6;text-align:center;">低-中（Web 前端为主）</td>
+      </tr>
+      <tr style="background:#f8f9fa;">
+        <td style="padding:8px;border:1px solid #dee2e6;"><strong>风险</strong></td>
+        <td style="padding:8px;border:1px solid #dee2e6;text-align:center;">MC→GIS 坐标映射复杂；QGIS 非游戏原生体验</td>
+        <td style="padding:8px;border:1px solid #dee2e6;text-align:center;">依赖第三方 mod；API 可能不公开/不稳定</td>
+        <td style="padding:8px;border:1px solid #dee2e6;text-align:center;">底图生成复杂；AI 辅助开发边界</td>
+      </tr>
+    </tbody>
+  </table>
+</div>
+
+<div class="section">
+  <h3>三条路线的架构示意</h3>
+</div>
+
+<div class="cards">
+  <div class="card" data-choice="A" onclick="toggleSelect(this)">
+    <div class="card-image" style="background:#1a1a2e;padding:20px;min-height:140px;">
+      <div style="color:#0d6efd;font-family:monospace;font-size:11px;line-height:1.7;">
+        ┌─────────────┐<br>
+        │  Wayfarer   │<br>
+        │  (轨迹录制)  │<br>
+        └──────┬──────┘<br>
+        &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;│ JSON<br>
+        &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;▼<br>
+        ┌─────────────┐&nbsp;&nbsp;&nbsp;┌──────────┐<br>
+        │ GeoJSON     │──▶│ QGIS /   │<br>
+        │ 导出/转换   │&nbsp;&nbsp;&nbsp;│ Leaflet  │<br>
+        └─────────────┘&nbsp;&nbsp;&nbsp;│ Web 地图  │<br>
+        &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;└──────────┘
+      </div>
+    </div>
+    <div class="card-body">
+      <h3>A · QGIS 集成</h3>
+      <p>路网导出为 GeoJSON，叠加在真实地理底图或 MC 世界自定义瓦片上，通过 QGIS/Leaflet 查看</p>
+    </div>
+  </div>
+
+  <div class="card" data-choice="B" onclick="toggleSelect(this)">
+    <div class="card-image" style="background:#1a1a2e;padding:20px;min-height:140px;">
+      <div style="color:#F0A030;font-family:monospace;font-size:11px;line-height:1.7;">
+        ┌─────────────┐<br>
+        │  Wayfarer   │<br>
+        │  (轨迹录制)  │<br>
+        └──────┬──────┘<br>
+        &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;│ 路网数据<br>
+        &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;▼<br>
+        ┌─────────────────────────┐<br>
+        │ Xaero's World Map       │<br>
+        │ ← 注入 Waypoint/Path   │<br>
+        │ ← 游戏内 HUD + 大地图  │<br>
+        └─────────────────────────┘
+      </div>
+    </div>
+    <div class="card-body">
+      <h3>B · Xaero 联动</h3>
+      <p>将 Wayfarer 路网数据注入 Xaero's World Map，在 MC 游戏内叠加显示路网</p>
+    </div>
+  </div>
+
+  <div class="card" data-choice="C" onclick="toggleSelect(this)">
+    <div class="card-image" style="background:#1a1a2e;padding:20px;min-height:140px;">
+      <div style="color:#20c997;font-family:monospace;font-size:11px;line-height:1.7;">
+        ┌─────────────┐&nbsp;&nbsp;&nbsp;┌──────────────┐<br>
+        │  Wayfarer   │──▶│  Web 预览    │<br>
+        │  (轨迹录制)  │&nbsp;&nbsp;&nbsp;│  Leaflet +   │<br>
+        └──────┬──────┘&nbsp;&nbsp;&nbsp;│  自建瓦片服务  │<br>
+        &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;│&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;└──────────────┘<br>
+        &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;│ 种子/区块数据<br>
+        &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;▼<br>
+        ┌─────────────┐<br>
+        │  MC 世界    │<br>
+        │  地形渲染    │<br>
+        └─────────────┘
+      </div>
+    </div>
+    <div class="card-body">
+      <h3>C · 自建轻量地图引擎</h3>
+      <p>Web 端引入 Leaflet/MapLibre，MC 侧生成地形瓦片，路网作为独立图层叠加</p>
+    </div>
+  </div>
+</div>
+
+<div class="section">
+  <div class="pros-cons">
+    <div class="pros"><h4>推荐优先级</h4><p>建议 <strong>B + C 并行</strong>：Xaero 联动覆盖游戏内体验，Leaflet Web 预览覆盖浏览器端。QGIS 作为后期高级用户选项。</p></div>
+    <div class="cons"><h4>关键决策点</h4><p>是否接受依赖 Xaero（第三方模组）？如果不接受 → 全力投入路线 C。如果可以接受 → B 是游戏内体验最优解。</p></div>
+  </div>
+</div>

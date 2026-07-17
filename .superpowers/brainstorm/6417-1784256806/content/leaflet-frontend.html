@@ -1,0 +1,149 @@
+<h2>设计章节 2：Leaflet Web 渲染前端</h2>
+<p class="subtitle">替换现有纯 Canvas 手绘，升级为专业地图引擎驱动的路网预览</p>
+
+<div class="section">
+  <h3>技术选型：Leaflet vs MapLibre GL</h3>
+  <table style="width:100%;border-collapse:collapse;font-size:12px;">
+    <thead>
+      <tr style="background:#f1f3f5;">
+        <th style="padding:8px;text-align:left;border:1px solid #dee2e6;">维度</th>
+        <th style="padding:8px;text-align:center;border:1px solid #dee2e6;">Leaflet</th>
+        <th style="padding:8px;text-align:center;border:1px solid #dee2e6;">MapLibre GL</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td style="padding:8px;border:1px solid #dee2e6;">体积</td>
+        <td style="padding:8px;border:1px solid #dee2e6;text-align:center;color:#20c997;">~40KB</td>
+        <td style="padding:8px;border:1px solid #dee2e6;text-align:center;">~500KB</td>
+      </tr>
+      <tr style="background:#f8f9fa;">
+        <td style="padding:8px;border:1px solid #dee2e6;">渲染</td>
+        <td style="padding:8px;border:1px solid #dee2e6;text-align:center;">SVG / Canvas</td>
+        <td style="padding:8px;border:1px solid #dee2e6;text-align:center;">WebGL</td>
+      </tr>
+      <tr>
+        <td style="padding:8px;border:1px solid #dee2e6;">路网线条</td>
+        <td style="padding:8px;border:1px solid #dee2e6;text-align:center;color:#20c997;">原生 GeoJSON LineString</td>
+        <td style="padding:8px;border:1px solid #dee2e6;text-align:center;">矢量瓦片更优</td>
+      </tr>
+      <tr style="background:#f8f9fa;">
+        <td style="padding:8px;border:1px solid #dee2e6;">沿路标签</td>
+        <td style="padding:8px;border:1px solid #dee2e6;text-align:center;color:#20c997;">插件丰富</td>
+        <td style="padding:8px;border:1px solid #dee2e6;text-align:center;">需自行实现</td>
+      </tr>
+      <tr>
+        <td style="padding:8px;border:1px solid #dee2e6;">学习曲线</td>
+        <td style="padding:8px;border:1px solid #dee2e6;text-align:center;color:#20c997;">低</td>
+        <td style="padding:8px;border:1px solid #dee2e6;text-align:center;">中高</td>
+      </tr>
+      <tr style="background:#f8f9fa;">
+        <td style="padding:8px;border:1px solid #dee2e6;">AI 辅助开发</td>
+        <td style="padding:8px;border:1px solid #dee2e6;text-align:center;color:#20c997;">优秀</td>
+        <td style="padding:8px;border:1px solid #dee2e6;text-align:center;">良好</td>
+      </tr>
+    </tbody>
+  </table>
+  <p style="margin-top:12px;"><strong>选择 Leaflet</strong>：MVP 阶段路网数据量在数千点级别，Leaflet 完全胜任。配合 leaflet-textpath 插件实现沿路标签。后期如需 WebGL 高性能渲染可平滑迁移到 MapLibre。</p>
+</div>
+
+<div class="section">
+  <h3>页面布局重构</h3>
+  <div class="mockup">
+    <div class="mockup-header">新 Web 预览布局</div>
+    <div class="mockup-body" style="background:#f8f9fa;padding:16px;">
+      <div style="display:flex;gap:0;min-height:360px;border:1px solid #dee2e6;border-radius:6px;overflow:hidden;">
+        <div style="flex:1;background:#fff;position:relative;">
+          <div style="position:absolute;top:8px;right:8px;display:flex;flex-direction:column;gap:4px;">
+            <div style="background:#fff;border:1px solid #ccc;border-radius:4px;padding:4px 6px;font-size:10px;">+</div>
+            <div style="background:#fff;border:1px solid #ccc;border-radius:4px;padding:4px 6px;font-size:10px;">−</div>
+            <div style="background:#fff;border:1px solid #ccc;border-radius:4px;padding:4px 6px;font-size:10px;">⊙</div>
+          </div>
+          <div style="position:absolute;top:8px;left:8px;background:#fff;border:1px solid #ccc;border-radius:4px;padding:6px 10px;font-size:10px;">
+            <div style="font-weight:600;">图层</div>
+            <div style="margin-top:4px;"><input type="checkbox" checked> ☰ 国道 G</div>
+            <div><input type="checkbox" checked> ☰ 省道 S</div>
+            <div><input type="checkbox" checked> ☰ 县道 X</div>
+            <div><input type="checkbox"> ☰ 乡道 Y</div>
+            <div><input type="checkbox"> ☰ 村道 C</div>
+          </div>
+          <div style="position:absolute;bottom:8px;left:8px;font-size:9px;color:#6c757d;">Leaflet | Wayfarer Road Network</div>
+          <div style="width:80%;margin:40px auto 0;">
+            <svg viewBox="0 0 600 280" style="width:100%;">
+              <line x1="50" y1="140" x2="300" y2="80" stroke="#D9432B" stroke-width="3"/>
+              <line x1="300" y1="80" x2="550" y2="160" stroke="#D9432B" stroke-width="3"/>
+              <line x1="50" y1="200" x2="280" y2="140" stroke="#F0A030" stroke-width="2.5"/>
+              <line x1="280" y1="140" x2="450" y2="220" stroke="#F0A030" stroke-width="2.5"/>
+              <line x1="350" y1="60" x2="400" y2="180" stroke="#adb5bd" stroke-width="1.5"/>
+              <rect x="230" y="72" width="50" height="18" rx="3" fill="#D9432B"/>
+              <text x="255" y="85" fill="#fff" font-size="9" text-anchor="middle">G107</text>
+              <rect x="140" y="158" width="45" height="16" rx="3" fill="#FFE066" stroke="#F0A030" stroke-width="1"/>
+              <text x="162" y="170" fill="#000" font-size="8" text-anchor="middle">S202</text>
+              <circle cx="300" cy="80" r="3" fill="#0d6efd"/>
+              <circle cx="50" cy="140" r="3" fill="#0d6efd"/>
+              <circle cx="280" cy="140" r="3" fill="#0d6efd"/>
+            </svg>
+          </div>
+        </div>
+        <div style="width:280px;background:#fff;border-left:1px solid #dee2e6;padding:12px;font-size:11px;overflow-y:auto;">
+          <div style="font-weight:600;margin-bottom:8px;">道路列表</div>
+          <div style="border-bottom:1px solid #eee;padding:4px 0;">
+            <div><span style="background:#D9432B;color:#fff;padding:1px 5px;border-radius:3px;font-size:9px;margin-right:4px;">G</span> G107 京深线</div>
+            <div style="color:#6c757d;font-size:10px;">156点 · 3交叉口 · 1.2km</div>
+          </div>
+          <div style="border-bottom:1px solid #eee;padding:4px 0;">
+            <div><span style="background:#F0A030;color:#000;padding:1px 5px;border-radius:3px;font-size:9px;margin-right:4px;">S</span> S202 省道</div>
+            <div style="color:#6c757d;font-size:10px;">89点 · 1交叉口 · 0.6km</div>
+          </div>
+          <div style="border-bottom:1px solid #eee;padding:4px 0;">
+            <div><span style="background:#fff;color:#495057;border:1px solid #adb5bd;padding:1px 4px;border-radius:3px;font-size:9px;margin-right:4px;">X</span> 新塘线</div>
+            <div style="color:#6c757d;font-size:10px;">42点 · 0交叉口 · 0.3km</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="section">
+  <h3>核心功能清单</h3>
+  <table style="width:100%;border-collapse:collapse;font-size:12px;">
+    <thead>
+      <tr style="background:#f1f3f5;">
+        <th style="padding:8px;text-align:left;border:1px solid #dee2e6;">功能</th>
+        <th style="padding:8px;text-align:left;border:1px solid #dee2e6;">实现</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td style="padding:8px;border:1px solid #dee2e6;">路网 GeoJSON 图层</td>
+        <td style="padding:8px;border:1px solid #dee2e6;font-size:11px;">RoadPath → GeoJSON FeatureCollection，按 classification 分组，每组独立 L.geoJSON layer</td>
+      </tr>
+      <tr style="background:#f8f9fa;">
+        <td style="padding:8px;border:1px solid #dee2e6;">道路标签</td>
+        <td style="padding:8px;border:1px solid #dee2e6;font-size:11px;">leaflet-textpath 插件，标签沿 LineString 方向排列。G/S 级始终显示，X/Y/C 随缩放级别渐隐</td>
+      </tr>
+      <tr>
+        <td style="padding:8px;border:1px solid #dee2e6;">图层控制面板</td>
+        <td style="padding:8px;border:1px solid #dee2e6;font-size:11px;">L.control.layers 实现五级道路独立开关。默认全开</td>
+      </tr>
+      <tr style="background:#f8f9fa;">
+        <td style="padding:8px;border:1px solid #dee2e6;">交叉口标记</td>
+        <td style="padding:8px;border:1px solid #dee2e6;font-size:11px;">L.circleMarker，T字蓝色/十字红色/环岛绿色。悬停显示连接道路列表</td>
+      </tr>
+      <tr>
+        <td style="padding:8px;border:1px solid #dee2e6;">道路点选</td>
+        <td style="padding:8px;border:1px solid #dee2e6;font-size:11px;">点击道路高亮并弹出信息卡片（名称、等级、长度、交叉口数）</td>
+      </tr>
+      <tr style="background:#f8f9fa;">
+        <td style="padding:8px;border:1px solid #dee2e6;">搜索/定位</td>
+        <td style="padding:8px;border:1px solid #dee2e6;font-size:11px;">搜索框输入道路名称 → flyTo 定位 + 高亮</td>
+      </tr>
+    </tbody>
+  </table>
+</div>
+
+<div class="section">
+  <h3>后端改造</h3>
+  <p>RoadPreviewServer Java 端：现有 HTML 内联字符串替换为静态 HTML 文件（classpath resources）。新增 <code>/api/roads/geojson</code> 端点，RoadDataStore 增加 toGeoJson() 方法。保留 <code>/api/roads</code> 兼容旧格式。</p>
+</div>

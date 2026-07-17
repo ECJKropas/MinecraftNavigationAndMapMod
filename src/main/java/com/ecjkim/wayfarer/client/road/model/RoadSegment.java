@@ -20,25 +20,13 @@ import java.util.ArrayList;
 import java.util.List;
 
 /**
- * A recorded road path with optional classification metadata.
- *
- * <p>All new fields ({@code segments}, {@code style}) are
- * {@code null} by default so that existing {@code roads.json}
- * files deserialize without error (backward-compatible).</p>
+ * A contiguous sub-section of a RoadPath bounded by two intersections.
  */
-public class RoadPath {
+public class RoadSegment {
     public String id;
-    public String name;
-    public double width;
-    /** G=国道, S=省道, X=县道, Y=乡道, C=村道. Defaults to C when missing. */
-    public String classification;
-    /** Road number, e.g. "318". */
-    public String number;
+    public String parentRoadId;
     public List<RoadPoint> points = new ArrayList<>();
-    /** Upgraded intersection model — may be null in legacy data. */
-    public List<RoadIntersection> intersections = new ArrayList<>();
-    /** Road sub-sections bounded by intersections — optional. */
-    public List<RoadSegment> segments;
-    /** Per-road visual style override — optional. */
-    public RoadStyle style;
+    public double length;
+    public String startIntersection;
+    public String endIntersection;
 }

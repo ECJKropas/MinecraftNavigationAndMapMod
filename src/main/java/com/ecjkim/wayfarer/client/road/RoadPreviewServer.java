@@ -20,44 +20,56 @@ import java.io.IOException;
 import java.io.OutputStream;
 import java.net.InetSocketAddress;
 import java.nio.charset.StandardCharsets;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
 import java.util.concurrent.Executors;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
+import com.ecjkim.wayfarer.client.road.layer.LayerManager;
+import com.ecjkim.wayfarer.client.road.layer.MapLayer;
 import com.ecjkim.wayfarer.client.road.model.RoadPath;
+import com.google.gson.Gson;
+import com.google.gson.GsonBuilder;
 import com.sun.net.httpserver.HttpExchange;
 import com.sun.net.httpserver.HttpServer;
 
 public class RoadPreviewServer {
-    private static final Logger LOGGER = Logger.getLogger("MC Nav Preview");
+    private static final Logger LOGGER = Logger.getLogger("Wayfarer|Preview");
     private static final int PORT = 7891;
 
+    private static final Gson GSON = new GsonBuilder().setPrettyPrinting().create();
+
     private final RoadDataStore roadDataStore;
+    private final LayerManager layerManager;
     private HttpServer server;
 
     public RoadPreviewServer(RoadDataStore roadDataStore) {
         this.roadDataStore = roadDataStore;
+        this.layerManager = new LayerManager();
     }
 
     public synchronized void start() {
-        if (server != null) {
-            return;
-        }
+        if (server != null) return;
 
         try {
             server = HttpServer.create(new InetSocketAddress(PORT), 0);
             server.createContext("/", this::handleRoot);
-            server.createContext("/api/roads", this::handleRoads);
+            server.createContext("/api/roads", this::handleRoadsLegacy);
+            server.createContext("/api/roads/geojson", this::handleRoadsGeoJson);
+            server.createContext("/api/roads/v2/geojson", this::handleRoadsGeoJson);
+            server.createContext("/api/roads/", this::handleRoadById);
+            server.createContext("/api/layers", this::handleLayers);
             server.setExecutor(Executors.newSingleThreadExecutor(runnable -> {
-                Thread thread = new Thread(runnable, "MC Nav Preview");
+                Thread thread = new Thread(runnable, "Wayfarer Preview");
                 thread.setDaemon(true);
                 return thread;
             }));
             Thread startThread = new Thread(() -> {
                 server.start();
-                LOGGER.info("MC Nav preview server started on http://localhost:" + PORT + "/ and http://127.0.0.1:"
-                    + PORT + "/");
-            }, "MC Nav Preview Starter");
+                LOGGER.info("Wayfarer preview server started on http://localhost:" + PORT + "/");
+            }, "Wayfarer Preview Starter");
             startThread.setDaemon(true);
             startThread.start();
         } catch (IOException exception) {
@@ -70,7 +82,7 @@ public class RoadPreviewServer {
         if (server != null) {
             server.stop(0);
             server = null;
-            LOGGER.info("MC Nav preview server stopped");
+            LOGGER.info("Wayfarer preview server stopped");
         }
     }
 
@@ -82,28 +94,113 @@ public class RoadPreviewServer {
         return "http://127.0.0.1:" + PORT + "/";
     }
 
+    // ------------------------------------------------------------------
+    // Handlers
+    // ------------------------------------------------------------------
+
+    /** GET / — Leaflet SPA */
     private void handleRoot(HttpExchange exchange) throws IOException {
         if (!"GET".equalsIgnoreCase(exchange.getRequestMethod())) {
-            sendText(exchange, 405, "Method Not Allowed", "text/plain; charset=utf-8");
+            sendText(exchange, 405, "Method Not Allowed");
             return;
         }
-
         try {
-            sendText(exchange, 200, createHtmlPage(), "text/html; charset=utf-8");
+            sendText(exchange, 200, createLeafletPage(), "text/html; charset=utf-8");
         } catch (RuntimeException exception) {
-            LOGGER.log(Level.SEVERE, "Failed to render preview page", exception);
-            sendText(exchange, 500, "Preview page error: " + exception.getMessage(), "text/plain; charset=utf-8");
+            LOGGER.log(Level.SEVERE, "Failed to render page", exception);
+            sendText(exchange, 500, "Internal error");
         }
     }
 
-    private void handleRoads(HttpExchange exchange) throws IOException {
+    /** GET /api/roads — legacy JSON array (backward-compat) */
+    private void handleRoadsLegacy(HttpExchange exchange) throws IOException {
         if (!"GET".equalsIgnoreCase(exchange.getRequestMethod())) {
-            sendText(exchange, 405, "Method Not Allowed", "text/plain; charset=utf-8");
+            sendText(exchange, 405, "Method Not Allowed");
             return;
         }
-
         roadDataStore.reloadFromDisk();
         sendText(exchange, 200, roadDataStore.toJson(), "application/json; charset=utf-8");
+    }
+
+    /** GET /api/roads/geojson?classification=G,S&bbox=minX,minZ,maxX,maxZ */
+    private void handleRoadsGeoJson(HttpExchange exchange) throws IOException {
+        if (!"GET".equalsIgnoreCase(exchange.getRequestMethod())) {
+            sendText(exchange, 405, "Method Not Allowed");
+            return;
+        }
+        roadDataStore.reloadFromDisk();
+        String rawQuery = exchange.getRequestURI().getRawQuery();
+        Map<String, String> queryParams = parseQueryParams(rawQuery);
+
+        try {
+            String geoJson = roadDataStore.toGeoJson();
+            if (!queryParams.isEmpty()) {
+                String clsFilter = queryParams.get("classification");
+                String bboxStr  = queryParams.get("bbox");
+                if (clsFilter != null || bboxStr != null) {
+                    double[] bbox = null;
+                    if (bboxStr != null) {
+                        bbox = parseBbox(bboxStr);
+                    }
+                    geoJson = applyQueryFilters(geoJson, clsFilter, bbox);
+                }
+            }
+            sendText(exchange, 200, geoJson, "application/json; charset=utf-8");
+        } catch (IllegalArgumentException ex) {
+            sendText(exchange, 400, jsonError("INVALID_PARAM", ex.getMessage()));
+        } catch (Exception ex) {
+            LOGGER.log(Level.SEVERE, "GeoJSON error", ex);
+            sendText(exchange, 500, jsonError("INTERNAL_ERROR", ex.getMessage()));
+        }
+    }
+
+    /** GET /api/roads/{id} */
+    private void handleRoadById(HttpExchange exchange) throws IOException {
+        if (!"GET".equalsIgnoreCase(exchange.getRequestMethod())) {
+            sendText(exchange, 405, "Method Not Allowed");
+            return;
+        }
+        roadDataStore.reloadFromDisk();
+        String path = exchange.getRequestURI().getPath();
+        // strip "/api/roads/"
+        String id = path.substring("/api/roads/".length());
+        if (id.isEmpty() || id.contains("/")) {
+            sendText(exchange, 400, jsonError("INVALID_PARAM", "missing road id"));
+            return;
+        }
+        String feature = roadDataStore.toGeoJsonFeature(id);
+        if (feature == null) {
+            sendText(exchange, 404, jsonError("NOT_FOUND", "road not found: " + id));
+        } else {
+            sendText(exchange, 200, feature, "application/json; charset=utf-8");
+        }
+    }
+
+    /** GET /api/layers */
+    private void handleLayers(HttpExchange exchange) throws IOException {
+        if (!"GET".equalsIgnoreCase(exchange.getRequestMethod())) {
+            sendText(exchange, 405, "Method Not Allowed");
+            return;
+        }
+        List<MapLayer> layers = layerManager.getAllLayers();
+        Map<String, Object> result = new HashMap<>();
+        result.put("layers", layers.stream().map(layer -> {
+            Map<String, Object> m = new HashMap<>();
+            m.put("id", layer.getId());
+            m.put("displayName", layer.getDisplayName());
+            m.put("zIndex", layer.getZIndex());
+            m.put("visible", layer.isVisible());
+            return m;
+        }).toList());
+        sendText(exchange, 200, GSON.toJson(result), "application/json; charset=utf-8");
+    }
+
+    // ------------------------------------------------------------------
+    // Helpers
+    // ------------------------------------------------------------------
+
+    private void sendText(HttpExchange exchange, int statusCode, String content) throws IOException {
+        sendText(exchange, statusCode, content, "text/plain; charset=utf-8");
     }
 
     private void sendText(HttpExchange exchange, int statusCode, String content, String contentType)
@@ -116,288 +213,451 @@ public class RoadPreviewServer {
         }
     }
 
-    private String createHtmlPage() {
-        roadDataStore.reloadFromDisk();
-        String roadJson = roadDataStore.toJson();
-        String contextLabel = escapeHtml(roadDataStore.getContextLabel());
-        String contextLabelLiteral = jsStringLiteral(roadDataStore.getContextLabel());
-        String dataFile = escapeHtml(String.valueOf(roadDataStore.getDataFile()));
-        String dataFileLiteral = jsStringLiteral(String.valueOf(roadDataStore.getDataFile()));
-        StringBuilder roadCardsBuilder = new StringBuilder();
-        for (RoadPath road : roadDataStore.getRoads()) {
-            String roadName = road.name == null || road.name.isBlank() ? "未命名道路" : road.name;
-            int pointCount = road.points == null ? 0 : road.points.size();
-            int intersectionCount = road.intersections == null ? 0 : road.intersections.size();
-            roadCardsBuilder.append("""
-                <div class="road">
-                  <h3>%s</h3>
-                  <p>宽度：%s 格</p>
-                  <p>轨迹点：%d</p>
-                  <p>交叉点：%d</p>
-                </div>
-                """.formatted(escapeHtml(roadName), road.width, pointCount, intersectionCount));
+    private static String jsonError(String error, String message) {
+        return "{\"error\":\"" + escapeJson(error) + "\",\"message\":\"" + escapeJson(message) + "\"}";
+    }
+
+    private static Map<String, String> parseQueryParams(String query) {
+        Map<String, String> map = new HashMap<>();
+        if (query == null || query.isEmpty()) return map;
+        for (String param : query.split("&")) {
+            String[] kv = param.split("=", 2);
+            if (kv.length == 2 && !kv[0].isEmpty()) {
+                map.put(kv[0], kv[1]);
+            }
         }
-        String roadCards = roadCardsBuilder.toString();
+        return map;
+    }
+
+    private static double[] parseBbox(String bboxStr) {
+        String[] parts = bboxStr.split(",");
+        if (parts.length != 4) {
+            throw new IllegalArgumentException("bbox format: minX,minZ,maxX,maxZ");
+        }
+        try {
+            return new double[] {
+                Double.parseDouble(parts[0]),
+                Double.parseDouble(parts[1]),
+                Double.parseDouble(parts[2]),
+                Double.parseDouble(parts[3]),
+            };
+        } catch (NumberFormatException e) {
+            throw new IllegalArgumentException("bbox must be numeric");
+        }
+    }
+
+    private static String escapeJson(String s) {
+        if (s == null) return "";
+        StringBuilder sb = new StringBuilder(s.length() + 16);
+        for (int i = 0; i < s.length(); i++) {
+            char c = s.charAt(i);
+            switch (c) {
+                case '"': sb.append("\\\""); break;
+                case '\\': sb.append("\\\\"); break;
+                case '\n': sb.append("\\n"); break;
+                case '\r': sb.append("\\r"); break;
+                case '\t': sb.append("\\t"); break;
+                default:
+                    if (c < 0x20) sb.append(String.format("\\u%04x", (int) c));
+                    else sb.append(c);
+            }
+        }
+        return sb.toString();
+    }
+
+    /**
+     * Apply classification and/or bbox filters to a GeoJSON string.
+     * Pure string-based filter — no JSON parse overhead.
+     */
+    private static String applyQueryFilters(String geoJson, String clsFilter, double[] bbox) {
+        int fcStart = geoJson.indexOf("\"features\": [");
+        if (fcStart < 0) fcStart = geoJson.indexOf("\"features\":[");
+        if (fcStart < 0) return geoJson;
+
+        String prefix = geoJson.substring(0, geoJson.indexOf('[', fcStart) + 1);
+        String rest   = geoJson.substring(prefix.length());
+
+        StringBuilder filtered = new StringBuilder(geoJson.length());
+        filtered.append(prefix);
+
+        String[] allowedCls = clsFilter != null ? clsFilter.split(",") : null;
+
+        boolean firstOut = true;
+        int idx = 0;
+        int len = rest.length();
+
+        while (idx < len) {
+            // skip whitespace / commas / ]
+            while (idx < len) {
+                char c = rest.charAt(idx);
+                if (c == ' ' || c == '\n' || c == '\r' || c == ',') {
+                    idx++;
+                } else if (c == ']') {
+                    idx = len; // reached end of features array
+                    break;
+                } else {
+                    break;
+                }
+            }
+            if (idx >= len) break;
+            if (rest.charAt(idx) != '{') break;
+
+            // find matching }
+            int depth = 0;
+            boolean inString = false;
+            int start = idx;
+            while (idx < len) {
+                char c = rest.charAt(idx);
+                if (inString) {
+                    if (c == '"') inString = false;
+                    else if (c == '\\') idx++;
+                } else {
+                    if (c == '"') inString = true;
+                    else if (c == '{') depth++;
+                    else if (c == '}') {
+                        depth--;
+                        if (depth == 0) { idx++; break; }
+                    }
+                }
+                idx++;
+            }
+
+            String feature = rest.substring(start, idx);
+            if (passesFilter(feature, allowedCls, bbox)) {
+                if (!firstOut) filtered.append(',');
+                firstOut = false;
+                filtered.append(feature);
+            }
+        }
+
+        int closeIdx = Math.max(
+            geoJson.lastIndexOf("]}"),
+            geoJson.lastIndexOf("] }")
+        );
+        if (closeIdx > fcStart) {
+            filtered.append(geoJson.substring(closeIdx));
+        } else {
+            filtered.append("]}");
+        }
+        return filtered.toString();
+    }
+
+    private static boolean passesFilter(String feature, String[] allowedCls, double[] bbox) {
+        if (allowedCls != null) {
+            boolean match = false;
+            for (String cls : allowedCls) {
+                String needle = "\"classification\": \"" + cls.trim() + "\"";
+                if (feature.contains(needle)) { match = true; break; }
+                // compact form
+                needle = "\"classification\":\"" + cls.trim() + "\"";
+                if (feature.contains(needle)) { match = true; break; }
+            }
+            if (!match) return false;
+        }
+
+        if (bbox != null) {
+            int coordsStart = feature.indexOf("\"coordinates\": [");
+            if (coordsStart < 0) coordsStart = feature.indexOf("\"coordinates\":[");
+            if (coordsStart >= 0) {
+                String coords = feature.substring(coordsStart + 14);
+                int pairStart = -1;
+                for (int i = 0; i < coords.length(); i++) {
+                    if (coords.charAt(i) == '[') { pairStart = i + 1; }
+                    else if (coords.charAt(i) == ']' && pairStart >= 0) {
+                        String[] nums = coords.substring(pairStart, i).split(",");
+                        if (nums.length >= 2) {
+                            try {
+                                double x = Double.parseDouble(nums[0].trim());
+                                double z = Double.parseDouble(nums[1].trim());
+                                if (x >= bbox[0] && x <= bbox[2] && z >= bbox[1] && z <= bbox[3]) {
+                                    return true;
+                                }
+                            } catch (NumberFormatException ignored) { }
+                        }
+                        pairStart = -1;
+                    }
+                }
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    // ------------------------------------------------------------------
+    // Leaflet SPA page
+    // ------------------------------------------------------------------
+
+    private String createLeafletPage() {
+        roadDataStore.reloadFromDisk();
+        String contextLabel = escapeHtml(roadDataStore.getContextLabel());
+        String dataFile = escapeHtml(String.valueOf(roadDataStore.getDataFile()));
+
         return """
             <!doctype html>
             <html lang="zh-CN">
             <head>
               <meta charset="utf-8" />
               <meta name="viewport" content="width=device-width, initial-scale=1" />
-              <title>MC Nav Preview</title>
+              <title>Wayfarer 路网预览</title>
+              <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
               <style>
-                :root { color-scheme: light; }
-                body { margin: 0; font-family: system-ui, -apple-system, BlinkMacSystemFont, sans-serif; background: #f8f9fa; color: #1a1a2e; }
-                header { padding: 14px 20px; border-bottom: 1px solid #dee2e6; display: flex; gap: 14px; align-items: center; flex-wrap: wrap; background: #fff; }
-                header strong { font-size: 18px; color: #16213e; }
-                header .meta { color: #495057; font-size: 13px; }
-                main { display: grid; grid-template-columns: 1fr 320px; height: calc(100vh - 65px); }
-                #canvasWrap { position: relative; min-width: 0; }
-                canvas { width: 100%%; height: 100%%; display: block; background: #ffffff; }
-                aside { border-left: 1px solid #dee2e6; padding: 16px; overflow: auto; background: #fff; }
-                .hint { color: #6c757d; font-size: 13px; }
-                .chip { display: inline-block; padding: 3px 8px; border-radius: 999px; background: #e9ecef; margin-right: 6px; margin-bottom: 6px; font-size: 12px; color: #0d6efd; }
-                ul { padding-left: 18px; }
-                .road { margin: 0 0 14px 0; }
-                .road h3 { margin: 0 0 4px 0; font-size: 15px; color: #16213e; }
-                .road p { margin: 2px 0; color: #6c757d; font-size: 13px; }
-                a { color: #0d6efd; }
-                button { background: #0d6efd; color: #fff; border: 1px solid #0b5ed7; border-radius: 6px; padding: 7px 10px; cursor: pointer; }
-                button:hover { background: #0b5ed7; }
+                *{margin:0;padding:0;box-sizing:border-box}
+                html,body{height:100%;overflow:hidden;background:#0d1117;color:#c9d1d9;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif}
+                #app{display:flex;height:100%}
+                #map{flex:1;min-width:0;background:#0d1117}
+                #sidebar{width:340px;background:rgba(22,27,34,0.95);border-left:1px solid #30363d;display:flex;flex-direction:column;overflow:hidden}
+                #sidebar-header{padding:14px 16px;border-bottom:1px solid #30363d}
+                #sidebar-header h2{font-size:16px;color:#e6edf3;margin-bottom:6px}
+                #sidebar-header .meta{font-size:11px;color:#8b949e;line-height:1.6}
+                #search-box{margin:10px 16px}
+                #search-box input{width:100%;padding:8px 12px;border-radius:6px;border:1px solid #30363d;background:#0d1117;color:#c9d1d9;font-size:13px;outline:none}
+                #search-box input:focus{border-color:#58a6ff}
+                #road-list{flex:1;overflow-y:auto;padding:0 8px 16px}
+                .road-item{padding:10px 12px;margin:2px 0;border-radius:6px;cursor:pointer;transition:background .15s;border-left:3px solid transparent}
+                .road-item:hover{background:rgba(88,166,255,0.08)}
+                .road-item.active{background:rgba(88,166,255,0.12);border-left-color:#58a6ff}
+                .road-item .road-name{font-size:13px;font-weight:600;color:#e6edf3}
+                .road-item .road-meta{font-size:11px;color:#8b949e;margin-top:2px}
+                .badge{display:inline-block;padding:1px 6px;border-radius:10px;font-size:10px;font-weight:700;margin-right:6px}
+                .badge-G{background:#D9432B;color:#fff}
+                .badge-S{background:#F0A030;color:#000}
+                .badge-X{background:#fff;color:#333;border:1px solid #999}
+                .badge-Y{background:#adb5bd;color:#000}
+                .badge-C{background:#dee2e6;color:#555}
+                #info-card{display:none;position:absolute;bottom:16px;left:16px;z-index:1000;background:rgba(22,27,34,0.95);border:1px solid #30363d;border-radius:8px;padding:14px 16px;max-width:280px;font-size:12px;color:#c9d1d9}
+                #info-card h3{font-size:14px;color:#e6edf3;margin-bottom:8px}
+                #info-card .close-btn{position:absolute;top:6px;right:10px;background:none;border:none;color:#8b949e;cursor:pointer;font-size:18px}
+                #info-card p{margin:3px 0}
+                #stats-bar{padding:6px 16px;border-top:1px solid #30363d;font-size:11px;color:#8b949e}
+                .leaflet-control-layers{background:rgba(22,27,34,0.95) !important;border:1px solid #30363d !important;border-radius:6px !important;color:#c9d1d9 !important}
+                .leaflet-control-layers label{color:#c9d1d9 !important}
+                .leaflet-control-layers-overlays label span{color:#c9d1d9 !important}
+                .leaflet-control-zoom a{background:rgba(22,27,34,0.9) !important;color:#c9d1d9 !important;border-color:#30363d !important}
+                .leaflet-popup-content-wrapper{background:rgba(22,27,34,0.95) !important;color:#c9d1d9 !important;border:1px solid #30363d !important;border-radius:8px !important}
+                .leaflet-popup-tip{background:rgba(22,27,34,0.95) !important}
+                .leaflet-container{background:#0d1117 !important}
               </style>
             </head>
             <body>
-              <header>
-                <strong>MC Nav 网页预览</strong>
-                <span class="meta">当前实例：%s</span>
-                <span class="meta">数据文件：%s</span>
-                <span class="hint">地址：<a href="http://localhost:7891/" target="_blank" rel="noreferrer">http://localhost:7891/</a> · <a href="http://127.0.0.1:7891/" target="_blank" rel="noreferrer">127.0.0.1</a></span>
-                <button id="refresh">刷新</button>
-              </header>
-              <main>
-                <div id="canvasWrap"><canvas id="map"></canvas></div>
-                <aside>
-                  <div id="stats" class="hint">载入中…</div>
-                  <div id="roads">%s</div>
-                </aside>
-              </main>
-              <script>window.__wayfarerContextLabel = %s; window.__wayfarerDataFile = %s; window.__roads = %s;</script>
+              <div id="app">
+                <div id="map"></div>
+                <div id="sidebar">
+                  <div id="sidebar-header">
+                    <h2>Wayfarer 路网预览</h2>
+                    <div class="meta">
+                      实例：%s<br>
+                      数据：%s
+                    </div>
+                  </div>
+                  <div id="search-box">
+                    <input type="text" id="search-input" placeholder="搜索道路名称 / 编号..." />
+                  </div>
+                  <div id="road-list"></div>
+                  <div id="stats-bar">加载中…</div>
+                </div>
+                <div id="info-card">
+                  <button class="close-btn" onclick="document.getElementById('info-card').style.display='none'">&times;</button>
+                  <h3 id="info-title"></h3>
+                  <div id="info-body"></div>
+                </div>
+              </div>
+              <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+              <script src="https://unpkg.com/leaflet-textpath@1.2.3/leaflet.textpath.js"></script>
               <script>
-                const canvas = document.getElementById('map');
-                const ctx = canvas.getContext('2d');
-                const stats = document.getElementById('stats');
-                const roadsDiv = document.getElementById('roads');
-                // --- Road styling by classification ---
-                function getRoadStyle(classification) {
-                  if (!classification) return { stroke: '#adb5bd', fill: '#ffffff', edgeWidth: 3, bodyWidth: 1, textColor: '#6c757d', labelBg: '#ffffff', labelColor: '#495057', labelBorder: '#adb5bd' };
-                  const cls = classification.charAt(0).toUpperCase();
-                  if (cls === 'G') return { stroke: '#D9432B', fill: '#D9432B', edgeWidth: 0, bodyWidth: 1, textColor: '#ffffff', labelBg: '#D9432B', labelColor: '#ffffff', labelBorder: '#ffffff' };
-                  if (cls === 'S') return { stroke: '#F0A030', fill: '#F0A030', edgeWidth: 0, bodyWidth: 1, textColor: '#000000', labelBg: '#FFE066', labelColor: '#000000', labelBorder: '#F0A030' };
-                  return { stroke: '#adb5bd', fill: '#ffffff', edgeWidth: 3, bodyWidth: 1, textColor: '#6c757d', labelBg: '#ffffff', labelColor: '#495057', labelBorder: '#adb5bd' };
-                }
+              (function(){
+                var CLASS_COLORS = {
+                  G:{color:'#D9432B',weight:4,opacity:0.9},
+                  S:{color:'#F0A030',weight:3,opacity:0.85},
+                  X:{color:'#ffffff',weight:2,opacity:0.75},
+                  Y:{color:'#adb5bd',weight:1.2,opacity:0.6},
+                  C:{color:'#dee2e6',weight:0.8,opacity:0.45}
+                };
+                var CLASS_ORDER = {G:0,S:1,X:2,Y:3,C:4};
 
-                function shouldDimName(road) {
-                  if (!road.classification || !road.name) return false;
-                  const cls = road.classification.charAt(0).toUpperCase();
-                  return cls === 'G' && /^[Gg]\\d+$/.test(road.name.trim());
-                }
+                var map = L.map('map',{zoomControl:true,attributionControl:false}).setView([0,0],8);
 
-                function getDisplayName(road) {
-                  return road.name || road.number || '';
-                }
-
-                function resizeCanvas() {
-                  const rect = canvas.getBoundingClientRect();
-                  const scale = window.devicePixelRatio || 1;
-                  canvas.width = Math.max(1, Math.floor(rect.width * scale));
-                  canvas.height = Math.max(1, Math.floor(rect.height * scale));
-                  render(window.__roads || []);
-                }
-
-                function boundsOf(roads) {
-                  const points = roads.flatMap(r => r.points || []);
-                  if (!points.length) return null;
-                  let minX = Infinity, minZ = Infinity, maxX = -Infinity, maxZ = -Infinity;
-                  for (const point of points) {
-                    minX = Math.min(minX, point.x);
-                    minZ = Math.min(minZ, point.z);
-                    maxX = Math.max(maxX, point.x);
-                    maxZ = Math.max(maxZ, point.z);
-                  }
-                  return { minX, minZ, maxX, maxZ };
-                }
-
-                function render(roads) {
-                  const width = canvas.width;
-                  const height = canvas.height;
-                  ctx.clearRect(0, 0, width, height);
-                  ctx.fillStyle = '#ffffff';
-                  ctx.fillRect(0, 0, width, height);
-
-                  if (!roads.length) {
-                    ctx.fillStyle = '#495057';
-                    ctx.font = '16px sans-serif';
-                    ctx.fillText('暂无道路数据。请在当前实例里按 R 记录一条道路。', 30, 40);
-                    stats.textContent = `0 条道路 · 当前实例：${window.__wayfarerContextLabel}`;
-                    roadsDiv.innerHTML = '<p class="hint">当前实例还没有保存的道路。</p>';
-                    return;
-                  }
-
-                  const bounds = boundsOf(roads);
-                  const pad = 40 * (window.devicePixelRatio || 1);
-                  const dx = Math.max(1, bounds.maxX - bounds.minX);
-                  const dz = Math.max(1, bounds.maxZ - bounds.minZ);
-                  const scale = Math.min((width - pad * 2) / dx, (height - pad * 2) / dz);
-                  const centerX = (bounds.minX + bounds.maxX) / 2;
-                  const centerZ = (bounds.minZ + bounds.maxZ) / 2;
-
-                  function tx(x) { return width / 2 + (x - centerX) * scale; }
-                  function ty(z) { return height / 2 - (z - centerZ) * scale; }
-
-                  ctx.lineCap = 'round';
-                  ctx.lineJoin = 'round';
-
-                  roads.forEach((road, index) => {
-                    const points = road.points || [];
-                    if (points.length < 2) return;
-
-                    const style = getRoadStyle(road.classification);
-                    const roadWidth = Math.max(2, (road.width || 7) * scale / 3);
-
-                    // Draw road body
-                    if (style.edgeWidth > 0) {
-                      // X/Y/C/普通: grey edge + white fill
-                      ctx.strokeStyle = '#adb5bd';
-                      ctx.lineWidth = roadWidth + style.edgeWidth;
-                      ctx.beginPath();
-                      ctx.moveTo(tx(points[0].x), ty(points[0].z));
-                      for (let i = 1; i < points.length; i++) {
-                        ctx.lineTo(tx(points[i].x), ty(points[i].z));
-                      }
-                      ctx.stroke();
-                      ctx.strokeStyle = '#ffffff';
-                      ctx.lineWidth = roadWidth;
-                      ctx.beginPath();
-                      ctx.moveTo(tx(points[0].x), ty(points[0].z));
-                      for (let i = 1; i < points.length; i++) {
-                        ctx.lineTo(tx(points[i].x), ty(points[i].z));
-                      }
-                      ctx.stroke();
-                    } else {
-                      // G/S roads: solid thick line
-                      ctx.strokeStyle = style.fill;
-                      ctx.lineWidth = roadWidth * 1.8;
-                      ctx.beginPath();
-                      ctx.moveTo(tx(points[0].x), ty(points[0].z));
-                      for (let i = 1; i < points.length; i++) {
-                        ctx.lineTo(tx(points[i].x), ty(points[i].z));
-                      }
-                      ctx.stroke();
+                var geoJsonLayer = L.geoJSON(null,{
+                  style:function(f){
+                    var cls=f.properties.classification||'C';
+                    var s=CLASS_COLORS[cls]||CLASS_COLORS.C;
+                    var rs=f.properties.style||{};
+                    return {
+                      color:rs.color||s.color,
+                      weight:rs.lineWidth||s.weight,
+                      opacity:s.opacity,
+                      dashArray:rs.dashPattern||null
+                    };
+                  },
+                  onEachFeature:function(feature,layer){
+                    var p=feature.properties;
+                    var cls=p.classification||'C';
+                    // popup
+                    layer.bindPopup(
+                      '<div style="font-size:13px">'+
+                      '<strong><span class="badge badge-'+cls+'">'+cls+'</span>'+(p.name||'未命名道路')+'</strong><br>'+
+                      '编号: '+(p.number||'-')+' &nbsp; 长度: '+(p.length||0).toFixed(0)+' 格'+
+                      '</div>'
+                    );
+                    // click
+                    layer.on('click',function(e){
+                      L.DomEvent.stopPropagation(e);
+                      showInfoCard(feature);
+                      highlightSidebar(p.id);
+                      map.flyTo(e.latlng,Math.max(map.getZoom(),12));
+                    });
+                    // textpath
+                    var label=p.name||p.number||'';
+                    if(label){
+                      if(cls==='G') layer.setText(label,{repeat:true,center:true,attributes:{fill:'#fff','font-weight':'bold','font-size':'13px'}});
+                      else if(cls==='S') layer.setText(label,{repeat:true,center:true,attributes:{fill:'#000','font-weight':'bold','font-size':'11px'}});
+                      else if(cls==='X') layer.setText(label,{repeat:true,center:true,attributes:{fill:'#fff','font-size':'10px',stroke:'#999','stroke-width':'1px'}});
                     }
+                  }
+                }).addTo(map);
 
-                    // Draw road name label at midpoint
-                    const displayName = getDisplayName(road);
-                    if (displayName) {
-                      const midIdx = Math.floor(points.length / 2);
-                      const midX = tx(points[midIdx].x);
-                      const midY = ty(points[midIdx].z);
-                      const fontSize = Math.max(10, Math.min(16, roadWidth * 1.2));
-                      ctx.font = `${fontSize}px system-ui, sans-serif`;
-                      const metrics = ctx.measureText(displayName);
-                      const textW = metrics.width;
-                      const textH = fontSize;
+                var intersectionLayer = L.layerGroup().addTo(map);
 
-                      if (shouldDimName(road)) {
-                        // Gxxx format: dim grey text on road center
-                        ctx.fillStyle = 'rgba(180,180,180,0.55)';
-                        ctx.fillText(displayName, midX - textW / 2, midY + textH / 3);
-                      } else {
-                        // Standard label: colored pill with border
-                        const padX = 6;
-                        const padY = 3;
-                        const rx = midX - textW / 2 - padX;
-                        const ry = midY - textH / 2 - padY;
-                        const rw = textW + padX * 2;
-                        const rh = textH + padY * 2;
-                        const radius = 4;
-
-                        ctx.fillStyle = style.labelBg;
-                        ctx.beginPath();
-                        ctx.moveTo(rx + radius, ry);
-                        ctx.lineTo(rx + rw - radius, ry);
-                        ctx.arcTo(rx + rw, ry, rx + rw, ry + radius, radius);
-                        ctx.lineTo(rx + rw, ry + rh - radius);
-                        ctx.arcTo(rx + rw, ry + rh, rx + rw - radius, ry + rh, radius);
-                        ctx.lineTo(rx + radius, ry + rh);
-                        ctx.arcTo(rx, ry + rh, rx, ry + rh - radius, radius);
-                        ctx.lineTo(rx, ry + radius);
-                        ctx.arcTo(rx, ry, rx + radius, ry, radius);
-                        ctx.closePath();
-                        ctx.fill();
-
-                        ctx.strokeStyle = style.labelBorder;
-                        ctx.lineWidth = 1.5;
-                        ctx.stroke();
-
-                        ctx.fillStyle = style.labelColor;
-                        ctx.fillText(displayName, midX - textW / 2, midY + textH / 3);
-                      }
+                // Dark grid tile layer
+                L.gridLayer({maxZoom:18,tileSize:256,
+                  createTile:function(c){
+                    var t=L.DomUtil.create('canvas','');
+                    t.width=256;t.height=256;
+                    var ctx=t.getContext('2d');
+                    ctx.fillStyle='#0d1117';ctx.fillRect(0,0,256,256);
+                    ctx.strokeStyle='rgba(48,54,61,0.35)';ctx.lineWidth=0.5;
+                    var gs=256;
+                    if(c.z>=14) gs=16; else if(c.z>=12) gs=32; else if(c.z>=10) gs=64; else if(c.z>=8) gs=128;
+                    for(var x=gs;x<256;x+=gs){ctx.beginPath();ctx.moveTo(x,0);ctx.lineTo(x,256);ctx.stroke();}
+                    for(var y=gs;y<256;y+=gs){ctx.beginPath();ctx.moveTo(0,y);ctx.lineTo(256,y);ctx.stroke();}
+                    if(c.z>=12){
+                      ctx.fillStyle='rgba(139,148,158,0.3)';ctx.font='8px monospace';
+                      var nw=L.CRS.EPSG3857.pointToLatLng(L.point(c.x*256,c.y*256),c.z);
+                      var se=L.CRS.EPSG3857.pointToLatLng(L.point((c.x+1)*256,(c.y+1)*256),c.z);
+                      ctx.fillText(nw.lng.toFixed(1)+','+nw.lat.toFixed(1),4,14);
+                      ctx.fillText(se.lng.toFixed(1)+','+se.lat.toFixed(1),4,246);
                     }
+                    return t;
+                  }
+                }).addTo(map);
 
-                    // Start point marker
-                    ctx.fillStyle = style.fill;
-                    const first = points[0];
-                    ctx.beginPath();
-                    ctx.arc(tx(first.x), ty(first.z), 4 * (window.devicePixelRatio || 1), 0, Math.PI * 2);
-                    ctx.fill();
+                L.control.layers(null,{
+                  '道路路网':geoJsonLayer,
+                  '交叉口':intersectionLayer
+                },{position:'topright',collapsed:false}).addTo(map);
+
+                // data
+                var allFeatures=[];
+                var roadNameIndex={};
+
+                // intersection markers
+                function renderIntersections(features){
+                  intersectionLayer.clearLayers();
+                  var seen={};
+                  features.forEach(function(f){
+                    var det=f.properties.intersectionDetails;
+                    if(!det)return;
+                    det.forEach(function(is){
+                      var key=is.position.x+','+is.position.z;
+                      if(seen[key])return;seen[key]=true;
+                      L.circleMarker([is.position.z,is.position.x],{
+                        radius:4,fillColor:'#58a6ff',color:'#1f6feb',weight:1.5,fillOpacity:0.7
+                      }).bindPopup(is.name||is.type||'交叉口').addTo(intersectionLayer);
+                    });
                   });
+                }
 
-                  stats.textContent = `${roads.length} 条道路 · ${roads.reduce((sum, road) => sum + (road.points ? road.points.length : 0), 0)} 个采样点`;
-                  roadsDiv.innerHTML = roads.map((road, index) => {
-                    const intersections = road.intersections ? road.intersections.length : 0;
-                    return `<div class="road"><h3><span class="chip">${index + 1}</span>${escapeHtml(road.name || '未命名道路')}</h3><p>宽度：${road.width ?? 7} 格</p><p>轨迹点：${(road.points || []).length}</p><p>交叉点：${intersections}</p></div>`;
+                // sidebar
+                function highlightSidebar(id){
+                  [].forEach.call(document.querySelectorAll('.road-item'),function(el){el.classList.remove('active')});
+                  var el=document.getElementById('road-'+id);
+                  if(el){el.classList.add('active');el.scrollIntoView({behavior:'smooth',block:'nearest'});}
+                }
+
+                function renderSidebar(features){
+                  var list=document.getElementById('road-list');
+                  var sorted=features.slice().sort(function(a,b){
+                    return (CLASS_ORDER[a.properties.classification||'C']||4)-(CLASS_ORDER[b.properties.classification||'C']||4);
+                  });
+                  list.innerHTML=sorted.map(function(f){
+                    var p=f.properties,cls=p.classification||'C';
+                    return '<div class="road-item" id="road-'+p.id+'" onclick="zoomToRoad(\''+p.id+'\')">'+
+                      '<span class="badge badge-'+cls+'">'+cls+'</span>'+
+                      '<span class="road-name">'+(p.name||'未命名道路')+'</span>'+
+                      '<div class="road-meta">'+(p.number||'')+' \u00B7 '+(p.length||0).toFixed(0)+'格 \u00B7 '+(p.intersectionCount||0)+'个交叉口</div>'+
+                    '</div>';
                   }).join('');
+                  document.getElementById('stats-bar').textContent=features.length+' 条道路';
                 }
 
-                function escapeHtml(text) {
-                  return String(text)
-                    .replaceAll('&', '&amp;')
-                    .replaceAll('<', '&lt;')
-                    .replaceAll('>', '&gt;')
-                    .replaceAll('"', '&quot;')
-                    .replaceAll("'", '&#39;');
+                function showInfoCard(feature){
+                  var p=feature.properties,cls=p.classification||'C';
+                  document.getElementById('info-title').innerHTML='<span class="badge badge-'+cls+'">'+cls+'</span>'+(p.name||'未命名道路');
+                  document.getElementById('info-body').innerHTML=
+                    '<p>编号：'+(p.number||'-')+'</p>'+
+                    '<p>等级：'+cls+'道</p>'+
+                    '<p>宽度：'+(p.width||'-')+' 格</p>'+
+                    '<p>长度：'+(p.length||0).toFixed(0)+' 格</p>'+
+                    '<p>交叉口：'+(p.intersectionCount||0)+' 个</p>';
+                  document.getElementById('info-card').style.display='block';
                 }
 
-                async function load() {
-                  try {
-                    const response = await fetch('/api/roads', { cache: 'no-store' });
-                    window.__roads = await response.json();
-                  } catch (error) {
-                    console.warn('Failed to refresh roads from API', error);
+                window.zoomToRoad=function(id){
+                  var f=allFeatures.find(function(f){return f.properties.id===id;});
+                  if(!f)return;
+                  var layer=geoJsonLayer.getLayers().find(function(l){return l.feature===f;});
+                  if(layer){map.flyToBounds(layer.getBounds().pad(0.3),{duration:0.6});showInfoCard(f);highlightSidebar(id);}
+                };
+
+                document.getElementById('search-input').addEventListener('input',function(e){
+                  var q=e.target.value.toLowerCase().trim();
+                  [].forEach.call(document.querySelectorAll('.road-item'),function(el){
+                    el.style.display=el.textContent.toLowerCase().indexOf(q)>=0?'':'none';
+                  });
+                  if(q&&allFeatures.length>0){
+                    var m=allFeatures.find(function(f){
+                      return ((f.properties.name||'')+(f.properties.number||'')).toLowerCase().indexOf(q)>=0;
+                    });
+                    if(m)window.zoomToRoad(m.properties.id);
                   }
-                  render(window.__roads || []);
+                });
+
+                // load
+                function loadData(){
+                  fetch('/api/roads/geojson',{cache:'no-store'})
+                    .then(function(r){return r.json();})
+                    .then(function(geo){
+                      allFeatures=geo.features||[];
+                      geoJsonLayer.clearLayers();
+                      geoJsonLayer.addData(geo);
+                      renderIntersections(allFeatures);
+                      renderSidebar(allFeatures);
+                      if(allFeatures.length>0){
+                        var b=geoJsonLayer.getBounds();
+                        if(b.isValid())map.fitBounds(b.pad(0.15),{maxZoom:14});
+                      }
+                    })
+                    .catch(function(err){
+                      console.error('Wayfarer load error',err);
+                      document.getElementById('stats-bar').textContent='加载失败';
+                    });
                 }
 
-                document.getElementById('refresh').addEventListener('click', load);
-                window.addEventListener('resize', resizeCanvas);
-                setInterval(load, 3000);
-                resizeCanvas();
-                load();
+                setInterval(loadData,5000);
+                loadData();
+              })();
               </script>
             </body>
             </html>
-            """
-            .formatted(contextLabel, dataFile, contextLabelLiteral, dataFileLiteral, roadJson, roadCards);
+            """.formatted(contextLabel, dataFile);
     }
 
-    private String escapeHtml(String text) {
-        return String.valueOf(text).replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
-            .replace("\"", "&quot;").replace("'", "&#39;");
-    }
-
-    private String jsStringLiteral(String text) {
-        return "\""
-            + String.valueOf(text).replace("\\", "\\\\").replace("\"", "\\\"").replace("\n", "\\n").replace("\r", "\\r")
-            + "\"";
+    private static String escapeHtml(String text) {
+        return String.valueOf(text)
+            .replace("&", "&amp;")
+            .replace("<", "&lt;")
+            .replace(">", "&gt;")
+            .replace("\"", "&quot;")
+            .replace("'", "&#39;");
     }
 }

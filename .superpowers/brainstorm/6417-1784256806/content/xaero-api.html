@@ -1,0 +1,69 @@
+<h2>Xaero 集成：技术可行性前置问题</h2>
+<p class="subtitle">要将 Wayfarer 路网渲染到 Xaero's World Map 上，需要回答几个关键问题</p>
+
+<div class="section">
+  <h3>Xaero's World Map 的技术边界</h3>
+
+  <table style="width:100%;border-collapse:collapse;font-size:13px;">
+    <thead>
+      <tr style="background:#f1f3f5;">
+        <th style="padding:8px;text-align:left;border:1px solid #dee2e6;">集成方式</th>
+        <th style="padding:8px;text-align:center;border:1px solid #dee2e6;">可行性</th>
+        <th style="padding:8px;text-align:left;border:1px solid #dee2e6;">说明</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td style="padding:8px;border:1px solid #dee2e6;"><strong>Waypoint 注入</strong></td>
+        <td style="padding:8px;border:1px solid #dee2e6;text-align:center;color:#20c997;">高</td>
+        <td style="padding:8px;border:1px solid #dee2e6;">Xaero 支持程序化添加/读取 Waypoint；每个路网节点作为 Waypoint 注入</td>
+      </tr>
+      <tr style="background:#f8f9fa;">
+        <td style="padding:8px;border:1px solid #dee2e6;"><strong>自定义渲染层</strong></td>
+        <td style="padding:8px;border:1px solid #dee2e6;text-align:center;color:#F0A030;">中</td>
+        <td style="padding:8px;border:1px solid #dee2e6;">需确认 Xaero 是否暴露 Mixin 钩子或渲染事件；可能需要 Mixin 注入</td>
+      </tr>
+      <tr>
+        <td style="padding:8px;border:1px solid #dee2e6;"><strong>线/路径绘制 API</strong></td>
+        <td style="padding:8px;border:1px solid #dee2e6;text-align:center;color:#D9432B;">低</td>
+        <td style="padding:8px;border:1px solid #dee2e6;">Xaero 本身可能不提供"画线"API；需自行在 Xaero 渲染管线中绘制道路线段</td>
+      </tr>
+      <tr style="background:#f8f9fa;">
+        <td style="padding:8px;border:1px solid #dee2e6;"><strong>独立 Canvas 叠加</strong></td>
+        <td style="padding:8px;border:1px solid #dee2e6;text-align:center;color:#20c997;">高</td>
+        <td style="padding:8px;border:1px solid #dee2e6;">在 Xaero 大地图 GUI 上层叠加自渲染 Canvas，最可控但需处理坐标同步</td>
+      </tr>
+    </tbody>
+  </table>
+</div>
+
+<div class="section">
+  <div class="mockup">
+    <div class="mockup-header">架构设想：双端统一路网图层</div>
+    <div class="mockup-body" style="background:#1a1a2e;padding:24px;font-family:monospace;font-size:12px;line-height:2;color:#e9ecef;">
+      <span style="color:#0d6efd;">┌─ Wayfarer 核心 ─────────────────────────┐</span><br>
+      <span style="color:#0d6efd;">│</span>  轨迹录制 + 交叉口识别                 <span style="color:#0d6efd;">│</span><br>
+      <span style="color:#0d6efd;">│</span>  <span style="color:#20c997;">RoadLayerModel</span>（统一路网数据模型）      <span style="color:#0d6efd;">│</span><br>
+      <span style="color:#0d6efd;">└────────────────┬─────────────────────────┘</span><br>
+      &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span style="color:#adb5bd;">│</span><br>
+      &nbsp;&nbsp;&nbsp;&nbsp;<span style="color:#adb5bd;">┌──────────────┼──────────────┐</span><br>
+      &nbsp;&nbsp;&nbsp;&nbsp;<span style="color:#adb5bd;">│</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span style="color:#adb5bd;">│</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span style="color:#adb5bd;">│</span><br>
+      &nbsp;&nbsp;<span style="color:#F0A030;">▼ 游戏内</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span style="color:#adb5bd;">│</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span style="color:#20c997;">▼ 浏览器</span><br>
+      <span style="color:#F0A030;">┌──────────┐</span>&nbsp;&nbsp;&nbsp;<span style="color:#adb5bd;">│</span>&nbsp;&nbsp;&nbsp;<span style="color:#20c997;">┌──────────────┐</span><br>
+      <span style="color:#F0A030;">│ Xaero    │</span>&nbsp;&nbsp;&nbsp;<span style="color:#adb5bd;">│</span>&nbsp;&nbsp;&nbsp;<span style="color:#20c997;">│ Leaflet /    │</span><br>
+      <span style="color:#F0A030;">│ 路网叠加 │</span>&nbsp;&nbsp;&nbsp;<span style="color:#adb5bd;">│</span>&nbsp;&nbsp;&nbsp;<span style="color:#20c997;">│ MapLibre GL  │</span><br>
+      <span style="color:#F0A030;">│ (Mixin)  │</span>&nbsp;&nbsp;&nbsp;<span style="color:#adb5bd;">│</span>&nbsp;&nbsp;&nbsp;<span style="color:#20c997;">│ GeoJSON 图层 │</span><br>
+      <span style="color:#F0A030;">└──────────┘</span>&nbsp;&nbsp;&nbsp;<span style="color:#adb5bd;">│</span>&nbsp;&nbsp;&nbsp;<span style="color:#20c997;">└──────────────┘</span>
+    </div>
+  </div>
+</div>
+
+<div class="section">
+  <h3>当前需要确认的关键问题</h3>
+  <p>你是否已经调研过 Xaero's World Map 的源码或 API？具体来说：</p>
+  <ol style="line-height:2;">
+    <li><strong>Xaero 是否暴露了渲染钩子</strong>（如 Mixin 注入点、渲染事件回调），允许第三方模组在大地图上绘制自定义内容？</li>
+    <li>Xaero 的 <strong>Waypoint 系统</strong>是否支持程序化批量增删？有没有公开的 Java API？</li>
+    <li>如果不走 Xaero 内部渲染，是否接受 <strong>用独立 Mixin 在 Xaero UI 上层叠加渲染 Canvas</strong>？</li>
+  </ol>
+</div>

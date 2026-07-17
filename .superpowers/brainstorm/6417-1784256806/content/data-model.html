@@ -1,0 +1,112 @@
+<h2>设计章节 1：统一路网数据模型</h2>
+<p class="subtitle">当前 roads.json 只存轨迹点 + 交叉口，需升级为支持分级渲染的完整路网模型</p>
+
+<div class="section">
+  <h3>核心数据结构</h3>
+  <table style="width:100%;border-collapse:collapse;font-size:12px;">
+    <thead>
+      <tr style="background:#f1f3f5;">
+        <th style="padding:8px;text-align:left;border:1px solid #dee2e6;">实体</th>
+        <th style="padding:8px;text-align:left;border:1px solid #dee2e6;">字段</th>
+        <th style="padding:8px;text-align:left;border:1px solid #dee2e6;">说明</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td style="padding:8px;border:1px solid #dee2e6;vertical-align:top;"><strong>RoadPath</strong><br><span style="color:#6c757d;font-size:11px;">道路</span></td>
+        <td style="padding:8px;border:1px solid #dee2e6;font-size:11px;">
+          id, name, number<br>
+          classification (G/S/X/Y/C)<br>
+          width, points[], segments[]<br>
+          color_override, dash_pattern<br>
+          created_at, updated_at
+        </td>
+        <td style="padding:8px;border:1px solid #dee2e6;font-size:11px;">
+          单条完整道路。classification 决定默认渲染样式。<br>
+          segments 按交叉口切分，每段独立渲染。
+        </td>
+      </tr>
+      <tr style="background:#f8f9fa;">
+        <td style="padding:8px;border:1px solid #dee2e6;vertical-align:top;"><strong>RoadSegment</strong><br><span style="color:#6c757d;font-size:11px;">路段</span></td>
+        <td style="padding:8px;border:1px solid #dee2e6;font-size:11px;">
+          id, parent_road_id<br>
+          points[], length<br>
+          start_intersection, end_intersection
+        </td>
+        <td style="padding:8px;border:1px solid #dee2e6;font-size:11px;">
+          两个交叉口之间的子段。<br>
+          支持分段样式覆盖和独立 LOD。
+        </td>
+      </tr>
+      <tr>
+        <td style="padding:8px;border:1px solid #dee2e6;vertical-align:top;"><strong>Intersection</strong><br><span style="color:#6c757d;font-size:11px;">交叉口</span></td>
+        <td style="padding:8px;border:1px solid #dee2e6;font-size:11px;">
+          id, position (x,y,z)<br>
+          connected_segments[], type<br>
+          name, label_offset
+        </td>
+        <td style="padding:8px;border:1px solid #dee2e6;font-size:11px;">
+          路口节点。type 区分 T字/十字/环岛。<br>
+          渲染时高亮 + 名称标注。
+        </td>
+      </tr>
+    </tbody>
+  </table>
+</div>
+
+<div class="section">
+  <h3>道路分级配色方案（MVP: A+B）</h3>
+  <table style="width:100%;border-collapse:collapse;font-size:12px;">
+    <thead>
+      <tr style="background:#f1f3f5;">
+        <th style="padding:8px;text-align:center;border:1px solid #dee2e6;">等级</th>
+        <th style="padding:8px;text-align:center;border:1px solid #dee2e6;">标识</th>
+        <th style="padding:8px;text-align:center;border:1px solid #dee2e6;">线宽</th>
+        <th style="padding:8px;text-align:center;border:1px solid #dee2e6;">颜色</th>
+        <th style="padding:8px;text-align:left;border:1px solid #dee2e6;">标签样式</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td style="padding:8px;border:1px solid #dee2e6;text-align:center;"><strong>国道 G</strong></td>
+        <td style="padding:8px;border:1px solid #dee2e6;text-align:center;"><span style="background:#D9432B;color:#fff;padding:2px 8px;border-radius:4px;">G</span></td>
+        <td style="padding:8px;border:1px solid #dee2e6;text-align:center;">3-4px</td>
+        <td style="padding:8px;border:1px solid #dee2e6;">#D9432B 红</td>
+        <td style="padding:8px;border:1px solid #dee2e6;">红底白字标签，沿道路方向</td>
+      </tr>
+      <tr style="background:#f8f9fa;">
+        <td style="padding:8px;border:1px solid #dee2e6;text-align:center;"><strong>省道 S</strong></td>
+        <td style="padding:8px;border:1px solid #dee2e6;text-align:center;"><span style="background:#F0A030;color:#000;padding:2px 8px;border-radius:4px;">S</span></td>
+        <td style="padding:8px;border:1px solid #dee2e6;text-align:center;">2-3px</td>
+        <td style="padding:8px;border:1px solid #dee2e6;">#F0A030 橙</td>
+        <td style="padding:8px;border:1px solid #dee2e6;">黄底黑字标签</td>
+      </tr>
+      <tr>
+        <td style="padding:8px;border:1px solid #dee2e6;text-align:center;"><strong>县道 X</strong></td>
+        <td style="padding:8px;border:1px solid #dee2e6;text-align:center;"><span style="background:#ffffff;color:#495057;border:1.5px solid #adb5bd;padding:2px 8px;border-radius:4px;">X</span></td>
+        <td style="padding:8px;border:1px solid #dee2e6;text-align:center;">1.5px</td>
+        <td style="padding:8px;border:1px solid #dee2e6;">白底灰边</td>
+        <td style="padding:8px;border:1px solid #dee2e6;">白底灰框标签</td>
+      </tr>
+      <tr style="background:#f8f9fa;">
+        <td style="padding:8px;border:1px solid #dee2e6;text-align:center;"><strong>乡道 Y</strong></td>
+        <td style="padding:8px;border:1px solid #dee2e6;text-align:center;"><span style="background:#ffffff;color:#6c757d;border:1px dashed #adb5bd;padding:2px 8px;border-radius:4px;">Y</span></td>
+        <td style="padding:8px;border:1px solid #dee2e6;text-align:center;">1px</td>
+        <td style="padding:8px;border:1px solid #dee2e6;">#adb5bd 灰</td>
+        <td style="padding:8px;border:1px solid #dee2e6;">灰字，缩放至一定级别显示</td>
+      </tr>
+      <tr>
+        <td style="padding:8px;border:1px solid #dee2e6;text-align:center;"><strong>村道 C</strong></td>
+        <td style="padding:8px;border:1px solid #dee2e6;text-align:center;"><span style="background:#ffffff;color:#adb5bd;border:1px dashed #dee2e6;padding:2px 8px;border-radius:4px;">C</span></td>
+        <td style="padding:8px;border:1px solid #dee2e6;text-align:center;">0.5px</td>
+        <td style="padding:8px;border:1px solid #dee2e6;">#dee2e6 浅灰</td>
+        <td style="padding:8px;border:1px solid #dee2e6;">不显示标签（高缩放级别可见）</td>
+      </tr>
+    </tbody>
+  </table>
+</div>
+
+<div class="section">
+  <h3>与现有数据模型的兼容策略</h3>
+  <p>现有 roads.json 格式不变，新增字段均为 optional。旧数据加载时自动补全默认值。RoadSegment 首次基于现有 intersection 数据自动切分生成。</p>
+</div>
