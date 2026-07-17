@@ -210,8 +210,7 @@ public class RoadRecordingManager {
 
     public void saveRecording(String roadName, double width, String classification, String number) {
         if (sessionPoints.size() < 2) {
-            LOGGER.log(Level.WARNING,
-                "saveRecording called with only {0} point(s), need at least 2 — save aborted",
+            LOGGER.log(Level.WARNING, "saveRecording called with only {0} point(s), need at least 2 — save aborted",
                 sessionPoints.size());
             return;
         }
@@ -326,13 +325,14 @@ public class RoadRecordingManager {
     }
 
     /**
-     * Snap the two endpoints of {@code road} onto nearby other roads so that a T-junction
-     * (a road ending just short of / poking slightly past another road) connects cleanly.
+     * Snap the two endpoints of {@code road} onto nearby other roads so that a T-junction (a road ending just short of
+     * / poking slightly past another road) connects cleanly.
      *
-     * <p>For each endpoint we search every other road's interior segments for the closest
-     * projection. If that projection is within {@link #SNAP_THRESHOLD} blocks and does not
-     * land on the other road's own endpoint, the endpoint is moved onto the projection,
-     * which also re-aims the road's last segment toward the other road.</p>
+     * <p>
+     * For each endpoint we search every other road's interior segments for the closest projection. If that projection
+     * is within {@link #SNAP_THRESHOLD} blocks and does not land on the other road's own endpoint, the endpoint is
+     * moved onto the projection, which also re-aims the road's last segment toward the other road.
+     * </p>
      */
     private void snapEndpoints(RoadPath road) {
         if (road.points == null || road.points.size() < 2) {
@@ -379,8 +379,9 @@ public class RoadRecordingManager {
                     continue;
                 }
 
-                double projection = ((endpoint.x - a.x) * segmentX + (endpoint.y - a.y) * segmentY
-                    + (endpoint.z - a.z) * segmentZ) / lengthSquared;
+                double projection =
+                    ((endpoint.x - a.x) * segmentX + (endpoint.y - a.y) * segmentY + (endpoint.z - a.z) * segmentZ)
+                        / lengthSquared;
 
                 RoadPoint projected = new RoadPoint(a.x + projection * segmentX, a.y + projection * segmentY,
                     a.z + projection * segmentZ, endpoint.tick);
@@ -397,10 +398,9 @@ public class RoadRecordingManager {
                 // Skip if the projected point lands near the other road's actual
                 // start/end endpoint — that's a proper cross-intersection, not a
                 // T-junction, and is handled by detectIntersections instead.
-                double distToStart = dist3D(projected.x, projected.y, projected.z,
-                    otherStart.x, otherStart.y, otherStart.z);
-                double distToEnd = dist3D(projected.x, projected.y, projected.z,
-                    otherEnd.x, otherEnd.y, otherEnd.z);
+                double distToStart =
+                    dist3D(projected.x, projected.y, projected.z, otherStart.x, otherStart.y, otherStart.z);
+                double distToEnd = dist3D(projected.x, projected.y, projected.z, otherEnd.x, otherEnd.y, otherEnd.z);
                 if (distToStart < SNAP_THRESHOLD || distToEnd < SNAP_THRESHOLD) {
                     continue;
                 }
@@ -414,8 +414,7 @@ public class RoadRecordingManager {
             endpoint.x = bestProjection.x;
             endpoint.y = bestProjection.y;
             endpoint.z = bestProjection.z;
-            LOGGER.log(Level.INFO,
-                "Snapped road \"{0}\" endpoint #{1} to nearby road (offset {2} blocks)",
+            LOGGER.log(Level.INFO, "Snapped road \"{0}\" endpoint #{1} to nearby road (offset {2} blocks)",
                 new Object[] {road.name, endpointIndex, Math.round(bestDistance * 100.0) / 100.0});
         }
     }

@@ -26,8 +26,10 @@ import java.util.Map;
 /**
  * Central registry for all map layers.
  *
- * <p>Four built-in layers are registered eagerly:
- * {@code xaero_base (0), road_network (100), administrative (200), poi (300)}.</p>
+ * <p>
+ * Four built-in layers are registered eagerly:
+ * {@code xaero_base (0), road_network (100), administrative (200), poi (300)}.
+ * </p>
  */
 public class LayerManager {
     private final Map<String, MapLayer> layers = new LinkedHashMap<>();
@@ -51,8 +53,8 @@ public class LayerManager {
      */
     public synchronized void unregister(String layerId) {
         // Never allow removal of the four built-in layers
-        if ("xaero_base".equals(layerId) || "road_network".equals(layerId)
-            || "administrative".equals(layerId) || "poi".equals(layerId)) {
+        if ("xaero_base".equals(layerId) || "road_network".equals(layerId) || "administrative".equals(layerId)
+            || "poi".equals(layerId)) {
             return;
         }
         layers.remove(layerId);
@@ -111,18 +113,28 @@ public class LayerManager {
         }
 
         @Override
-        public String getId() { return id; }
+        public String getId() {
+            return id;
+        }
 
         @Override
-        public String getDisplayName() { return displayName; }
+        public String getDisplayName() {
+            return displayName;
+        }
 
         @Override
-        public int getZIndex() { return zIndex; }
+        public int getZIndex() {
+            return zIndex;
+        }
 
         @Override
-        public boolean isVisible() { return visible; }
+        public boolean isVisible() {
+            return visible;
+        }
 
         @Override
-        public void setVisible(boolean visible) { this.visible = visible; }
+        public void setVisible(boolean visible) {
+            this.visible = visible;
+        }
     }
 }

@@ -19,11 +19,9 @@ package com.ecjkim.wayfarer.client.road.model;
 import java.util.List;
 
 /**
- * Upgraded intersection model that keeps legacy flat fields
- * ({@code roadId}, {@code roadName}, {@code x}, {@code y}, {@code z})
- * for backward-compatibility while adding the structured
- * {@code id} / {@code position} / {@code type} / {@code connectedSegments}
- * / {@code name} fields used by the new GeoJSON + Leaflet frontend.
+ * Upgraded intersection model that keeps legacy flat fields ({@code roadId}, {@code roadName}, {@code x}, {@code y},
+ * {@code z}) for backward-compatibility while adding the structured {@code id} / {@code position} / {@code type} /
+ * {@code connectedSegments} / {@code name} fields used by the new GeoJSON + Leaflet frontend.
  */
 public class RoadIntersection {
     // ---- legacy fields (kept for deserialization of old roads.json) ----

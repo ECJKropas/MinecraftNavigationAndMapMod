@@ -29,7 +29,6 @@ import java.util.logging.Logger;
 
 import com.ecjkim.wayfarer.client.road.layer.LayerManager;
 import com.ecjkim.wayfarer.client.road.layer.MapLayer;
-import com.ecjkim.wayfarer.client.road.model.RoadPath;
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
 import com.sun.net.httpserver.HttpExchange;
@@ -51,7 +50,8 @@ public class RoadPreviewServer {
     }
 
     public synchronized void start() {
-        if (server != null) return;
+        if (server != null)
+            return;
 
         try {
             server = HttpServer.create(new InetSocketAddress(PORT), 0);
@@ -141,7 +141,7 @@ public class RoadPreviewServer {
             String geoJson = roadDataStore.toGeoJson();
             if (!queryParams.isEmpty()) {
                 String clsFilter = queryParams.get("classification");
-                String bboxStr  = queryParams.get("bbox");
+                String bboxStr = queryParams.get("bbox");
                 if (clsFilter != null || bboxStr != null) {
                     double[] bbox = null;
                     if (bboxStr != null) {
@@ -166,20 +166,20 @@ public class RoadPreviewServer {
             return;
         }
         try {
-        roadDataStore.reloadFromDisk();
-        String path = exchange.getRequestURI().getPath();
-        // strip "/api/roads/"
-        String id = path.substring("/api/roads/".length());
-        if (id.isEmpty() || id.contains("/")) {
-            sendText(exchange, 400, jsonError("INVALID_PARAM", "missing road id"));
-            return;
-        }
-        String feature = roadDataStore.toGeoJsonFeature(id);
-        if (feature == null) {
-            sendText(exchange, 404, jsonError("NOT_FOUND", "road not found: " + id));
-        } else {
-            sendText(exchange, 200, feature, "application/json; charset=utf-8");
-        }
+            roadDataStore.reloadFromDisk();
+            String path = exchange.getRequestURI().getPath();
+            // strip "/api/roads/"
+            String id = path.substring("/api/roads/".length());
+            if (id.isEmpty() || id.contains("/")) {
+                sendText(exchange, 400, jsonError("INVALID_PARAM", "missing road id"));
+                return;
+            }
+            String feature = roadDataStore.toGeoJsonFeature(id);
+            if (feature == null) {
+                sendText(exchange, 404, jsonError("NOT_FOUND", "road not found: " + id));
+            } else {
+                sendText(exchange, 200, feature, "application/json; charset=utf-8");
+            }
         } catch (Exception exception) {
             LOGGER.log(Level.SEVERE, "Road by ID error", exception);
             sendText(exchange, 500, jsonError("INTERNAL_ERROR", exception.getMessage()));
@@ -234,7 +234,8 @@ public class RoadPreviewServer {
 
     private static Map<String, String> parseQueryParams(String query) {
         Map<String, String> map = new HashMap<>();
-        if (query == null || query.isEmpty()) return map;
+        if (query == null || query.isEmpty())
+            return map;
         for (String param : query.split("&")) {
             String[] kv = param.split("=", 2);
             if (kv.length == 2 && !kv[0].isEmpty()) {
@@ -250,47 +251,57 @@ public class RoadPreviewServer {
             throw new IllegalArgumentException("bbox format: minX,minZ,maxX,maxZ");
         }
         try {
-            return new double[] {
-                Double.parseDouble(parts[0]),
-                Double.parseDouble(parts[1]),
-                Double.parseDouble(parts[2]),
-                Double.parseDouble(parts[3]),
-            };
+            return new double[] {Double.parseDouble(parts[0]), Double.parseDouble(parts[1]),
+                Double.parseDouble(parts[2]), Double.parseDouble(parts[3]),};
         } catch (NumberFormatException e) {
             throw new IllegalArgumentException("bbox must be numeric");
         }
     }
 
     private static String escapeJson(String s) {
-        if (s == null) return "";
+        if (s == null)
+            return "";
         StringBuilder sb = new StringBuilder(s.length() + 16);
         for (int i = 0; i < s.length(); i++) {
             char c = s.charAt(i);
             switch (c) {
-                case '"': sb.append("\\\""); break;
-                case '\\': sb.append("\\\\"); break;
-                case '\n': sb.append("\\n"); break;
-                case '\r': sb.append("\\r"); break;
-                case '\t': sb.append("\\t"); break;
+                case '"':
+                    sb.append("\\\"");
+                    break;
+                case '\\':
+                    sb.append("\\\\");
+                    break;
+                case '\n':
+                    sb.append("\\n");
+                    break;
+                case '\r':
+                    sb.append("\\r");
+                    break;
+                case '\t':
+                    sb.append("\\t");
+                    break;
                 default:
-                    if (c < 0x20) sb.append(String.format("\\u%04x", (int) c));
-                    else sb.append(c);
+                    if (c < 0x20)
+                        sb.append(String.format("\\u%04x", (int)c));
+                    else
+                        sb.append(c);
             }
         }
         return sb.toString();
     }
 
     /**
-     * Apply classification and/or bbox filters to a GeoJSON string.
-     * Pure string-based filter — no JSON parse overhead.
+     * Apply classification and/or bbox filters to a GeoJSON string. Pure string-based filter — no JSON parse overhead.
      */
     private static String applyQueryFilters(String geoJson, String clsFilter, double[] bbox) {
         int fcStart = geoJson.indexOf("\"features\": [");
-        if (fcStart < 0) fcStart = geoJson.indexOf("\"features\":[");
-        if (fcStart < 0) return geoJson;
+        if (fcStart < 0)
+            fcStart = geoJson.indexOf("\"features\":[");
+        if (fcStart < 0)
+            return geoJson;
 
         String prefix = geoJson.substring(0, geoJson.indexOf('[', fcStart) + 1);
-        String rest   = geoJson.substring(prefix.length());
+        String rest = geoJson.substring(prefix.length());
 
         StringBuilder filtered = new StringBuilder(geoJson.length());
         filtered.append(prefix);
@@ -314,8 +325,10 @@ public class RoadPreviewServer {
                     break;
                 }
             }
-            if (idx >= len) break;
-            if (rest.charAt(idx) != '{') break;
+            if (idx >= len)
+                break;
+            if (rest.charAt(idx) != '{')
+                break;
 
             // find matching }
             int depth = 0;
@@ -324,14 +337,21 @@ public class RoadPreviewServer {
             while (idx < len) {
                 char c = rest.charAt(idx);
                 if (inString) {
-                    if (c == '"') inString = false;
-                    else if (c == '\\') idx++;
+                    if (c == '"')
+                        inString = false;
+                    else if (c == '\\')
+                        idx++;
                 } else {
-                    if (c == '"') inString = true;
-                    else if (c == '{') depth++;
+                    if (c == '"')
+                        inString = true;
+                    else if (c == '{')
+                        depth++;
                     else if (c == '}') {
                         depth--;
-                        if (depth == 0) { idx++; break; }
+                        if (depth == 0) {
+                            idx++;
+                            break;
+                        }
                     }
                 }
                 idx++;
@@ -339,16 +359,14 @@ public class RoadPreviewServer {
 
             String feature = rest.substring(start, idx);
             if (passesFilter(feature, allowedCls, bbox)) {
-                if (!firstOut) filtered.append(',');
+                if (!firstOut)
+                    filtered.append(',');
                 firstOut = false;
                 filtered.append(feature);
             }
         }
 
-        int closeIdx = Math.max(
-            geoJson.lastIndexOf("]}"),
-            geoJson.lastIndexOf("] }")
-        );
+        int closeIdx = Math.max(geoJson.lastIndexOf("]}"), geoJson.lastIndexOf("] }"));
         if (closeIdx > fcStart) {
             filtered.append(geoJson.substring(closeIdx));
         } else {
@@ -362,23 +380,32 @@ public class RoadPreviewServer {
             boolean match = false;
             for (String cls : allowedCls) {
                 String needle = "\"classification\": \"" + cls.trim() + "\"";
-                if (feature.contains(needle)) { match = true; break; }
+                if (feature.contains(needle)) {
+                    match = true;
+                    break;
+                }
                 // compact form
                 needle = "\"classification\":\"" + cls.trim() + "\"";
-                if (feature.contains(needle)) { match = true; break; }
+                if (feature.contains(needle)) {
+                    match = true;
+                    break;
+                }
             }
-            if (!match) return false;
+            if (!match)
+                return false;
         }
 
         if (bbox != null) {
             int coordsStart = feature.indexOf("\"coordinates\": [");
-            if (coordsStart < 0) coordsStart = feature.indexOf("\"coordinates\":[");
+            if (coordsStart < 0)
+                coordsStart = feature.indexOf("\"coordinates\":[");
             if (coordsStart >= 0) {
                 String coords = feature.substring(coordsStart + 14);
                 int pairStart = -1;
                 for (int i = 0; i < coords.length(); i++) {
-                    if (coords.charAt(i) == '[') { pairStart = i + 1; }
-                    else if (coords.charAt(i) == ']' && pairStart >= 0) {
+                    if (coords.charAt(i) == '[') {
+                        pairStart = i + 1;
+                    } else if (coords.charAt(i) == ']' && pairStart >= 0) {
                         String[] nums = coords.substring(pairStart, i).split(",");
                         if (nums.length >= 2) {
                             try {
@@ -387,7 +414,8 @@ public class RoadPreviewServer {
                                 if (x >= bbox[0] && x <= bbox[2] && z >= bbox[1] && z <= bbox[3]) {
                                     return true;
                                 }
-                            } catch (NumberFormatException ignored) { }
+                            } catch (NumberFormatException ignored) {
+                            }
                         }
                         pairStart = -1;
                     }
@@ -754,15 +782,12 @@ public class RoadPreviewServer {
               </script>
             </body>
             </html>
-            """.replace("{{CTX}}", contextLabel).replace("{{FILE}}", dataFile);
+            """
+            .replace("{{CTX}}", contextLabel).replace("{{FILE}}", dataFile);
     }
 
     private static String escapeHtml(String text) {
-        return String.valueOf(text)
-            .replace("&", "&amp;")
-            .replace("<", "&lt;")
-            .replace(">", "&gt;")
-            .replace("\"", "&quot;")
-            .replace("'", "&#39;");
+        return String.valueOf(text).replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
+            .replace("\"", "&quot;").replace("'", "&#39;");
     }
 }

@@ -121,9 +121,10 @@ public class RoadDataStore {
     /**
      * Export all roads as a GeoJSON FeatureCollection.
      *
-     * <p>Each road is a Feature with a LineString geometry (x → longitude,
-     * z → latitude). Properties include id, name, number, classification,
-     * width, length, and intersection count.</p>
+     * <p>
+     * Each road is a Feature with a LineString geometry (x → longitude, z → latitude). Properties include id, name,
+     * number, classification, width, length, and intersection count.
+     * </p>
      */
     public synchronized String toGeoJson() {
         syncToCurrentContext();
@@ -133,8 +134,10 @@ public class RoadDataStore {
         sb.append("{\"type\":\"FeatureCollection\",\"features\":[");
         boolean first = true;
         for (RoadPath road : roads) {
-            if (road.points == null || road.points.size() < 2) continue;
-            if (!first) sb.append(',');
+            if (road.points == null || road.points.size() < 2)
+                continue;
+            if (!first)
+                sb.append(',');
             first = false;
 
             // classification defaults to C, normalize to first letter for JS compatibility
@@ -172,7 +175,8 @@ public class RoadDataStore {
                 sb.append(",\"intersectionDetails\":[");
                 boolean intFirst = true;
                 for (RoadIntersection isect : road.intersections) {
-                    if (!intFirst) sb.append(',');
+                    if (!intFirst)
+                        sb.append(',');
                     intFirst = false;
                     sb.append('{');
                     if (isect.id != null) {
@@ -180,12 +184,10 @@ public class RoadDataStore {
                         sb.append(',');
                     }
                     if (isect.position != null) {
-                        sb.append("\"position\":{\"x\":").append(isect.position.x)
-                            .append(",\"y\":").append(isect.position.y)
-                            .append(",\"z\":").append(isect.position.z).append('}');
+                        sb.append("\"position\":{\"x\":").append(isect.position.x).append(",\"y\":")
+                            .append(isect.position.y).append(",\"z\":").append(isect.position.z).append('}');
                     } else {
-                        sb.append("\"position\":{\"x\":").append(isect.x)
-                            .append(",\"y\":").append(isect.y)
+                        sb.append("\"position\":{\"x\":").append(isect.x).append(",\"y\":").append(isect.y)
                             .append(",\"z\":").append(isect.z).append('}');
                     }
                     if (isect.type != null) {
@@ -209,12 +211,14 @@ public class RoadDataStore {
                     styleFirst = false;
                 }
                 if (road.style.lineWidth != null) {
-                    if (!styleFirst) sb.append(',');
+                    if (!styleFirst)
+                        sb.append(',');
                     sb.append("\"lineWidth\":").append(road.style.lineWidth);
                     styleFirst = false;
                 }
                 if (road.style.dashPattern != null) {
-                    if (!styleFirst) sb.append(',');
+                    if (!styleFirst)
+                        sb.append(',');
                     appendJsonProperty(sb, "dashPattern", road.style.dashPattern);
                 }
                 sb.append('}');
@@ -222,7 +226,8 @@ public class RoadDataStore {
             sb.append("},\"geometry\":{\"type\":\"LineString\",\"coordinates\":[");
             boolean ptFirst = true;
             for (RoadPoint pt : road.points) {
-                if (!ptFirst) sb.append(',');
+                if (!ptFirst)
+                    sb.append(',');
                 ptFirst = false;
                 sb.append('[').append(pt.x).append(',').append(pt.z).append(']');
             }
@@ -279,7 +284,8 @@ public class RoadDataStore {
             sb.append(",\"segments\":[");
             boolean segFirst = true;
             for (RoadSegment seg : road.segments) {
-                if (!segFirst) sb.append(',');
+                if (!segFirst)
+                    sb.append(',');
                 segFirst = false;
                 appendJsonProperty(sb, null, seg.id);
             }
@@ -290,7 +296,8 @@ public class RoadDataStore {
             sb.append(",\"intersectionDetails\":[");
             boolean intFirst = true;
             for (RoadIntersection isect : road.intersections) {
-                if (!intFirst) sb.append(',');
+                if (!intFirst)
+                    sb.append(',');
                 intFirst = false;
                 sb.append('{');
                 if (isect.id != null) {
@@ -298,16 +305,12 @@ public class RoadDataStore {
                     sb.append(',');
                 }
                 if (isect.position != null) {
-                    sb.append("\"position\":{\"x\":").append(isect.position.x)
-                        .append(",\"y\":").append(isect.position.y)
-                        .append(",\"z\":").append(isect.position.z)
-                        .append('}');
+                    sb.append("\"position\":{\"x\":").append(isect.position.x).append(",\"y\":")
+                        .append(isect.position.y).append(",\"z\":").append(isect.position.z).append('}');
                 } else {
                     // fallback to legacy fields
-                    sb.append("\"position\":{\"x\":").append(isect.x)
-                        .append(",\"y\":").append(isect.y)
-                        .append(",\"z\":").append(isect.z)
-                        .append('}');
+                    sb.append("\"position\":{\"x\":").append(isect.x).append(",\"y\":").append(isect.y)
+                        .append(",\"z\":").append(isect.z).append('}');
                 }
                 if (isect.type != null) {
                     sb.append(',');
@@ -330,12 +333,14 @@ public class RoadDataStore {
                 styleFirst = false;
             }
             if (road.style.lineWidth != null) {
-                if (!styleFirst) sb.append(',');
+                if (!styleFirst)
+                    sb.append(',');
                 sb.append("\"lineWidth\":").append(road.style.lineWidth);
                 styleFirst = false;
             }
             if (road.style.dashPattern != null) {
-                if (!styleFirst) sb.append(',');
+                if (!styleFirst)
+                    sb.append(',');
                 appendJsonProperty(sb, "dashPattern", road.style.dashPattern);
             }
             sb.append('}');
@@ -343,7 +348,8 @@ public class RoadDataStore {
         sb.append("},\"geometry\":{\"type\":\"LineString\",\"coordinates\":[");
         boolean ptFirst = true;
         for (RoadPoint pt : road.points) {
-            if (!ptFirst) sb.append(',');
+            if (!ptFirst)
+                sb.append(',');
             ptFirst = false;
             sb.append('[').append(pt.x).append(',').append(pt.z).append(']');
         }
@@ -365,14 +371,24 @@ public class RoadDataStore {
         for (int i = 0; i < s.length(); i++) {
             char c = s.charAt(i);
             switch (c) {
-                case '"': sb.append("\\\""); break;
-                case '\\': sb.append("\\\\"); break;
-                case '\n': sb.append("\\n"); break;
-                case '\r': sb.append("\\r"); break;
-                case '\t': sb.append("\\t"); break;
+                case '"':
+                    sb.append("\\\"");
+                    break;
+                case '\\':
+                    sb.append("\\\\");
+                    break;
+                case '\n':
+                    sb.append("\\n");
+                    break;
+                case '\r':
+                    sb.append("\\r");
+                    break;
+                case '\t':
+                    sb.append("\\t");
+                    break;
                 default:
                     if (c < 0x20) {
-                        sb.append(String.format("\\u%04x", (int) c));
+                        sb.append(String.format("\\u%04x", (int)c));
                     } else {
                         sb.append(c);
                     }
@@ -450,8 +466,7 @@ public class RoadDataStore {
             Path dataFile = currentContext.resolveDataFile(baseDirectory);
             Files.createDirectories(dataFile.getParent());
             Files.writeString(dataFile, GSON.toJson(roadBook), StandardCharsets.UTF_8);
-            LOGGER.log(Level.INFO, "Persisted {0} road(s) to {1}",
-                new Object[] {roadBook.roads.size(), dataFile});
+            LOGGER.log(Level.INFO, "Persisted {0} road(s) to {1}", new Object[] {roadBook.roads.size(), dataFile});
         } catch (IOException exception) {
             LOGGER.log(Level.SEVERE, "Failed to persist roads: {0}", exception.getMessage());
             throw new IllegalStateException("Failed to save road data", exception);

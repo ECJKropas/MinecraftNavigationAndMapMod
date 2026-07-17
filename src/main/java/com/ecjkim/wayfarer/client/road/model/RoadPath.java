@@ -22,9 +22,10 @@ import java.util.List;
 /**
  * A recorded road path with optional classification metadata.
  *
- * <p>All new fields ({@code segments}, {@code style}) are
- * {@code null} by default so that existing {@code roads.json}
- * files deserialize without error (backward-compatible).</p>
+ * <p>
+ * All new fields ({@code segments}, {@code style}) are {@code null} by default so that existing {@code roads.json}
+ * files deserialize without error (backward-compatible).
+ * </p>
  */
 public class RoadPath {
     public String id;

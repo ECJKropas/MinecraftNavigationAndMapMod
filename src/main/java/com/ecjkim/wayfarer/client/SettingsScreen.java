@@ -276,8 +276,8 @@ public class SettingsScreen extends Screen {
 
         classifBtn.visible = !filtering || matchesSearch("默认分级", classifBtn.getMessage().getString());
 
-        classifToggleBtn.visible = !filtering
-            || matchesSearch("使用分级宽度替代手动输入", classifToggleBtn.getMessage().getString());
+        classifToggleBtn.visible =
+            !filtering || matchesSearch("使用分级宽度替代手动输入", classifToggleBtn.getMessage().getString());
 
         for (Map.Entry<String, EditBox> e : classifBoxes.entrySet()) {
             e.getValue().visible = !filtering || matchesSearch(e.getKey(), e.getValue().getValue());
@@ -378,8 +378,8 @@ public class SettingsScreen extends Screen {
         // 滚动条指示器
         int maxScroll = Math.max(0, totalContentHeight - visibleHeight);
         if (maxScroll > 0) {
-            int barHeight = Math.max(20, (int) ((double) visibleHeight / totalContentHeight * visibleHeight));
-            int barY = CONTENT_TOP + (int) ((double) scrollOffset / maxScroll * (visibleHeight - barHeight));
+            int barHeight = Math.max(20, (int)((double)visibleHeight / totalContentHeight * visibleHeight));
+            int barY = CONTENT_TOP + (int)((double)scrollOffset / maxScroll * (visibleHeight - barHeight));
             int barX = this.width - 4;
             g.fill(barX, barY, barX + 3, barY + barHeight, 0x66FFFFFF);
         }
@@ -400,7 +400,7 @@ public class SettingsScreen extends Screen {
         int contentBottom = this.height - (capturing ? 36 : 8);
         int visibleHeight = contentBottom - CONTENT_TOP;
         int maxScroll = Math.max(0, totalContentHeight - visibleHeight);
-        scrollOffset = Math.max(0, Math.min(scrollOffset - (int) (amount * 20), maxScroll));
+        scrollOffset = Math.max(0, Math.min(scrollOffset - (int)(amount * 20), maxScroll));
         return true;
     }
 

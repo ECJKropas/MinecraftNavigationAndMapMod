@@ -17,8 +17,7 @@
 package com.ecjkim.wayfarer.client.road.layer;
 
 /**
- * A single map layer that can be toggled on/off in both the browser
- * and in-game UIs.
+ * A single map layer that can be toggled on/off in both the browser and in-game UIs.
  */
 public interface MapLayer {
     /** Unique identifier, e.g. "road_network". */
@@ -30,13 +29,15 @@ public interface MapLayer {
     /**
      * Stacking order — higher values render on top.
      *
-     * <p>Built-in convention:
+     * <p>
+     * Built-in convention:
      * <ul>
-     *   <li>0 — xaero_base</li>
-     *   <li>100 — road_network</li>
-     *   <li>200 — administrative</li>
-     *   <li>300 — poi</li>
-     * </ul></p>
+     * <li>0 — xaero_base</li>
+     * <li>100 — road_network</li>
+     * <li>200 — administrative</li>
+     * <li>300 — poi</li>
+     * </ul>
+     * </p>
      */
     int getZIndex();
 

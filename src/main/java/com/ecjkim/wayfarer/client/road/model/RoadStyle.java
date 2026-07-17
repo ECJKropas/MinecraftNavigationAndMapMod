@@ -17,8 +17,7 @@
 package com.ecjkim.wayfarer.client.road.model;
 
 /**
- * Optional per-road styling override. All fields are nullable
- * so that the default classification-based palette applies
+ * Optional per-road styling override. All fields are nullable so that the default classification-based palette applies
  * when any field is missing.
  */
 public class RoadStyle {
