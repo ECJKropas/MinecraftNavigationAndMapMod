@@ -106,9 +106,9 @@ public class RoadPreviewServer {
         }
         try {
             sendText(exchange, 200, createLeafletPage(), "text/html; charset=utf-8");
-        } catch (RuntimeException exception) {
+        } catch (Exception exception) {
             LOGGER.log(Level.SEVERE, "Failed to render page", exception);
-            sendText(exchange, 500, "Internal error");
+            sendText(exchange, 500, "Internal error: " + exception.getClass().getSimpleName());
         }
     }
 
@@ -118,8 +118,13 @@ public class RoadPreviewServer {
             sendText(exchange, 405, "Method Not Allowed");
             return;
         }
-        roadDataStore.reloadFromDisk();
-        sendText(exchange, 200, roadDataStore.toJson(), "application/json; charset=utf-8");
+        try {
+            roadDataStore.reloadFromDisk();
+            sendText(exchange, 200, roadDataStore.toJson(), "application/json; charset=utf-8");
+        } catch (Exception exception) {
+            LOGGER.log(Level.SEVERE, "Legacy roads error", exception);
+            sendText(exchange, 500, jsonError("INTERNAL_ERROR", exception.getMessage()));
+        }
     }
 
     /** GET /api/roads/geojson?classification=G,S&bbox=minX,minZ,maxX,maxZ */
@@ -160,6 +165,7 @@ public class RoadPreviewServer {
             sendText(exchange, 405, "Method Not Allowed");
             return;
         }
+        try {
         roadDataStore.reloadFromDisk();
         String path = exchange.getRequestURI().getPath();
         // strip "/api/roads/"
@@ -174,6 +180,10 @@ public class RoadPreviewServer {
         } else {
             sendText(exchange, 200, feature, "application/json; charset=utf-8");
         }
+        } catch (Exception exception) {
+            LOGGER.log(Level.SEVERE, "Road by ID error", exception);
+            sendText(exchange, 500, jsonError("INTERNAL_ERROR", exception.getMessage()));
+        }
     }
 
     /** GET /api/layers */
@@ -182,17 +192,22 @@ public class RoadPreviewServer {
             sendText(exchange, 405, "Method Not Allowed");
             return;
         }
-        List<MapLayer> layers = layerManager.getAllLayers();
-        Map<String, Object> result = new HashMap<>();
-        result.put("layers", layers.stream().map(layer -> {
-            Map<String, Object> m = new HashMap<>();
-            m.put("id", layer.getId());
-            m.put("displayName", layer.getDisplayName());
-            m.put("zIndex", layer.getZIndex());
-            m.put("visible", layer.isVisible());
-            return m;
-        }).toList());
-        sendText(exchange, 200, GSON.toJson(result), "application/json; charset=utf-8");
+        try {
+            List<MapLayer> layers = layerManager.getAllLayers();
+            Map<String, Object> result = new HashMap<>();
+            result.put("layers", layers.stream().map(layer -> {
+                Map<String, Object> m = new HashMap<>();
+                m.put("id", layer.getId());
+                m.put("displayName", layer.getDisplayName());
+                m.put("zIndex", layer.getZIndex());
+                m.put("visible", layer.isVisible());
+                return m;
+            }).toList());
+            sendText(exchange, 200, GSON.toJson(result), "application/json; charset=utf-8");
+        } catch (Exception exception) {
+            LOGGER.log(Level.SEVERE, "Layers error", exception);
+            sendText(exchange, 500, jsonError("INTERNAL_ERROR", exception.getMessage()));
+        }
     }
 
     // ------------------------------------------------------------------
@@ -403,51 +418,57 @@ public class RoadPreviewServer {
               <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
               <style>
                 *{margin:0;padding:0;box-sizing:border-box}
-                html,body{height:100%;overflow:hidden;background:#0d1117;color:#c9d1d9;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif}
+                html,body{height:100%;overflow:hidden;background:#f0f4f8;color:#333;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif}
                 #app{display:flex;height:100%}
-                #map{flex:1;min-width:0;background:#0d1117}
-                #sidebar{width:340px;background:rgba(22,27,34,0.95);border-left:1px solid #30363d;display:flex;flex-direction:column;overflow:hidden}
-                #sidebar-header{padding:14px 16px;border-bottom:1px solid #30363d}
-                #sidebar-header h2{font-size:16px;color:#e6edf3;margin-bottom:6px}
-                #sidebar-header .meta{font-size:11px;color:#8b949e;line-height:1.6}
+                #map{flex:1;min-width:0;background:#fff}
+                #sidebar{width:340px;background:#fff;border-left:1px solid #4a90d9;display:flex;flex-direction:column;overflow:hidden;box-shadow:-2px 0 8px rgba(0,0,0,0.04)}
+                #sidebar-header{padding:14px 16px;border-bottom:1px solid #4a90d9;background:#f8f9fb}
+                #sidebar-header h2{font-size:16px;color:#1a1a2e;margin-bottom:6px}
+                #sidebar-header .meta{font-size:11px;color:#656d76;line-height:1.6}
                 #search-box{margin:10px 16px}
-                #search-box input{width:100%;padding:8px 12px;border-radius:6px;border:1px solid #30363d;background:#0d1117;color:#c9d1d9;font-size:13px;outline:none}
-                #search-box input:focus{border-color:#58a6ff}
+                #search-box input{width:100%;padding:8px 12px;border-radius:6px;border:1px solid #4a90d9;background:#fff;color:#333;font-size:13px;outline:none}
+                #search-box input:focus{border-color:#4a90d9;box-shadow:0 0 0 3px rgba(74,144,217,0.15)}
                 #road-list{flex:1;overflow-y:auto;padding:0 8px 16px}
                 .road-item{padding:10px 12px;margin:2px 0;border-radius:6px;cursor:pointer;transition:background .15s;border-left:3px solid transparent}
-                .road-item:hover{background:rgba(88,166,255,0.08)}
-                .road-item.active{background:rgba(88,166,255,0.12);border-left-color:#58a6ff}
-                .road-item .road-name{font-size:13px;font-weight:600;color:#e6edf3}
-                .road-item .road-meta{font-size:11px;color:#8b949e;margin-top:2px}
+                .road-item:hover{background:rgba(74,144,217,0.06)}
+                .road-item.active{background:rgba(74,144,217,0.1);border-left-color:#4a90d9}
+                .road-item .road-name{font-size:13px;font-weight:600;color:#1a1a2e}
+                .road-item .road-meta{font-size:11px;color:#656d76;margin-top:2px}
                 .badge{display:inline-block;padding:1px 6px;border-radius:10px;font-size:10px;font-weight:700;margin-right:6px}
-                .badge-G{background:#D9432B;color:#fff}
-                .badge-S{background:#F0A030;color:#000}
-                .badge-X{background:#fff;color:#333;border:1px solid #999}
-                .badge-Y{background:#adb5bd;color:#000}
-                .badge-C{background:#dee2e6;color:#555}
-                #info-card{display:none;position:absolute;bottom:16px;left:16px;z-index:1000;background:rgba(22,27,34,0.95);border:1px solid #30363d;border-radius:8px;padding:14px 16px;max-width:280px;font-size:12px;color:#c9d1d9}
-                #info-card h3{font-size:14px;color:#e6edf3;margin-bottom:8px}
-                #info-card .close-btn{position:absolute;top:6px;right:10px;background:none;border:none;color:#8b949e;cursor:pointer;font-size:18px}
+                .badge-G{background:#E85D2C;color:#fff}
+                .badge-S{background:#F0A030;color:#fff}
+                .badge-X{background:#6c757d;color:#fff}
+                .badge-Y{background:#8899aa;color:#fff}
+                .badge-C{background:#a0b0c0;color:#fff}
+                #info-card{display:none;position:absolute;bottom:16px;left:16px;z-index:1000;background:#fff;border:1px solid #4a90d9;border-radius:8px;padding:14px 16px;max-width:280px;font-size:12px;color:#333;box-shadow:0 2px 12px rgba(0,0,0,0.08)}
+                #info-card h3{font-size:14px;color:#1a1a2e;margin-bottom:8px}
+                #info-card .close-btn{position:absolute;top:6px;right:10px;background:none;border:none;color:#656d76;cursor:pointer;font-size:18px}
                 #info-card p{margin:3px 0}
-                #stats-bar{padding:6px 16px;border-top:1px solid #30363d;font-size:11px;color:#8b949e}
-                .leaflet-control-layers{background:rgba(22,27,34,0.95) !important;border:1px solid #30363d !important;border-radius:6px !important;color:#c9d1d9 !important}
-                .leaflet-control-layers label{color:#c9d1d9 !important}
-                .leaflet-control-layers-overlays label span{color:#c9d1d9 !important}
-                .leaflet-control-zoom a{background:rgba(22,27,34,0.9) !important;color:#c9d1d9 !important;border-color:#30363d !important}
-                .leaflet-popup-content-wrapper{background:rgba(22,27,34,0.95) !important;color:#c9d1d9 !important;border:1px solid #30363d !important;border-radius:8px !important}
-                .leaflet-popup-tip{background:rgba(22,27,34,0.95) !important}
-                .leaflet-container{background:#0d1117 !important}
+                #stats-bar{padding:6px 16px;border-top:1px solid #4a90d9;font-size:11px;color:#656d76;background:#f8f9fb}
+                .leaflet-control-layers{background:#fff !important;border:1px solid #4a90d9 !important;border-radius:6px !important;color:#333 !important;box-shadow:0 2px 6px rgba(0,0,0,0.06) !important}
+                .leaflet-control-layers label{color:#333 !important}
+                .leaflet-control-layers-overlays label span{color:#333 !important}
+                .leaflet-control-zoom a{background:#fff !important;color:#333 !important;border-color:#4a90d9 !important}
+                .leaflet-popup-content-wrapper{background:#fff !important;color:#333 !important;border:1px solid #4a90d9 !important;border-radius:8px !important;box-shadow:0 2px 12px rgba(0,0,0,0.1) !important}
+                .leaflet-popup-tip{background:#fff !important}
+                .leaflet-container{background:#fff !important}
+                #cdn-error{display:none;position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);background:rgba(217,67,43,0.9);color:#fff;padding:12px 20px;border-radius:8px;font-size:14px;z-index:2000;text-align:center}
+                #cdn-error a{color:#fff;text-decoration:underline}
               </style>
             </head>
             <body>
               <div id="app">
                 <div id="map"></div>
+                <div id="cdn-error">
+                  无法加载 Leaflet 地图库（CDN 不可用）。<br>
+                  请检查网络连接后刷新页面。
+                </div>
                 <div id="sidebar">
                   <div id="sidebar-header">
                     <h2>Wayfarer 路网预览</h2>
                     <div class="meta">
-                      实例：%s<br>
-                      数据：%s
+                      实例：{{CTX}}<br>
+                      数据：{{FILE}}
                     </div>
                   </div>
                   <div id="search-box">
@@ -463,19 +484,42 @@ public class RoadPreviewServer {
                 </div>
               </div>
               <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-              <script src="https://unpkg.com/leaflet-textpath@1.2.3/leaflet.textpath.js"></script>
               <script>
+              // CDN fallback detection
+              if(typeof L==='undefined'){
+                document.getElementById('cdn-error').style.display='block';
+                document.getElementById('stats-bar').textContent='CDN 加载失败';
+              } else {
               (function(){
                 var CLASS_COLORS = {
                   G:{color:'#D9432B',weight:4,opacity:0.9},
                   S:{color:'#F0A030',weight:3,opacity:0.85},
-                  X:{color:'#ffffff',weight:2,opacity:0.75},
-                  Y:{color:'#adb5bd',weight:1.2,opacity:0.6},
-                  C:{color:'#dee2e6',weight:0.8,opacity:0.45}
+                  X:{color:'#5a6a7a',weight:2,opacity:0.7},
+                  Y:{color:'#8899aa',weight:1.5,opacity:0.6},
+                  C:{color:'#a0b0c0',weight:1.2,opacity:0.55}
                 };
                 var CLASS_ORDER = {G:0,S:1,X:2,Y:3,C:4};
 
-                var map = L.map('map',{zoomControl:true,attributionControl:false}).setView([0,0],8);
+                var crs = L.Util.extend({}, L.CRS.Simple, {
+                  transformation: new L.Transformation(1, 0, 1, 0),
+                  infinite: true
+                });
+                var map = L.map('map',{crs:crs,zoomControl:true,attributionControl:false});
+
+                var recenterBtn = L.control({position:'topleft'});
+                recenterBtn.onAdd = function(){
+                  var div = L.DomUtil.create('div','');
+                  div.innerHTML = '<button class="recenter-btn">回正</button>';
+                  L.DomEvent.on(div,'click',function(e){
+                    L.DomEvent.stopPropagation(e);
+                    if(allFeatures.length>0){
+                      var b=geoJsonLayer.getBounds();
+                      if(b.isValid()){map.fitBounds(b.pad(0.15),{maxZoom:14});}
+                    }
+                  });
+                  return div;
+                };
+                recenterBtn.addTo(map);
 
                 var geoJsonLayer = L.geoJSON(null,{
                   style:function(f){
@@ -506,44 +550,93 @@ public class RoadPreviewServer {
                       highlightSidebar(p.id);
                       map.flyTo(e.latlng,Math.max(map.getZoom(),12));
                     });
-                    // textpath
-                    var label=p.name||p.number||'';
-                    if(label){
-                      if(cls==='G') layer.setText(label,{repeat:true,center:true,attributes:{fill:'#fff','font-weight':'bold','font-size':'13px'}});
-                      else if(cls==='S') layer.setText(label,{repeat:true,center:true,attributes:{fill:'#000','font-weight':'bold','font-size':'11px'}});
-                      else if(cls==='X') layer.setText(label,{repeat:true,center:true,attributes:{fill:'#fff','font-size':'10px',stroke:'#999','stroke-width':'1px'}});
+                    // horizontal road labels (no rotation)
+                    var labelHtml='';
+                    var number=p.number||'';
+                    var coords=feature.geometry.coordinates;
+                    var midIdx=Math.floor(coords.length/2);
+                    var mid=coords[midIdx];
+                    var latlng=[mid[1],mid[0]];
+                    if(cls==='G'||cls==='S'){
+                      var labelText=cls+number;
+                      if(p.name===number){
+                        labelHtml='<div style="color:#aaa;font-size:10px;white-space:nowrap;text-shadow:0 0 3px #fff">'+labelText+'</div>';
+                      }else{
+                        if(cls==='G'){
+                          labelHtml='<div style="background:#E85D2C;color:#fff;padding:2px 8px;border-radius:4px;border:2px solid #fff;font-weight:bold;font-size:12px;white-space:nowrap;box-shadow:0 2px 4px rgba(0,0,0,0.25)">'+labelText+'</div>';
+                        }else{
+                          labelHtml='<div style="background:#F0A030;color:#000;padding:2px 8px;border-radius:4px;border:2px solid #D98A20;font-weight:bold;font-size:12px;white-space:nowrap;box-shadow:0 2px 4px rgba(0,0,0,0.25)">'+labelText+'</div>';
+                        }
+                        if(p.name&&p.name!==number){
+                          labelHtml+='<div style="color:#777;font-size:10px;white-space:nowrap;margin-top:2px;text-shadow:0 0 3px #fff">'+p.name+'</div>';
+                        }
+                      }
+                    }else{
+                      labelHtml='<div style="color:#555;font-size:10px;white-space:nowrap;text-shadow:0 0 3px #fff">'+(p.name||p.number||'')+'</div>';
+                    }
+                    if(labelHtml){
+                      L.marker(latlng,{icon:L.divIcon({className:'road-label-icon',html:labelHtml,iconSize:null,iconAnchor:[0,0]}),interactive:false}).addTo(labelLayer);
                     }
                   }
                 }).addTo(map);
 
+                var labelLayer = L.layerGroup().addTo(map);
+
                 var intersectionLayer = L.layerGroup().addTo(map);
 
-                // Dark grid tile layer
+                // Light grid tile layer
                 L.gridLayer({maxZoom:18,tileSize:256,
                   createTile:function(c){
                     var t=L.DomUtil.create('canvas','');
                     t.width=256;t.height=256;
                     var ctx=t.getContext('2d');
-                    ctx.fillStyle='#0d1117';ctx.fillRect(0,0,256,256);
-                    ctx.strokeStyle='rgba(48,54,61,0.35)';ctx.lineWidth=0.5;
+                    ctx.fillStyle='#fff';ctx.fillRect(0,0,256,256);
+                    ctx.strokeStyle='rgba(180,190,200,0.4)';ctx.lineWidth=0.5;
                     var gs=256;
                     if(c.z>=14) gs=16; else if(c.z>=12) gs=32; else if(c.z>=10) gs=64; else if(c.z>=8) gs=128;
                     for(var x=gs;x<256;x+=gs){ctx.beginPath();ctx.moveTo(x,0);ctx.lineTo(x,256);ctx.stroke();}
                     for(var y=gs;y<256;y+=gs){ctx.beginPath();ctx.moveTo(0,y);ctx.lineTo(256,y);ctx.stroke();}
                     if(c.z>=12){
-                      ctx.fillStyle='rgba(139,148,158,0.3)';ctx.font='8px monospace';
-                      var nw=L.CRS.EPSG3857.pointToLatLng(L.point(c.x*256,c.y*256),c.z);
-                      var se=L.CRS.EPSG3857.pointToLatLng(L.point((c.x+1)*256,(c.y+1)*256),c.z);
-                      ctx.fillText(nw.lng.toFixed(1)+','+nw.lat.toFixed(1),4,14);
-                      ctx.fillText(se.lng.toFixed(1)+','+se.lat.toFixed(1),4,246);
+                      ctx.fillStyle='rgba(100,110,120,0.35)';ctx.font='8px monospace';
+                      var nwX=c.x*256,nwY=c.y*256,seX=(c.x+1)*256,seY=(c.y+1)*256;
+                      ctx.fillText(nwX.toFixed(0)+','+nwY.toFixed(0),4,14);
+                      ctx.fillText(seX.toFixed(0)+','+seY.toFixed(0),4,246);
                     }
                     return t;
                   }
                 }).addTo(map);
 
+                // Chunk grid background layer (administrative reference lines)
+                var chunkGridLayer = L.layerGroup({zIndex:50});
+                chunkGridLayer._layerId = 'administrative';
+
+                // Draw 16x16 block (1 chunk) grid lines within bounds, padded by 2 chunks
+                function renderChunkGrid(layer, bounds){
+                  layer.clearLayers();
+                  if(!bounds || !bounds.isValid()) return;
+                  var CHUNK = 16;          // 1 chunk = 16 blocks
+                  var PAD = 2 * CHUNK;     // 2-chunk margin
+                  var sw = bounds.getSouthWest();
+                  var ne = bounds.getNorthEast();
+                  var minX = Math.floor((sw.lng - PAD) / CHUNK) * CHUNK;
+                  var maxX = Math.ceil((ne.lng + PAD) / CHUNK) * CHUNK;
+                  var minY = Math.floor((sw.lat - PAD) / CHUNK) * CHUNK;
+                  var maxY = Math.ceil((ne.lat + PAD) / CHUNK) * CHUNK;
+                  var lineStyle = {color:'rgba(180,190,200,0.3)', weight:1, dashArray:'2,4', interactive:false};
+                  // vertical lines (constant X)
+                  for(var x = minX; x <= maxX; x += CHUNK){
+                    L.polyline([[minY, x],[maxY, x]], lineStyle).addTo(layer);
+                  }
+                  // horizontal lines (constant Y)
+                  for(var y = minY; y <= maxY; y += CHUNK){
+                    L.polyline([[y, minX],[y, maxX]], lineStyle).addTo(layer);
+                  }
+                }
+
                 L.control.layers(null,{
                   '道路路网':geoJsonLayer,
-                  '交叉口':intersectionLayer
+                  '交叉口':intersectionLayer,
+                  '区块网格':chunkGridLayer
                 },{position:'topright',collapsed:false}).addTo(map);
 
                 // data
@@ -554,14 +647,17 @@ public class RoadPreviewServer {
                 function renderIntersections(features){
                   intersectionLayer.clearLayers();
                   var seen={};
+                  var count=0;
                   features.forEach(function(f){
                     var det=f.properties.intersectionDetails;
                     if(!det)return;
                     det.forEach(function(is){
+                      if(!is.position){return;}
                       var key=is.position.x+','+is.position.z;
                       if(seen[key])return;seen[key]=true;
+                      count++;
                       L.circleMarker([is.position.z,is.position.x],{
-                        radius:4,fillColor:'#58a6ff',color:'#1f6feb',weight:1.5,fillOpacity:0.7
+                        radius:4,fillColor:'#4a90d9',color:'#3678b5',weight:1.5,fillOpacity:0.7
                       }).bindPopup(is.name||is.type||'交叉口').addTo(intersectionLayer);
                     });
                   });
@@ -581,24 +677,24 @@ public class RoadPreviewServer {
                   });
                   list.innerHTML=sorted.map(function(f){
                     var p=f.properties,cls=p.classification||'C';
-                    return '<div class="road-item" id="road-'+p.id+'" onclick="zoomToRoad(\''+p.id+'\')">'+
-                      '<span class="badge badge-'+cls+'">'+cls+'</span>'+
-                      '<span class="road-name">'+(p.name||'未命名道路')+'</span>'+
-                      '<div class="road-meta">'+(p.number||'')+' \u00B7 '+(p.length||0).toFixed(0)+'格 \u00B7 '+(p.intersectionCount||0)+'个交叉口</div>'+
-                    '</div>';
+                    return `<div class="road-item" id="road-${p.id}" onclick="zoomToRoad('${p.id}')">
+                      <span class="badge badge-${cls}">${cls}</span>
+                      <span class="road-name">${p.name||'未命名道路'}</span>
+                      <div class="road-meta">${p.number||''} \u00B7 ${(p.length||0).toFixed(0)}格 \u00B7 ${p.intersectionCount||0}个交叉口</div>
+                    </div>`;
                   }).join('');
                   document.getElementById('stats-bar').textContent=features.length+' 条道路';
                 }
 
                 function showInfoCard(feature){
                   var p=feature.properties,cls=p.classification||'C';
-                  document.getElementById('info-title').innerHTML='<span class="badge badge-'+cls+'">'+cls+'</span>'+(p.name||'未命名道路');
+                  document.getElementById('info-title').innerHTML=`<span class="badge badge-${cls}">${cls}</span>${p.name||'未命名道路'}`;
                   document.getElementById('info-body').innerHTML=
-                    '<p>编号：'+(p.number||'-')+'</p>'+
-                    '<p>等级：'+cls+'道</p>'+
-                    '<p>宽度：'+(p.width||'-')+' 格</p>'+
-                    '<p>长度：'+(p.length||0).toFixed(0)+' 格</p>'+
-                    '<p>交叉口：'+(p.intersectionCount||0)+' 个</p>';
+                    `<p>编号：${p.number||'-'}</p>
+                    <p>等级：${cls}道</p>
+                    <p>宽度：${p.width||'-'} 格</p>
+                    <p>长度：${(p.length||0).toFixed(0)} 格</p>
+                    <p>交叉口：${p.intersectionCount||0} 个</p>`;
                   document.getElementById('info-card').style.display='block';
                 }
 
@@ -625,31 +721,40 @@ public class RoadPreviewServer {
                 // load
                 function loadData(){
                   fetch('/api/roads/geojson',{cache:'no-store'})
-                    .then(function(r){return r.json();})
+                    .then(function(r){
+                      if(!r.ok)throw new Error('HTTP '+r.status);
+                      return r.json();
+                    })
                     .then(function(geo){
                       allFeatures=geo.features||[];
                       geoJsonLayer.clearLayers();
+                      labelLayer.clearLayers();
                       geoJsonLayer.addData(geo);
+                      var layerCount=geoJsonLayer.getLayers().length;
                       renderIntersections(allFeatures);
                       renderSidebar(allFeatures);
                       if(allFeatures.length>0){
                         var b=geoJsonLayer.getBounds();
-                        if(b.isValid())map.fitBounds(b.pad(0.15),{maxZoom:14});
+                        if(b.isValid()){
+                          map.fitBounds(b.pad(0.15),{maxZoom:14});
+                          renderChunkGrid(chunkGridLayer, b);
+                        }
+                      }else{
                       }
                     })
                     .catch(function(err){
                       console.error('Wayfarer load error',err);
-                      document.getElementById('stats-bar').textContent='加载失败';
+                      document.getElementById('stats-bar').textContent='加载失败: '+err.message;
                     });
                 }
 
-                setInterval(loadData,5000);
                 loadData();
               })();
+              } // end CDN check
               </script>
             </body>
             </html>
-            """.formatted(contextLabel, dataFile);
+            """.replace("{{CTX}}", contextLabel).replace("{{FILE}}", dataFile);
     }
 
     private static String escapeHtml(String text) {

@@ -132,8 +132,9 @@ public class RoadDataStore {
             if (!first) sb.append(',');
             first = false;
 
-            // classification defaults to C
-            String cls = road.classification != null ? road.classification : "C";
+            // classification defaults to C, normalize to first letter for JS compatibility
+            String rawCls = road.classification != null ? road.classification : "C";
+            String cls = rawCls.length() > 1 ? rawCls.substring(0, 1) : rawCls;
 
             // compute length
             double length = 0.0;
@@ -161,6 +162,39 @@ public class RoadDataStore {
             sb.append("\"length\":").append(Math.round(length * 10.0) / 10.0);
             int intersectionCount = road.intersections != null ? road.intersections.size() : 0;
             sb.append(",\"intersectionCount\":").append(intersectionCount);
+            // intersections detail
+            if (road.intersections != null && !road.intersections.isEmpty()) {
+                sb.append(",\"intersectionDetails\":[");
+                boolean intFirst = true;
+                for (RoadIntersection isect : road.intersections) {
+                    if (!intFirst) sb.append(',');
+                    intFirst = false;
+                    sb.append('{');
+                    if (isect.id != null) {
+                        appendJsonProperty(sb, "id", isect.id);
+                        sb.append(',');
+                    }
+                    if (isect.position != null) {
+                        sb.append("\"position\":{\"x\":").append(isect.position.x)
+                            .append(",\"y\":").append(isect.position.y)
+                            .append(",\"z\":").append(isect.position.z).append('}');
+                    } else {
+                        sb.append("\"position\":{\"x\":").append(isect.x)
+                            .append(",\"y\":").append(isect.y)
+                            .append(",\"z\":").append(isect.z).append('}');
+                    }
+                    if (isect.type != null) {
+                        sb.append(',');
+                        appendJsonProperty(sb, "type", isect.type);
+                    }
+                    if (isect.name != null) {
+                        sb.append(',');
+                        appendJsonProperty(sb, "name", isect.name);
+                    }
+                    sb.append('}');
+                }
+                sb.append(']');
+            }
             // style override
             if (road.style != null) {
                 sb.append(",\"style\":{");
@@ -207,7 +241,8 @@ public class RoadDataStore {
     }
 
     private String toGeoJsonFeature(RoadPath road) {
-        String cls = road.classification != null ? road.classification : "C";
+        String rawCls = road.classification != null ? road.classification : "C";
+        String cls = rawCls.length() > 1 ? rawCls.substring(0, 1) : rawCls;
         double length = 0.0;
         RoadPoint prev = null;
         for (RoadPoint pt : road.points) {
