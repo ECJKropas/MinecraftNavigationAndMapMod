@@ -113,6 +113,59 @@ public class RoadDataStore {
         persist();
     }
 
+    /**
+     * Check every existing road (excluding {@code newRoad} itself) and snap its endpoints onto {@code newRoad} when
+     * they are within snapping threshold of an interior segment. This makes roads recorded earlier connect cleanly
+     * to a road that was recorded later (the reverse direction of the snap that happens during
+     * {@link RoadRecordingManager#saveRoad saveRoad}).
+     *
+     * <p>
+     * Any road whose endpoints were moved is updated in-place; the entire road book is persisted if at least one
+     * change occurred.
+     * </p>
+     */
+    public synchronized void snapRoadsToRoad(RoadPath newRoad) {
+        syncToCurrentContext();
+        if (newRoad == null) {
+            return;
+        }
+
+        boolean anySnapped = false;
+        for (RoadPath existing : roadBook.roads) {
+            if (existing.id != null && existing.id.equals(newRoad.id)) {
+                continue;
+            }
+            if (existing.points == null || existing.points.size() < 2) {
+                continue;
+            }
+            if (RoadRecordingManager.snapEndpointsToRoad(existing, newRoad)) {
+                anySnapped = true;
+            }
+        }
+
+        if (anySnapped) {
+            persist();
+        }
+    }
+
+    /**
+     * Update the intersections list of the road in the store whose {@code id} matches {@code road.id}. This is
+     * used after a post-add re-detection of intersections refreshes the in-memory copy.
+     */
+    public synchronized void refreshRoadIntersections(RoadPath road) {
+        syncToCurrentContext();
+        if (road == null || road.id == null) {
+            return;
+        }
+        for (RoadPath stored : roadBook.roads) {
+            if (stored.id != null && stored.id.equals(road.id)) {
+                stored.intersections = road.intersections;
+                persist();
+                return;
+            }
+        }
+    }
+
     public synchronized String toJson() {
         syncToCurrentContext();
         return GSON.toJson(snapshot().roads);
