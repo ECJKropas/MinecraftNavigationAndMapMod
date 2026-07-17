@@ -33,6 +33,12 @@ public class RoadRecordingManager {
     private static final Logger LOGGER = Logger.getLogger("Wayfarer|RoadRecording");
     private static final double SAMPLE_DISTANCE_SQUARED = 0.5D * 0.5D;
     private static final double MIN_ANGLE_DEGREES = 60.0;
+    /** Threshold (blocks) for snapping a road endpoint to a nearby other road path. */
+    private static final double SNAP_THRESHOLD = 2.0;
+    /** When projecting an endpoint onto another road, ignore projections that land within
+     *  this fraction of the segment length from either endpoint of the other road (avoids
+     *  snapping endpoint-to-endpoint, which is a proper cross-intersection, not a T-junction). */
+    private static final double SNAP_EDGE_EXCLUSION = 0.15;
 
     private final RoadDataStore roadDataStore;
 
@@ -155,6 +161,7 @@ public class RoadRecordingManager {
         updated.classification = classification;
         updated.number = number;
         updated.points = new ArrayList<>(sessionPoints);
+        snapEndpoints(updated);
         updated.intersections = detectIntersections(updated);
 
         roadDataStore.addRoad(updated);
@@ -224,6 +231,7 @@ public class RoadRecordingManager {
         road.classification = classification;
         road.number = number;
         road.points = new ArrayList<>(sessionPoints);
+        snapEndpoints(road);
         road.intersections = detectIntersections(road);
 
         roadDataStore.addRoad(road);
@@ -319,6 +327,92 @@ public class RoadRecordingManager {
         double dy = y1 - y2;
         double dz = z1 - z2;
         return Math.sqrt(dx * dx + dy * dy + dz * dz);
+    }
+
+    /**
+     * Snap the two endpoints of {@code road} onto nearby other roads so that a T-junction
+     * (a road ending just short of / poking slightly past another road) connects cleanly.
+     *
+     * <p>For each endpoint we search every other road's interior segments for the closest
+     * projection. If that projection is within {@link #SNAP_THRESHOLD} blocks and does not
+     * land on the other road's own endpoint, the endpoint is moved onto the projection,
+     * which also re-aims the road's last segment toward the other road.</p>
+     */
+    private void snapEndpoints(RoadPath road) {
+        if (road.points == null || road.points.size() < 2) {
+            return;
+        }
+
+        List<RoadPath> others = new ArrayList<>();
+        for (RoadPath candidate : roadDataStore.getRoads()) {
+            if (candidate.id != null && candidate.id.equals(road.id)) {
+                continue;
+            }
+            if (candidate.points == null || candidate.points.size() < 2) {
+                continue;
+            }
+            others.add(candidate);
+        }
+        if (others.isEmpty()) {
+            return;
+        }
+
+        snapEndpoint(road, 0, others);
+        snapEndpoint(road, road.points.size() - 1, others);
+    }
+
+    private void snapEndpoint(RoadPath road, int endpointIndex, List<RoadPath> others) {
+        RoadPoint endpoint = road.points.get(endpointIndex);
+
+        RoadPoint bestProjection = null;
+        double bestDistance = Double.MAX_VALUE;
+
+        for (RoadPath other : others) {
+            for (int i = 0; i < other.points.size() - 1; i++) {
+                RoadPoint a = other.points.get(i);
+                RoadPoint b = other.points.get(i + 1);
+
+                double segmentX = b.x - a.x;
+                double segmentY = b.y - a.y;
+                double segmentZ = b.z - a.z;
+                double lengthSquared = segmentX * segmentX + segmentY * segmentY + segmentZ * segmentZ;
+                if (lengthSquared == 0.0D) {
+                    continue;
+                }
+
+                double projection = ((endpoint.x - a.x) * segmentX + (endpoint.y - a.y) * segmentY
+                    + (endpoint.z - a.z) * segmentZ) / lengthSquared;
+
+                // Ignore projections that land on (or very near) the other road's own endpoints:
+                // those are proper cross-intersections, not T-junctions, and are handled by
+                // detectIntersections instead.
+                if (projection <= SNAP_EDGE_EXCLUSION || projection >= 1.0D - SNAP_EDGE_EXCLUSION) {
+                    continue;
+                }
+
+                RoadPoint projected = new RoadPoint(a.x + projection * segmentX, a.y + projection * segmentY,
+                    a.z + projection * segmentZ, endpoint.tick);
+
+                double dx = endpoint.x - projected.x;
+                double dy = endpoint.y - projected.y;
+                double dz = endpoint.z - projected.z;
+                double distance = Math.sqrt(dx * dx + dy * dy + dz * dz);
+
+                if (distance <= SNAP_THRESHOLD && distance < bestDistance) {
+                    bestDistance = distance;
+                    bestProjection = projected;
+                }
+            }
+        }
+
+        if (bestProjection != null) {
+            endpoint.x = bestProjection.x;
+            endpoint.y = bestProjection.y;
+            endpoint.z = bestProjection.z;
+            LOGGER.log(Level.INFO,
+                "Snapped road \"{0}\" endpoint #{1} to nearby road (offset {2} blocks)",
+                new Object[] {road.name, endpointIndex, Math.round(bestDistance * 100.0) / 100.0});
+        }
     }
 
     private List<RoadIntersection> detectIntersections(RoadPath newRoad) {
