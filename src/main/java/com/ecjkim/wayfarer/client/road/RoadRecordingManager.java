@@ -161,6 +161,9 @@ public class RoadRecordingManager {
         updated.intersections = detectIntersections(updated);
 
         roadDataStore.addRoad(updated);
+        roadDataStore.snapRoadsToRoad(updated);
+        updated.intersections = detectIntersections(updated);
+        roadDataStore.refreshRoadIntersections(updated);
 
         sessionPoints.clear();
         appendMode = false;
@@ -230,6 +233,9 @@ public class RoadRecordingManager {
         road.intersections = detectIntersections(road);
 
         roadDataStore.addRoad(road);
+        roadDataStore.snapRoadsToRoad(road);
+        road.intersections = detectIntersections(road);
+        roadDataStore.refreshRoadIntersections(road);
         sessionPoints.clear();
     }
 
@@ -419,10 +425,106 @@ public class RoadRecordingManager {
         }
     }
 
+    /**
+     * Snap the two endpoints of {@code existingRoad} onto {@code newRoad} so that a road recorded earlier (whose
+     * endpoint ends just short of / pokes slightly past the newly recorded road) connects cleanly once the new road is
+     * saved.
+     *
+     * <p>
+     * This is the reverse direction of {@link #snapEndpoints(RoadPath)}: instead of pulling the new road's endpoints
+     * onto existing roads, it pulls existing roads' endpoints onto the new road. The same {@link #SNAP_THRESHOLD}
+     * threshold and endpoint-exclusion logic are used so that a proper cross-intersection (where the existing road's
+     * endpoint already lands on the new road's own endpoint) is left to {@code detectIntersections} rather than being
+     * snapped.
+     * </p>
+     *
+     * @return {@code true} if at least one endpoint of {@code existingRoad} was moved onto {@code newRoad}
+     */
+    public static boolean snapEndpointsToRoad(RoadPath existingRoad, RoadPath newRoad) {
+        if (existingRoad == null || existingRoad.points == null || existingRoad.points.size() < 2) {
+            return false;
+        }
+        if (newRoad == null || newRoad.points == null || newRoad.points.size() < 2) {
+            return false;
+        }
+
+        boolean snapped = false;
+        snapped |= snapEndpointToRoad(existingRoad, 0, newRoad);
+        snapped |= snapEndpointToRoad(existingRoad, existingRoad.points.size() - 1, newRoad);
+        return snapped;
+    }
+
+    private static boolean snapEndpointToRoad(RoadPath existingRoad, int endpointIndex, RoadPath newRoad) {
+        RoadPoint endpoint = existingRoad.points.get(endpointIndex);
+
+        RoadPoint bestProjection = null;
+        double bestDistance = Double.MAX_VALUE;
+
+        RoadPoint newStart = newRoad.points.get(0);
+        RoadPoint newEnd = newRoad.points.get(newRoad.points.size() - 1);
+
+        for (int i = 0; i < newRoad.points.size() - 1; i++) {
+            RoadPoint a = newRoad.points.get(i);
+            RoadPoint b = newRoad.points.get(i + 1);
+
+            double segmentX = b.x - a.x;
+            double segmentY = b.y - a.y;
+            double segmentZ = b.z - a.z;
+            double lengthSquared = segmentX * segmentX + segmentY * segmentY + segmentZ * segmentZ;
+            if (lengthSquared == 0.0D) {
+                continue;
+            }
+
+            double projection =
+                ((endpoint.x - a.x) * segmentX + (endpoint.y - a.y) * segmentY + (endpoint.z - a.z) * segmentZ)
+                    / lengthSquared;
+
+            RoadPoint projected = new RoadPoint(a.x + projection * segmentX, a.y + projection * segmentY,
+                a.z + projection * segmentZ, endpoint.tick);
+
+            double dx = endpoint.x - projected.x;
+            double dy = endpoint.y - projected.y;
+            double dz = endpoint.z - projected.z;
+            double distance = Math.sqrt(dx * dx + dy * dy + dz * dz);
+
+            if (distance > SNAP_THRESHOLD || distance >= bestDistance) {
+                continue;
+            }
+
+            // Skip if the projected point lands near the new road's own start/end
+            // endpoint — that's a proper cross-intersection, not a T-junction, and
+            // is handled by detectIntersections instead.
+            double distToStart = dist3D(projected.x, projected.y, projected.z, newStart.x, newStart.y, newStart.z);
+            double distToEnd = dist3D(projected.x, projected.y, projected.z, newEnd.x, newEnd.y, newEnd.z);
+            if (distToStart < SNAP_THRESHOLD || distToEnd < SNAP_THRESHOLD) {
+                continue;
+            }
+
+            bestDistance = distance;
+            bestProjection = projected;
+        }
+
+        if (bestProjection != null) {
+            endpoint.x = bestProjection.x;
+            endpoint.y = bestProjection.y;
+            endpoint.z = bestProjection.z;
+            LOGGER.log(Level.INFO,
+                "Snapped existing road \"{0}\" endpoint #{1} onto new road \"{2}\" (offset {3} blocks)",
+                new Object[] {existingRoad.name, endpointIndex, newRoad.name,
+                    Math.round(bestDistance * 100.0) / 100.0});
+            return true;
+        }
+
+        return false;
+    }
+
     private List<RoadIntersection> detectIntersections(RoadPath newRoad) {
         List<RoadIntersection> intersections = new ArrayList<>();
 
         for (RoadPath existingRoad : roadDataStore.getRoads()) {
+            if (existingRoad.id != null && existingRoad.id.equals(newRoad.id)) {
+                continue;
+            }
             double threshold = Math.max(1.0D, (newRoad.width + existingRoad.width) / 2.0D);
             for (RoadPoint point : newRoad.points) {
                 RoadPoint nearestPoint = null;
