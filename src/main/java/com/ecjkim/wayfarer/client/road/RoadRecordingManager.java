@@ -509,9 +509,8 @@ public class RoadRecordingManager {
             endpoint.y = bestProjection.y;
             endpoint.z = bestProjection.z;
             LOGGER.log(Level.INFO,
-                "Snapped existing road \"{0}\" endpoint #{1} onto new road \"{2}\" (offset {3} blocks)",
-                new Object[] {existingRoad.name, endpointIndex, newRoad.name,
-                    Math.round(bestDistance * 100.0) / 100.0});
+                "Snapped existing road \"{0}\" endpoint #{1} onto new road \"{2}\" (offset {3} blocks)", new Object[] {
+                    existingRoad.name, endpointIndex, newRoad.name, Math.round(bestDistance * 100.0) / 100.0});
             return true;
         }
 

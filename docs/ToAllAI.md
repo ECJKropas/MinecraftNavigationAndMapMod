@@ -22,8 +22,9 @@ AIGC:
 ## 每次修改代码后的标准流程
 
 ```bash
-# 1. 构建（跳过 spotless）
-./gradlew build -x spotlessCheck
+# 1. 构建（不要跳过 spotless）
+./gradlew spotlessApply
+./gradlew build
 
 # 2. 修复编译错误后提交
 git add -A && git commit -m "type(scope): description" && git push

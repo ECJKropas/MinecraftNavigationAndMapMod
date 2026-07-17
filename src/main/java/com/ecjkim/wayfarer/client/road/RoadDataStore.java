@@ -115,13 +115,13 @@ public class RoadDataStore {
 
     /**
      * Check every existing road (excluding {@code newRoad} itself) and snap its endpoints onto {@code newRoad} when
-     * they are within snapping threshold of an interior segment. This makes roads recorded earlier connect cleanly
-     * to a road that was recorded later (the reverse direction of the snap that happens during
+     * they are within snapping threshold of an interior segment. This makes roads recorded earlier connect cleanly to a
+     * road that was recorded later (the reverse direction of the snap that happens during
      * {@link RoadRecordingManager#saveRoad saveRoad}).
      *
      * <p>
-     * Any road whose endpoints were moved is updated in-place; the entire road book is persisted if at least one
-     * change occurred.
+     * Any road whose endpoints were moved is updated in-place; the entire road book is persisted if at least one change
+     * occurred.
      * </p>
      */
     public synchronized void snapRoadsToRoad(RoadPath newRoad) {
@@ -149,8 +149,8 @@ public class RoadDataStore {
     }
 
     /**
-     * Update the intersections list of the road in the store whose {@code id} matches {@code road.id}. This is
-     * used after a post-add re-detection of intersections refreshes the in-memory copy.
+     * Update the intersections list of the road in the store whose {@code id} matches {@code road.id}. This is used
+     * after a post-add re-detection of intersections refreshes the in-memory copy.
      */
     public synchronized void refreshRoadIntersections(RoadPath road) {
         syncToCurrentContext();
