@@ -47,3 +47,5 @@ __pycache__
 
 # gemini
 .gemini/
+
+docs/other_mods

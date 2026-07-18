@@ -19,8 +19,11 @@ package com.ecjkim.wayfarer.client.road;
 import java.lang.reflect.Field;
 import java.util.List;
 
+import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphicsExtractor;
 import net.minecraft.client.gui.screens.Screen;
+
+import com.mojang.blaze3d.platform.Window;
 
 import net.fabricmc.fabric.api.client.screen.v1.ScreenEvents;
 
@@ -43,12 +46,17 @@ public final class XaeroMapOverlay {
     private static Field cameraXField;
     private static Field cameraZField;
     private static int reflectionFailCount;
+    /** Xaero scale is in physical pixels/block; divide by guiScale for GUI-scaled coords */
+    private static double guiScale = 2.0;
 
     private XaeroMapOverlay() {}
 
     public static void register() {
         ScreenEvents.AFTER_INIT.register((client, screen, scaledWidth, scaledHeight) -> {
             if (isGuiMap(screen)) {
+                // Compute guiScale once when GuiMap opens (Xaero scale is in physical px/block)
+                Window win = Minecraft.getInstance().getWindow();
+                guiScale = (double)win.getScreenWidth() / win.getGuiScaledWidth();
                 ScreenEvents.afterExtract(screen).register(XaeroMapOverlay::onAfterScreenRender);
             }
         });
@@ -132,12 +140,17 @@ public final class XaeroMapOverlay {
     private static void renderRoadNetwork(GuiGraphicsExtractor graphics, List<RoadPath> roads, double scale,
         double cameraX, double cameraZ, int screenW, int screenH) {
 
+        // Xaero scale is in physical px/block. GuiMap renders to an FBO with a
+        // 1/guiScale downscale, then blits 1:1 to screen (physical px). Since
+        // we draw directly to the GUI layer, we must divide by guiScale twice:
+        // once for FBO downscale, once for physical→GUI coordinate conversion.
+        double effectiveScale = scale / (guiScale * guiScale);
         double centerX = screenW / 2.0;
         double centerY = screenH / 2.0;
 
-        double halfWorldW = screenW / (2.0 * scale);
-        double halfWorldH = screenH / (2.0 * scale);
-        double margin = 50.0;
+        double halfWorldW = screenW / (2.0 * effectiveScale);
+        double halfWorldH = screenH / (2.0 * effectiveScale);
+        double margin = 50.0 / effectiveScale;
         double minWorldX = cameraX - halfWorldW - margin;
         double maxWorldX = cameraX + halfWorldW + margin;
         double minWorldZ = cameraZ - halfWorldH - margin;
@@ -149,7 +162,7 @@ public final class XaeroMapOverlay {
 
             int lineWidth = "G".equals(road.classification) ? 3 : ("S".equals(road.classification) ? 2 : 1);
             int color = classificationColor(road.classification);
-            renderRoad(graphics, road, scale, cameraX, cameraZ, centerX, centerY, color, lineWidth);
+            renderRoad(graphics, road, effectiveScale, cameraX, cameraZ, centerX, centerY, color, lineWidth);
         }
     }
 
@@ -174,7 +187,7 @@ public final class XaeroMapOverlay {
         return !(roadMaxX < minX || roadMinX > maxX || roadMaxZ < minZ || roadMinZ > maxZ);
     }
 
-    private static void renderRoad(GuiGraphicsExtractor graphics, RoadPath road, double scale, double cameraX,
+    private static void renderRoad(GuiGraphicsExtractor graphics, RoadPath road, double effectiveScale, double cameraX,
         double cameraZ, double centerX, double centerY, int color, int thickness) {
 
         List<RoadPoint> points = road.points;
@@ -185,10 +198,10 @@ public final class XaeroMapOverlay {
             RoadPoint p1 = points.get(i);
             RoadPoint p2 = points.get(i + 1);
 
-            int sx1 = (int)((p1.x - cameraX) * scale + centerX);
-            int sy1 = (int)((p1.z - cameraZ) * scale + centerY);
-            int sx2 = (int)((p2.x - cameraX) * scale + centerX);
-            int sy2 = (int)((p2.z - cameraZ) * scale + centerY);
+            int sx1 = (int)((p1.x - cameraX) * effectiveScale + centerX);
+            int sy1 = (int)((p1.z - cameraZ) * effectiveScale + centerY);
+            int sx2 = (int)((p2.x - cameraX) * effectiveScale + centerX);
+            int sy2 = (int)((p2.z - cameraZ) * effectiveScale + centerY);
 
             drawThickLine(graphics, sx1, sy1, sx2, sy2, color, thickness);
         }

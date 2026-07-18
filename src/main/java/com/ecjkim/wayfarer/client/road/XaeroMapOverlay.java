@@ -19,10 +19,12 @@ package com.ecjkim.wayfarer.client.road;
 import java.lang.reflect.Field;
 import java.util.List;
 
+import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.client.renderer.GameRenderer;
 
+import com.mojang.blaze3d.platform.Window;
 import com.mojang.blaze3d.systems.RenderSystem;
 import com.mojang.blaze3d.vertex.BufferBuilder;
 import com.mojang.blaze3d.vertex.BufferUploader;
@@ -52,12 +54,17 @@ public final class XaeroMapOverlay {
     private static Field cameraXField;
     private static Field cameraZField;
     private static int reflectionFailCount;
+    /** Xaero scale is in physical pixels/block; divide by guiScale for GUI-scaled coords */
+    private static double guiScale = 2.0;
 
     private XaeroMapOverlay() {}
 
     public static void register() {
         ScreenEvents.AFTER_INIT.register((client, screen, scaledWidth, scaledHeight) -> {
             if (isGuiMap(screen)) {
+                // Compute guiScale once when GuiMap opens (Xaero scale is in physical px/block)
+                Window win = Minecraft.getInstance().getWindow();
+                guiScale = (double)win.getScreenWidth() / win.getGuiScaledWidth();
                 ScreenEvents.afterRender(screen).register(XaeroMapOverlay::onAfterScreenRender);
             }
         });
@@ -141,12 +148,17 @@ public final class XaeroMapOverlay {
     private static void renderRoadNetwork(GuiGraphics graphics, List<RoadPath> roads, double scale, double cameraX,
         double cameraZ, int screenW, int screenH) {
 
+        // Xaero scale is in physical px/block. GuiMap renders to an FBO with a
+        // 1/guiScale downscale, then blits 1:1 to screen (physical px). Since
+        // we draw directly to the GUI layer, we must divide by guiScale twice:
+        // once for FBO downscale, once for physical→GUI coordinate conversion.
+        double effectiveScale = scale / (guiScale * guiScale);
         double centerX = screenW / 2.0;
         double centerY = screenH / 2.0;
 
-        double halfWorldW = screenW / (2.0 * scale);
-        double halfWorldH = screenH / (2.0 * scale);
-        double margin = 50.0;
+        double halfWorldW = screenW / (2.0 * effectiveScale);
+        double halfWorldH = screenH / (2.0 * effectiveScale);
+        double margin = 50.0 / effectiveScale;
         double minWorldX = cameraX - halfWorldW - margin;
         double maxWorldX = cameraX + halfWorldW + margin;
         double minWorldZ = cameraZ - halfWorldH - margin;
@@ -161,7 +173,7 @@ public final class XaeroMapOverlay {
                 continue;
 
             int color = classificationColor(road.classification);
-            renderRoad(graphics, road, scale, cameraX, cameraZ, centerX, centerY, color);
+            renderRoad(graphics, road, effectiveScale, cameraX, cameraZ, centerX, centerY, color);
         }
 
         RenderSystem.enableDepthTest();
@@ -189,8 +201,8 @@ public final class XaeroMapOverlay {
         return !(roadMaxX < minX || roadMinX > maxX || roadMaxZ < minZ || roadMinZ > maxZ);
     }
 
-    private static void renderRoad(GuiGraphics graphics, RoadPath road, double scale, double cameraX, double cameraZ,
-        double centerX, double centerY, int color) {
+    private static void renderRoad(GuiGraphics graphics, RoadPath road, double effectiveScale, double cameraX,
+        double cameraZ, double centerX, double centerY, int color) {
 
         List<RoadPoint> points = road.points;
         if (points.size() < 2)
@@ -213,8 +225,8 @@ public final class XaeroMapOverlay {
         float a = 0.85f;
 
         for (RoadPoint pt : points) {
-            float sx = (float)((pt.x - cameraX) * scale + centerX);
-            float sy = (float)((pt.z - cameraZ) * scale + centerY);
+            float sx = (float)((pt.x - cameraX) * effectiveScale + centerX);
+            float sy = (float)((pt.z - cameraZ) * effectiveScale + centerY);
             builder.vertex(matrix, sx, sy, 0.0f).color(r, g, b, a).endVertex();
         }
 

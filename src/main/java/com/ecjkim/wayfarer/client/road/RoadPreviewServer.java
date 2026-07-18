@@ -20,18 +20,12 @@ import java.io.IOException;
 import java.io.OutputStream;
 import java.net.InetSocketAddress;
 import java.nio.charset.StandardCharsets;
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.Executors;
 import java.util.logging.Level;
 import java.util.logging.Logger;
-import java.util.stream.Stream;
-
-import net.fabricmc.loader.api.FabricLoader;
 
 import com.ecjkim.wayfarer.client.road.layer.LayerManager;
 import com.ecjkim.wayfarer.client.road.layer.MapLayer;
@@ -217,96 +211,29 @@ public class RoadPreviewServer {
         }
     }
 
-    /** GET /api/xaero/tiles/{z}/{x}/{y} — proxy Xaero WM local tiles as Leaflet tile layer */
+    /**
+     * GET /api/xaero/tiles/{z}/{x}/{y} — transparent placeholder tile layer. Xaero World Map stores tiles as
+     * proprietary binary region.xaero inside zip files (e.g. mw$default/x_y.zip), not standard PNG. This endpoint
+     * returns a 1×1 transparent PNG to keep the Leaflet tile layer functional until a tile decoder is implemented.
+     */
     private void handleXaeroTile(HttpExchange exchange) throws IOException {
         if (!"GET".equalsIgnoreCase(exchange.getRequestMethod())) {
             sendText(exchange, 405, "Method Not Allowed");
             return;
         }
 
-        String path = exchange.getRequestURI().getPath();
-        // path format: /api/xaero/tiles/{z}/{x}/{y}
-        String subPath = path.substring("/api/xaero/tiles/".length());
-        if (subPath.isEmpty() || subPath.endsWith("/")) {
-            sendText(exchange, 400, jsonError("INVALID_PARAM", "missing z/x/y"));
-            return;
-        }
+        // 1×1 transparent PNG (67 bytes)
+        byte[] transparentPng = {(byte)0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A, 0x00, 0x00, 0x00, 0x0D, 0x49,
+            0x48, 0x44, 0x52, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x01, 0x08, 0x06, 0x00, 0x00, 0x00, 0x1F, 0x15,
+            (byte)0xC4, (byte)0x89, 0x00, 0x00, 0x00, 0x0A, 0x49, 0x44, 0x41, 0x54, 0x78, (byte)0x9C, 0x62, 0x00, 0x00,
+            0x00, 0x02, 0x00, 0x01, (byte)0xE5, 0x27, (byte)0xDE, (byte)0xFC, 0x00, 0x00, 0x00, 0x00, 0x49, 0x45, 0x4E,
+            0x44, (byte)0xAE, 0x42, 0x60, (byte)0x82};
 
-        String[] parts = subPath.split("/");
-        if (parts.length != 3) {
-            sendText(exchange, 400, jsonError("INVALID_PARAM", "expected z/x/y"));
-            return;
-        }
-
-        try {
-            int z = Integer.parseInt(parts[0]);
-            int x = Integer.parseInt(parts[1]);
-            int y = Integer.parseInt(parts[2]);
-
-            Path tileFile = findXaeroTile(z, x, y);
-            if (tileFile == null) {
-                // Return 204 No Content (transparent tile) instead of 404 to avoid console spam
-                exchange.getResponseHeaders().set("Content-Type", "image/png");
-                exchange.sendResponseHeaders(204, -1);
-                return;
-            }
-
-            byte[] data = Files.readAllBytes(tileFile);
-            exchange.getResponseHeaders().set("Content-Type", "image/png");
-            exchange.getResponseHeaders().set("Cache-Control", "public, max-age=300");
-            exchange.sendResponseHeaders(200, data.length);
-            try (OutputStream os = exchange.getResponseBody()) {
-                os.write(data);
-            }
-        } catch (NumberFormatException e) {
-            sendText(exchange, 400, jsonError("INVALID_PARAM", "z/x/y must be integers"));
-        } catch (IOException e) {
-            LOGGER.log(Level.WARNING, "Failed to read Xaero tile: " + e.getMessage());
-            exchange.getResponseHeaders().set("Content-Type", "image/png");
-            exchange.sendResponseHeaders(204, -1);
-        }
-    }
-
-    /**
-     * Locate a Xaero World Map tile file for given zoom/x/y. Scans all multiplayer server directories and dimensions.
-     *
-     * <p>
-     * Tile path pattern: {@code XaeroWorldMap/Multiplayer_<server>/<dim>/<zoom>/<x>_<y>.png}
-     */
-    private Path findXaeroTile(int z, int x, int y) {
-        Path xaeroRoot = FabricLoader.getInstance().getGameDir().resolve("XaeroWorldMap");
-        if (!Files.isDirectory(xaeroRoot))
-            return null;
-
-        try (Stream<Path> serverDirs = Files.list(xaeroRoot)) {
-            List<Path> candidates = new ArrayList<>();
-            serverDirs.filter(Files::isDirectory).forEach(serverDir -> {
-                try {
-                    if (!Files.isDirectory(serverDir))
-                        return;
-                    try (Stream<Path> dimDirs = Files.list(serverDir)) {
-                        dimDirs.filter(Files::isDirectory).forEach(dimDir -> {
-                            // Xaero tile naming: <zoom>/<x>_<y>.png
-                            Path zoomDir = dimDir.resolve(Integer.toString(z));
-                            if (Files.isDirectory(zoomDir)) {
-                                // Try both underscore and comma separators
-                                Path tileA = zoomDir.resolve(x + "_" + y + ".png");
-                                Path tileB = zoomDir.resolve(x + "," + y + ".png");
-                                if (Files.exists(tileA))
-                                    candidates.add(tileA);
-                                else if (Files.exists(tileB))
-                                    candidates.add(tileB);
-                            }
-                        });
-                    }
-                } catch (IOException ignored) {
-                }
-            });
-
-            // Return first found tile (preferring higher-resolution from any server)
-            return candidates.isEmpty() ? null : candidates.get(0);
-        } catch (IOException e) {
-            return null;
+        exchange.getResponseHeaders().set("Content-Type", "image/png");
+        exchange.getResponseHeaders().set("Cache-Control", "public, max-age=3600");
+        exchange.sendResponseHeaders(200, transparentPng.length);
+        try (OutputStream os = exchange.getResponseBody()) {
+            os.write(transparentPng);
         }
     }
 
@@ -738,7 +665,9 @@ public class RoadPreviewServer {
                 var chunkGridLayer = L.layerGroup({zIndex:50});
                 chunkGridLayer._layerId = 'administrative';
 
-                // Xaero World Map tile layer (proxied from local Xaero tiles)
+                // Xaero World Map tile layer (proxied from local Xaero tiles).
+                // Currently serves transparent placeholder tiles because Xaero stores data
+                // as proprietary binary region.xaero inside zip files (mw$default/x_y.zip).
                 var xaeroTileLayer = L.tileLayer('/api/xaero/tiles/{z}/{x}/{y}', {
                   minZoom: 0,
                   maxZoom: 18,
@@ -747,7 +676,6 @@ public class RoadPreviewServer {
                   errorTileUrl: '',
                   attribution: 'Xaero World Map'
                 });
-                xaeroTileLayer.addTo(map);
 
                 // Draw 16x16 block (1 chunk) grid lines within bounds, padded by 2 chunks
                 function renderChunkGrid(layer, bounds){
@@ -772,9 +700,8 @@ public class RoadPreviewServer {
                   }
                 }
 
-                L.control.layers({
-                  'Xaero \u5E95\u56FE': xaeroTileLayer
-                },{
+                L.control.layers({},{
+                  'Xaero \u5E95\u56FE': xaeroTileLayer,
                   '\u9053\u8DEF\u8DEF\u7F51':geoJsonLayer,
                   '\u4EA4\u53C9\u53E3':intersectionLayer,
                   '\u533A\u5757\u7F51\u683C':chunkGridLayer
