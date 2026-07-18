@@ -21,9 +21,7 @@
     "fabric-key-binding-api-v1": "*",
     "fabric-screen-api-v1": "*"
   },
-  "mixins": [
-    "wayfarer.mixins.json"
-  ],
+  "mixins": ["wayfarer.mixins.json"],
   "custom": {
     "modmenu": {
       "links": {
