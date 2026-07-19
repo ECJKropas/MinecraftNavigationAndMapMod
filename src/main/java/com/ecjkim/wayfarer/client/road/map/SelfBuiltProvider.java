@@ -22,9 +22,6 @@ import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
-import java.util.concurrent.TimeUnit;
 
 import net.minecraft.client.Minecraft;
 import net.minecraft.core.BlockPos;
@@ -51,11 +48,6 @@ public class SelfBuiltProvider implements MapProvider {
 
     private final Map<Long, SoftReference<int[]>> tileCache = new ConcurrentHashMap<>();
     private final Set<Long> dirtyTileSet = ConcurrentHashMap.newKeySet();
-    private final ExecutorService workerPool = Executors.newFixedThreadPool(2, r -> {
-        Thread t = new Thread(r, "Wayfarer-TileWorker");
-        t.setDaemon(true);
-        return t;
-    });
 
     private boolean chunkListenerRegistered;
 
@@ -158,7 +150,7 @@ public class SelfBuiltProvider implements MapProvider {
         return pixels;
     }
 
-    // --- background worker ---
+    // --- main-thread batch render ---
 
     private volatile boolean processingScheduled;
 
@@ -166,23 +158,22 @@ public class SelfBuiltProvider implements MapProvider {
         if (processingScheduled)
             return;
         processingScheduled = true;
-        workerPool.submit(this::processDirtyTiles);
+        Minecraft.getInstance().execute(this::processDirtyTiles);
     }
 
     private void processDirtyTiles() {
-        try {
-            // short delay to batch up rapid chunk loads
-            Thread.sleep(500);
-        } catch (InterruptedException ignored) {
-        }
-
         Set<Long> batch = new HashSet<>();
         dirtyTileSet.removeIf(key -> {
-            if (batch.size() >= 8)
+            if (batch.size() >= 4)
                 return false;
             batch.add(key);
             return true;
         });
+
+        if (batch.isEmpty()) {
+            processingScheduled = false;
+            return;
+        }
 
         for (long key : batch) {
             int tileX = (int)(key >> 32);
@@ -195,18 +186,13 @@ public class SelfBuiltProvider implements MapProvider {
 
         processingScheduled = false;
 
-        // if more dirty tiles remain, schedule another round
         if (!dirtyTileSet.isEmpty()) {
             scheduleDirtyProcessing();
         }
     }
 
     public void shutdown() {
-        workerPool.shutdown();
-        try {
-            workerPool.awaitTermination(2, TimeUnit.SECONDS);
-        } catch (InterruptedException ignored) {
-        }
+        // no background threads to shut down
     }
 
     // --- helpers ---
