@@ -16,6 +16,8 @@
  */
 package com.ecjkim.wayfarer.client.road;
 
+import java.awt.image.BufferedImage;
+import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.OutputStream;
 import java.net.InetSocketAddress;
@@ -27,8 +29,11 @@ import java.util.concurrent.Executors;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
+import javax.imageio.ImageIO;
+
 import com.ecjkim.wayfarer.client.road.layer.LayerManager;
 import com.ecjkim.wayfarer.client.road.layer.MapLayer;
+import com.ecjkim.wayfarer.client.road.map.ProviderManager;
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
 import com.sun.net.httpserver.HttpExchange;
@@ -42,11 +47,16 @@ public class RoadPreviewServer {
 
     private final RoadDataStore roadDataStore;
     private final LayerManager layerManager;
+    private ProviderManager providerManager;
     private HttpServer server;
 
     public RoadPreviewServer(RoadDataStore roadDataStore) {
         this.roadDataStore = roadDataStore;
         this.layerManager = new LayerManager();
+    }
+
+    public void setProviderManager(ProviderManager providerManager) {
+        this.providerManager = providerManager;
     }
 
     public synchronized void start() {
@@ -62,6 +72,7 @@ public class RoadPreviewServer {
             server.createContext("/api/roads/", this::handleRoadById);
             server.createContext("/api/layers", this::handleLayers);
             server.createContext("/api/xaero/tiles/", this::handleXaeroTile);
+            server.createContext("/api/tiles/", this::handleTile);
             server.setExecutor(Executors.newSingleThreadExecutor(runnable -> {
                 Thread thread = new Thread(runnable, "Wayfarer Preview");
                 thread.setDaemon(true);
@@ -212,17 +223,75 @@ public class RoadPreviewServer {
     }
 
     /**
-     * GET /api/xaero/tiles/{z}/{x}/{y} — transparent placeholder tile layer. Xaero World Map stores tiles as
-     * proprietary binary region.xaero inside zip files (e.g. mw$default/x_y.zip), not standard PNG. This endpoint
-     * returns a 1×1 transparent PNG to keep the Leaflet tile layer functional until a tile decoder is implemented.
+     * GET /api/xaero/tiles/{z}/{x}/{y} — legacy alias, redirects to /api/tiles/
      */
     private void handleXaeroTile(HttpExchange exchange) throws IOException {
         if (!"GET".equalsIgnoreCase(exchange.getRequestMethod())) {
             sendText(exchange, 405, "Method Not Allowed");
             return;
         }
+        String path = exchange.getRequestURI().getPath();
+        // /api/xaero/tiles/{z}/{x}/{y} -> /api/tiles/0/{z}/{x}/{y}.png
+        String sub = path.substring("/api/xaero/tiles/".length());
+        String newPath = "/api/tiles/0/" + sub + ".png";
+        exchange.getResponseHeaders().set("Location", newPath);
+        exchange.sendResponseHeaders(302, -1);
+    }
 
-        // 1×1 transparent PNG (67 bytes)
+    /**
+     * GET /api/tiles/{dim}/{zoom}/{tileX}/{tileY}.png
+     * Delegates to ProviderManager for pixel data, encodes as PNG on output.
+     */
+    private void handleTile(HttpExchange exchange) throws IOException {
+        if (!"GET".equalsIgnoreCase(exchange.getRequestMethod())) {
+            sendText(exchange, 405, "Method Not Allowed");
+            return;
+        }
+        if (providerManager == null) {
+            sendTransparentPng(exchange);
+            return;
+        }
+
+        String path = exchange.getRequestURI().getPath();
+        // /api/tiles/{dim}/{zoom}/{tileX}/{tileY}.png
+        String sub = path.substring("/api/tiles/".length());
+        if (sub.endsWith(".png")) sub = sub.substring(0, sub.length() - 4);
+        String[] parts = sub.split("/");
+        if (parts.length != 4) {
+            sendText(exchange, 400, "Bad tile path: expected /api/tiles/{dim}/{zoom}/{x}/{y}.png");
+            return;
+        }
+        try {
+            int dim = Integer.parseInt(parts[0]);
+            int zoom = Integer.parseInt(parts[1]);
+            int tileX = Integer.parseInt(parts[2]);
+            int tileY = Integer.parseInt(parts[3]);
+
+            BufferedImage img = providerManager.getTile(dim, zoom, tileX, tileY);
+            if (img == null) {
+                sendTransparentPng(exchange);
+                return;
+            }
+
+            ByteArrayOutputStream baos = new ByteArrayOutputStream();
+            ImageIO.write(img, "PNG", baos);
+            byte[] pngBytes = baos.toByteArray();
+
+            exchange.getResponseHeaders().set("Content-Type", "image/png");
+            exchange.getResponseHeaders().set("Cache-Control", "public, max-age=10");
+            exchange.sendResponseHeaders(200, pngBytes.length);
+            try (OutputStream os = exchange.getResponseBody()) {
+                os.write(pngBytes);
+            }
+        } catch (NumberFormatException e) {
+            sendText(exchange, 400, "Invalid tile coordinates");
+        } catch (Exception e) {
+            LOGGER.log(Level.WARNING, "Tile render error", e);
+            sendTransparentPng(exchange);
+        }
+    }
+
+    private void sendTransparentPng(HttpExchange exchange) throws IOException {
         byte[] transparentPng = {(byte)0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A, 0x00, 0x00, 0x00, 0x0D, 0x49,
             0x48, 0x44, 0x52, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x01, 0x08, 0x06, 0x00, 0x00, 0x00, 0x1F, 0x15,
             (byte)0xC4, (byte)0x89, 0x00, 0x00, 0x00, 0x0A, 0x49, 0x44, 0x41, 0x54, 0x78, (byte)0x9C, 0x62, 0x00, 0x00,
@@ -230,7 +299,7 @@ public class RoadPreviewServer {
             0x44, (byte)0xAE, 0x42, 0x60, (byte)0x82};
 
         exchange.getResponseHeaders().set("Content-Type", "image/png");
-        exchange.getResponseHeaders().set("Cache-Control", "public, max-age=3600");
+        exchange.getResponseHeaders().set("Cache-Control", "public, max-age=10");
         exchange.sendResponseHeaders(200, transparentPng.length);
         try (OutputStream os = exchange.getResponseBody()) {
             os.write(transparentPng);
@@ -665,16 +734,14 @@ public class RoadPreviewServer {
                 var chunkGridLayer = L.layerGroup({zIndex:50});
                 chunkGridLayer._layerId = 'administrative';
 
-                // Xaero World Map tile layer (proxied from local Xaero tiles).
-                // Currently serves transparent placeholder tiles because Xaero stores data
-                // as proprietary binary region.xaero inside zip files (mw$default/x_y.zip).
-                var xaeroTileLayer = L.tileLayer('/api/xaero/tiles/{z}/{x}/{y}', {
-                  minZoom: 0,
-                  maxZoom: 18,
-                  opacity: 0.7,
-                  zIndex: 1,
-                  errorTileUrl: '',
-                  attribution: 'Xaero World Map'
+                // Map tile layers via /api/tiles/{dim}/{zoom}/{x}/{y}.png
+                var overworldTiles = L.tileLayer('/api/tiles/0/{z}/{x}/{y}.png', {
+                  minZoom: 0, maxZoom: 18, opacity: 0.85, zIndex: 0,
+                  errorTileUrl: '', attribution: 'Wayfarer Tiles'
+                });
+                var netherTiles = L.tileLayer('/api/tiles/-1/{z}/{x}/{y}.png', {
+                  minZoom: 0, maxZoom: 18, opacity: 0.85, zIndex: 0,
+                  errorTileUrl: '', attribution: 'Wayfarer Tiles (Nether)'
                 });
 
                 // Draw 16x16 block (1 chunk) grid lines within bounds, padded by 2 chunks
@@ -701,7 +768,8 @@ public class RoadPreviewServer {
                 }
 
                 L.control.layers({},{
-                  'Xaero \u5E95\u56FE': xaeroTileLayer,
+                  '\u4E3B\u4E16\u754C\u5730\u5F62': overworldTiles,
+                  '\u5730\u72F1\u5730\u5F62': netherTiles,
                   '\u9053\u8DEF\u8DEF\u7F51':geoJsonLayer,
                   '\u4EA4\u53C9\u53E3':intersectionLayer,
                   '\u533A\u5757\u7F51\u683C':chunkGridLayer
