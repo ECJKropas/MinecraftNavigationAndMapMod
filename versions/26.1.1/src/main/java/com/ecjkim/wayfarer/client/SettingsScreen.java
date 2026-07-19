@@ -32,6 +32,9 @@ import org.lwjgl.glfw.GLFW;
 
 public class SettingsScreen extends Screen {
     private static final List<String> CLASSIFICATIONS = List.of("", "G国道", "G高速", "S省道", "S高架", "X乡道", "Y县道", "C村道");
+    private static final List<String> TILE_MODES = List.of("AUTO", "XAERO_ONLY", "SELF_BUILT");
+    private static final List<String> TILE_MODE_LABELS = List.of(
+        "自动（优先Xaero）", "仅Xaero", "自建瓦片");
 
     private static final int ROW_H = 24;
     private static final int GAP = 2;
@@ -59,6 +62,10 @@ public class SettingsScreen extends Screen {
     private Button recHotkeyBtn;
     private Button menuHotkeyBtn;
 
+    // 瓦片方案
+    private int tileModeIdx;
+    private Button tileModeBtn;
+
     // 捕获状态
     private boolean capturing;
     private String capturingAction;
@@ -80,6 +87,8 @@ public class SettingsScreen extends Screen {
         this.parent = parent;
         this.config = WayfarerConfig.getInstance();
         this.useClassificationWidth = config.useClassificationWidth;
+        int idx = TILE_MODES.indexOf(config.tileProviderMode);
+        this.tileModeIdx = idx >= 0 ? idx : 0;
     }
 
     @Override
@@ -146,7 +155,15 @@ public class SettingsScreen extends Screen {
             hotkeySectionY = sectionY + 14 + ROW_H + 4 + config.classificationWidths.size() * (ROW_H + GAP) + 8;
         }
 
-        buildHotkeyButtons(hotkeySectionY);
+        // === 瓦片方案 section ===
+        String tileLabel = TILE_MODE_LABELS.get(tileModeIdx);
+        tileModeBtn = Button.builder(Component.literal(tileLabel), btn -> {
+            tileModeIdx = (tileModeIdx + 1) % TILE_MODES.size();
+            btn.setMessage(Component.literal(TILE_MODE_LABELS.get(tileModeIdx)));
+        }).bounds(valueX, hotkeySectionY + 14, VALUE_W, 20).build();
+        addRenderableWidget(tileModeBtn);
+
+        buildHotkeyButtons(hotkeySectionY + ROW_H + GAP + 8);
 
         // 计算总内容高度
         computeTotalContentHeight();
@@ -185,7 +202,7 @@ public class SettingsScreen extends Screen {
             hotkeySectionY = sectionY + 14 + ROW_H + 4 + config.classificationWidths.size() * (ROW_H + GAP) + 8;
         }
 
-        buildHotkeyButtons(hotkeySectionY);
+        buildHotkeyButtons(hotkeySectionY + ROW_H + GAP + 8);
         computeTotalContentHeight();
     }
 
@@ -243,7 +260,7 @@ public class SettingsScreen extends Screen {
             hotkeySectionY = sectionY + 14 + ROW_H + 4 + config.classificationWidths.size() * (ROW_H + GAP) + 8;
         }
 
-        int lastY = hotkeySectionY + 14;
+        int lastY = hotkeySectionY + 14 + ROW_H + GAP + 8; // tile mode section
 
         List<WayfarerConfig.HotkeyBind> recBinds = config.getHotkeysForAction("toggle_recording");
         if (!recBinds.isEmpty()) {
@@ -289,6 +306,9 @@ public class SettingsScreen extends Screen {
         }
         if (menuHotkeyBtn != null) {
             menuHotkeyBtn.visible = !filtering || matchesSearch("打开主菜单", menuHotkeyBtn.getMessage().getString());
+        }
+        if (tileModeBtn != null) {
+            tileModeBtn.visible = !filtering || matchesSearch("瓦片底图", "底图方案", tileModeBtn.getMessage().getString());
         }
 
         computeTotalContentHeight();
@@ -357,6 +377,13 @@ public class SettingsScreen extends Screen {
             ex.text(this.font, Component.literal("按键"), labelX, drawY, 0xFFAAAAAA, false);
         }
         drawY += 14;
+
+        // 瓦片底图
+        String tileLabel = tileModeBtn != null ? tileModeBtn.getMessage().getString() : "";
+        if (!filtering || matchesSearch("瓦片底图", "底图方案", tileLabel)) {
+            ex.text(this.font, Component.literal("瓦片底图"), labelX, drawY + 1, 0xFFCCCCCC, false);
+        }
+        drawY += ROW_H + GAP + 8;
 
         List<WayfarerConfig.HotkeyBind> recBinds = config.getHotkeysForAction("toggle_recording");
         if (!recBinds.isEmpty()) {
@@ -473,6 +500,7 @@ public class SettingsScreen extends Screen {
         config.defaultWidth = parseWidth(defaultWidthBox.getValue());
         config.defaultClassification = CLASSIFICATIONS.get(classificationIdx);
         config.useClassificationWidth = useClassificationWidth;
+        config.tileProviderMode = TILE_MODES.get(tileModeIdx);
 
         for (Map.Entry<String, EditBox> e : classifBoxes.entrySet()) {
             try {

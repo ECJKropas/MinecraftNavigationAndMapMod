@@ -71,6 +71,15 @@ public class ProviderManager {
         }
     }
 
+    /** Shutdown all providers (e.g. thread pools). */
+    public void shutdown() {
+        for (MapProvider provider : providers) {
+            if (provider instanceof SelfBuiltProvider) {
+                ((SelfBuiltProvider) provider).shutdown();
+            }
+        }
+    }
+
     /** Fallback provider that always returns a transparent 256x256 tile. */
     private static class NullProvider implements MapProvider {
         private BufferedImage emptyTile;

@@ -44,6 +44,7 @@ public class WayfarerConfig {
     public Map<String, Double> classificationWidths = defaultClassificationWidths();
     public double defaultWidth = 7.0;
     public String defaultClassification = "";
+    public String tileProviderMode = "AUTO";
     public Map<String, List<HotkeyBind>> hotkeys = defaultHotkeys();
 
     private WayfarerConfig() {}
