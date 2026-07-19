@@ -49,8 +49,8 @@ public class WayfarerClient implements ClientModInitializer {
         PREVIEW_SERVER.start();
 
         // init tile providers
-        ProviderManager pm = new ProviderManager(
-            ProviderManager.Mode.valueOf(WayfarerConfig.getInstance().tileProviderMode));
+        ProviderManager pm =
+            new ProviderManager(ProviderManager.Mode.valueOf(WayfarerConfig.getInstance().tileProviderMode));
         pm.add(new XaeroProvider());
         pm.add(new SelfBuiltProvider());
         PREVIEW_SERVER.setProviderManager(pm);

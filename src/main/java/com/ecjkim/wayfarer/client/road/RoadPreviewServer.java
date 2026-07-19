@@ -239,8 +239,8 @@ public class RoadPreviewServer {
     }
 
     /**
-     * GET /api/tiles/{dim}/{zoom}/{tileX}/{tileY}.png
-     * Delegates to ProviderManager for pixel data, encodes as PNG on output.
+     * GET /api/tiles/{dim}/{zoom}/{tileX}/{tileY}.png Delegates to ProviderManager for pixel data, encodes as PNG on
+     * output.
      */
     private void handleTile(HttpExchange exchange) throws IOException {
         if (!"GET".equalsIgnoreCase(exchange.getRequestMethod())) {
@@ -255,7 +255,8 @@ public class RoadPreviewServer {
         String path = exchange.getRequestURI().getPath();
         // /api/tiles/{dim}/{zoom}/{tileX}/{tileY}.png
         String sub = path.substring("/api/tiles/".length());
-        if (sub.endsWith(".png")) sub = sub.substring(0, sub.length() - 4);
+        if (sub.endsWith(".png"))
+            sub = sub.substring(0, sub.length() - 4);
         String[] parts = sub.split("/");
         if (parts.length != 4) {
             sendText(exchange, 400, "Bad tile path: expected /api/tiles/{dim}/{zoom}/{x}/{y}.png");

@@ -1,16 +1,16 @@
 /*
  * Copyright (C) 2025  MinecraftNavigationAndMapMod contributors
  * https://github.com/ECJKropas/MinecraftNavigationAndMapMod
- *
+
  * MinecraftNavigationAndMapMod is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
  * the Free Software Foundation, version 3 of the License.
- *
+
  * MinecraftNavigationAndMapMod is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
- *
+
  * You should have received a copy of the GNU General Public License
  * along with MinecraftNavigationAndMapMod.  If not, see <https://www.gnu.org/licenses/>.
  */
@@ -26,7 +26,6 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 
-import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientChunkEvents;
 import net.minecraft.client.Minecraft;
 import net.minecraft.core.BlockPos;
 import net.minecraft.world.level.ChunkPos;
@@ -35,14 +34,15 @@ import net.minecraft.world.level.chunk.LevelChunk;
 import net.minecraft.world.level.levelgen.Heightmap;
 import net.minecraft.world.level.material.MapColor;
 
+import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientChunkEvents;
+
 /**
- * Self-built tile provider (Scheme B).
- * Listens to chunk load events and renders tiles using vanilla MapColor.
- * Does not depend on any external mod.
+ * Self-built tile provider (Scheme B). Listens to chunk load events and renders tiles using vanilla MapColor. Does not
+ * depend on any external mod.
  *
- * <p>Coordinate convention:
- * tileX = floor(worldX / 256), pixelX = worldX % 256.
- * Chunk (chunkX, chunkZ) belongs to tile (floor(chunkX * 16 / 256), floor(chunkZ * 16 / 256)).
+ * <p>
+ * Coordinate convention: tileX = floor(worldX / 256), pixelX = worldX % 256. Chunk (chunkX, chunkZ) belongs to tile
+ * (floor(chunkX * 16 / 256), floor(chunkZ * 16 / 256)).
  */
 public class SelfBuiltProvider implements MapProvider {
 
@@ -59,8 +59,7 @@ public class SelfBuiltProvider implements MapProvider {
 
     private boolean chunkListenerRegistered;
 
-    public SelfBuiltProvider() {
-    }
+    public SelfBuiltProvider() {}
 
     // --- MapProvider ---
 
@@ -80,7 +79,8 @@ public class SelfBuiltProvider implements MapProvider {
                 tileCache.put(key, new SoftReference<>(pixels));
             }
         }
-        if (pixels == null) return null;
+        if (pixels == null)
+            return null;
         BufferedImage img = new BufferedImage(TILE_SIZE, TILE_SIZE, BufferedImage.TYPE_INT_ARGB);
         img.setRGB(0, 0, TILE_SIZE, TILE_SIZE, pixels, 0, TILE_SIZE);
         return img;
@@ -102,7 +102,8 @@ public class SelfBuiltProvider implements MapProvider {
     // --- lifecycle ---
 
     public void registerChunkListener() {
-        if (chunkListenerRegistered) return;
+        if (chunkListenerRegistered)
+            return;
         chunkListenerRegistered = true;
         ClientChunkEvents.CHUNK_LOAD.register((world, chunk) -> onChunkLoad(chunk));
     }
@@ -116,13 +117,14 @@ public class SelfBuiltProvider implements MapProvider {
     // --- rendering ---
 
     /**
-     * Render a tile synchronously from the current client world.
-     * Returns null if the world is not available or dimension mismatch.
+     * Render a tile synchronously from the current client world. Returns null if the world is not available or
+     * dimension mismatch.
      */
     private int[] renderTile(int dimension, int tileX, int tileY) {
         Minecraft mc = Minecraft.getInstance();
         Level level = mc.level;
-        if (level == null) return null;
+        if (level == null)
+            return null;
 
         // dimension check: overlay worlds freely since we serve what we have
         int[] pixels = new int[TILE_SIZE * TILE_SIZE];
@@ -158,7 +160,8 @@ public class SelfBuiltProvider implements MapProvider {
     private volatile boolean processingScheduled;
 
     private void scheduleDirtyProcessing() {
-        if (processingScheduled) return;
+        if (processingScheduled)
+            return;
         processingScheduled = true;
         workerPool.submit(this::processDirtyTiles);
     }
@@ -172,14 +175,15 @@ public class SelfBuiltProvider implements MapProvider {
 
         Set<Long> batch = new HashSet<>();
         dirtyTileSet.removeIf(key -> {
-            if (batch.size() >= 8) return false;
+            if (batch.size() >= 8)
+                return false;
             batch.add(key);
             return true;
         });
 
         for (long key : batch) {
-            int tileX = (int) (key >> 32);
-            int tileY = (int) key;
+            int tileX = (int)(key >> 32);
+            int tileY = (int)key;
             int[] pixels = renderTile(0, tileX, tileY);
             if (pixels != null) {
                 tileCache.put(key, new SoftReference<>(pixels));
@@ -205,6 +209,6 @@ public class SelfBuiltProvider implements MapProvider {
     // --- helpers ---
 
     private static long tileKey(int tileX, int tileY) {
-        return ((long) tileX << 32) | (tileY & 0xFFFFFFFFL);
+        return ((long)tileX << 32) | (tileY & 0xFFFFFFFFL);
     }
 }

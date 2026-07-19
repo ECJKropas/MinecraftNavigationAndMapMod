@@ -1,5 +1,19 @@
-// Copyright header same as base
+/*
+ * Copyright (C) 2025  MinecraftNavigationAndMapMod contributors
+ * https://github.com/ECJKropas/MinecraftNavigationAndMapMod
 
+ * MinecraftNavigationAndMapMod is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, version 3 of the License.
+
+ * MinecraftNavigationAndMapMod is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+
+ * You should have received a copy of the GNU General Public License
+ * along with MinecraftNavigationAndMapMod.  If not, see <https://www.gnu.org/licenses/>.
+ */
 package com.ecjkim.wayfarer.client.road.map;
 
 import java.awt.image.BufferedImage;
@@ -24,8 +38,7 @@ public class XaeroProvider implements MapProvider {
     private Method mapProcessorGetWorldMethod;
     private Method mapWorldGetTileMethod;
 
-    public XaeroProvider() {
-    }
+    public XaeroProvider() {}
 
     @Override
     public boolean isAvailable() {
@@ -35,9 +48,11 @@ public class XaeroProvider implements MapProvider {
 
     @Override
     public BufferedImage getTile(int dimension, int zoom, int tileX, int tileY) {
-        if (!isAvailable()) return null;
+        if (!isAvailable())
+            return null;
         probeReflection();
-        if (guiMapProcessorField == null) return null;
+        if (guiMapProcessorField == null)
+            return null;
 
         try {
             // reflect read GuiMap.mapProcessor -> MapProcessor -> MapWorld -> tile cache
@@ -52,8 +67,7 @@ public class XaeroProvider implements MapProvider {
     }
 
     @Override
-    public void invalidate(ChunkPos chunk) {
-    }
+    public void invalidate(ChunkPos chunk) {}
 
     @Override
     public String getName() {
@@ -61,7 +75,8 @@ public class XaeroProvider implements MapProvider {
     }
 
     private void probeReflection() {
-        if (reflectionProbed) return;
+        if (reflectionProbed)
+            return;
         reflectionProbed = true;
 
         try {

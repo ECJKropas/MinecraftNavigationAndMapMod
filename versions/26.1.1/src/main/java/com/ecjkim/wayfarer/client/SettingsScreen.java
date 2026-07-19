@@ -33,8 +33,7 @@ import org.lwjgl.glfw.GLFW;
 public class SettingsScreen extends Screen {
     private static final List<String> CLASSIFICATIONS = List.of("", "G国道", "G高速", "S省道", "S高架", "X乡道", "Y县道", "C村道");
     private static final List<String> TILE_MODES = List.of("AUTO", "XAERO_ONLY", "SELF_BUILT");
-    private static final List<String> TILE_MODE_LABELS = List.of(
-        "自动（优先Xaero）", "仅Xaero", "自建瓦片");
+    private static final List<String> TILE_MODE_LABELS = List.of("自动（优先Xaero）", "仅Xaero", "自建瓦片");
 
     private static final int ROW_H = 24;
     private static final int GAP = 2;
