@@ -737,11 +737,13 @@ public class RoadPreviewServer {
 
                 // Map tile layers via /api/tiles/{dim}/{zoom}/{x}/{y}.png
                 var overworldTiles = L.tileLayer('/api/tiles/0/{z}/{x}/{y}.png', {
-                  minZoom: 0, maxZoom: 18, opacity: 0.85, zIndex: 0,
+                  minZoom: 0, maxZoom: 18, maxNativeZoom: 0, tileSize: 256, noWrap: true,
+                  opacity: 0.85, zIndex: 0,
                   errorTileUrl: '', attribution: 'Wayfarer Tiles'
                 });
                 var netherTiles = L.tileLayer('/api/tiles/-1/{z}/{x}/{y}.png', {
-                  minZoom: 0, maxZoom: 18, opacity: 0.85, zIndex: 0,
+                  minZoom: 0, maxZoom: 18, maxNativeZoom: 0, tileSize: 256, noWrap: true,
+                  opacity: 0.85, zIndex: 0,
                   errorTileUrl: '', attribution: 'Wayfarer Tiles (Nether)'
                 });
 
