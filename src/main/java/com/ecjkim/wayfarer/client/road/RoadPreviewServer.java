@@ -270,7 +270,11 @@ public class RoadPreviewServer {
 
             BufferedImage img = providerManager.getTile(dim, zoom, tileX, tileY);
             if (img == null) {
-                sendTransparentPng(exchange);
+                // Tile not yet rendered: ask providers to render it asynchronously and return a
+                // transparent placeholder. no-cache tells the browser to retry immediately so that
+                // once the worker thread finishes rendering, the next request hits the cache.
+                providerManager.requestTileRender(dim, tileX, tileY);
+                sendNoCacheTransparentPng(exchange);
                 return;
             }
 
@@ -301,6 +305,25 @@ public class RoadPreviewServer {
 
         exchange.getResponseHeaders().set("Content-Type", "image/png");
         exchange.getResponseHeaders().set("Cache-Control", "public, max-age=10");
+        exchange.sendResponseHeaders(200, transparentPng.length);
+        try (OutputStream os = exchange.getResponseBody()) {
+            os.write(transparentPng);
+        }
+    }
+
+    /**
+     * Send a transparent PNG that the browser must not cache. Used when a tile is not yet rendered — the browser will
+     * immediately retry on the next refresh / tile load, picking up the tile once the worker finishes.
+     */
+    private void sendNoCacheTransparentPng(HttpExchange exchange) throws IOException {
+        byte[] transparentPng = {(byte)0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A, 0x00, 0x00, 0x00, 0x0D, 0x49,
+            0x48, 0x44, 0x52, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x01, 0x08, 0x06, 0x00, 0x00, 0x00, 0x1F, 0x15,
+            (byte)0xC4, (byte)0x89, 0x00, 0x00, 0x00, 0x0A, 0x49, 0x44, 0x41, 0x54, 0x78, (byte)0x9C, 0x62, 0x00, 0x00,
+            0x00, 0x02, 0x00, 0x01, (byte)0xE5, 0x27, (byte)0xDE, (byte)0xFC, 0x00, 0x00, 0x00, 0x00, 0x49, 0x45, 0x4E,
+            0x44, (byte)0xAE, 0x42, 0x60, (byte)0x82};
+
+        exchange.getResponseHeaders().set("Content-Type", "image/png");
+        exchange.getResponseHeaders().set("Cache-Control", "no-cache, no-store, must-revalidate");
         exchange.sendResponseHeaders(200, transparentPng.length);
         try (OutputStream os = exchange.getResponseBody()) {
             os.write(transparentPng);

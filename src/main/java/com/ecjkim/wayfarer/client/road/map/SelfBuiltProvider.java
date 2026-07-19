@@ -73,17 +73,20 @@ public class SelfBuiltProvider implements MapProvider {
         long key = tileKey(tileX, tileY);
         SoftReference<int[]> ref = tileCache.get(key);
         int[] pixels = ref != null ? ref.get() : null;
-        if (pixels == null) {
-            pixels = renderTile(dimension, tileX, tileY);
-            if (pixels != null) {
-                tileCache.put(key, new SoftReference<>(pixels));
-            }
-        }
         if (pixels == null)
             return null;
         BufferedImage img = new BufferedImage(TILE_SIZE, TILE_SIZE, BufferedImage.TYPE_INT_ARGB);
         img.setRGB(0, 0, TILE_SIZE, TILE_SIZE, pixels, 0, TILE_SIZE);
         return img;
+    }
+
+    @Override
+    public void requestTileRender(int dimension, int tileX, int tileY) {
+        long key = tileKey(tileX, tileY);
+        if (tileCache.containsKey(key))
+            return;
+        dirtyTileSet.add(key);
+        scheduleDirtyProcessing();
     }
 
     @Override

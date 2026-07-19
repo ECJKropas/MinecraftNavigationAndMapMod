@@ -41,6 +41,16 @@ public interface MapProvider {
      */
     BufferedImage getTile(int dimension, int zoom, int tileX, int tileY);
 
+    /**
+     * Request async rendering of the specified tile. The provider may schedule a background render and cache the result
+     * so that a subsequent {@link #getTile} call will hit the cache.
+     * <p>
+     * This is used by the HTTP layer when a tile is not yet cached: instead of blocking the HTTP thread with a
+     * synchronous render (which calls unsafe Minecraft API), the server returns a transparent placeholder and asks the
+     * provider to render the tile asynchronously. The browser will retry and get the cached tile on the next request.
+     */
+    default void requestTileRender(int dimension, int tileX, int tileY) {}
+
     /** Mark the tile(s) covering this chunk as dirty for re-render. */
     void invalidate(ChunkPos chunk);
 

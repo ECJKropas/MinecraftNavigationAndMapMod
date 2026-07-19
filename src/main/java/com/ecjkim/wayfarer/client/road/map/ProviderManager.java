@@ -82,6 +82,18 @@ public class ProviderManager {
         }
     }
 
+    /**
+     * Request async rendering of a tile from all providers. Used when a tile is not yet cached — the HTTP handler calls
+     * this and returns a transparent placeholder, then the providers render the tile in the background.
+     */
+    public void requestTileRender(int dimension, int tileX, int tileY) {
+        for (MapProvider provider : providers) {
+            if (provider.isAvailable()) {
+                provider.requestTileRender(dimension, tileX, tileY);
+            }
+        }
+    }
+
     /** Shutdown all providers (e.g. thread pools). */
     public void shutdown() {
         for (MapProvider provider : providers) {
