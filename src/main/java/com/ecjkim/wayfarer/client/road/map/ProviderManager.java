@@ -39,8 +39,18 @@ public class ProviderManager {
 
     private final List<MapProvider> providers = new ArrayList<>();
     private final MapProvider nullProvider = new NullProvider();
+    private final Mode mode;
 
     public ProviderManager() {
+        this(Mode.AUTO);
+    }
+
+    public ProviderManager(Mode mode) {
+        this.mode = mode;
+    }
+
+    public void add(MapProvider provider) {
+        providers.add(provider);
     }
 
     public void addProvider(MapProvider provider) {

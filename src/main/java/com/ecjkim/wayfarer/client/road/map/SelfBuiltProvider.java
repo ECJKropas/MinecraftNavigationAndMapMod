@@ -88,8 +88,8 @@ public class SelfBuiltProvider implements MapProvider {
 
     @Override
     public void invalidate(ChunkPos chunk) {
-        int tileX = Math.floorDiv(chunk.x * 16, TILE_SIZE);
-        int tileZ = Math.floorDiv(chunk.z * 16, TILE_SIZE);
+        int tileX = Math.floorDiv(chunk.getMinBlockX(), TILE_SIZE);
+        int tileZ = Math.floorDiv(chunk.getMinBlockZ(), TILE_SIZE);
         long key = tileKey(tileX, tileZ);
         dirtyTileSet.add(key);
     }
