@@ -4,3 +4,33 @@ key:
     open_road_list: Open road list (N)
 category:
   wayfarer: Wayfarer
+
+wayfarer.gui.title.configs: Wayfarer Settings
+
+useClassificationWidth: Use Classification Width
+defaultWidth: Default Width
+defaultClassification: Default Classification
+tileProviderMode: Tile Provider Mode
+widthGGuodao: G-National Road Width
+widthGGaosu: G-Expressway Width
+widthSShengdao: S-Provincial Road Width
+widthSGaojia: S-Elevated Road Width
+widthXXiangdao: X-Township Road Width
+widthYXiaodao: Y-County Road Width
+widthCCundao: C-Village Road Width
+toggleRecording: Toggle Recording
+openMenu: Open Menu
+
+"是否启用分级道路宽度": Enable classification-based road width
+"道路默认宽度": Default road width
+"新建道路时默认使用的分级代码，如 G国道、S省道": Default classification code for new roads, e.g. G (National), S (Provincial)
+"地图瓦片提供者模式": Map tile provider mode
+"G国道宽度": G-National road width
+"G高速宽度": G-Expressway width
+"S省道宽度": S-Provincial road width
+"S高架宽度": S-Elevated road width
+"X乡道宽度": X-Township road width
+"Y县道宽度": Y-County road width
+"C村道宽度": C-Village road width
+"切换道路录制开关": Toggle road recording on/off
+"打开导航菜单": Open navigation menu

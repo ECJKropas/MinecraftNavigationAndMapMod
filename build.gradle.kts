@@ -105,8 +105,6 @@ spotless {
             "*.json",
             "*.yml",
             "*.xml",
-            "src/main/resources/assets/**/*.yml",
-            "src/main/resources/assets/**/*.json",
             ".github/**/*.yml",
         )
 

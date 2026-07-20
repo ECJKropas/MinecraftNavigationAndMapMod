@@ -4,3 +4,33 @@ key:
     open_road_list: 打开路线列表（N）
 category:
   wayfarer: Wayfarer
+
+wayfarer.gui.title.configs: Wayfarer 设置
+
+useClassificationWidth: 使用分级道路宽度
+defaultWidth: 道路默认宽度
+defaultClassification: 默认分级代码
+tileProviderMode: 地图瓦片提供者模式
+widthGGuodao: G国道宽度
+widthGGaosu: G高速宽度
+widthSShengdao: S省道宽度
+widthSGaojia: S高架宽度
+widthXXiangdao: X乡道宽度
+widthYXiaodao: Y县道宽度
+widthCCundao: C村道宽度
+toggleRecording: 切换道路录制
+openMenu: 打开导航菜单
+
+"是否启用分级道路宽度": 是否启用分级道路宽度
+"道路默认宽度": 道路默认宽度
+"新建道路时默认使用的分级代码，如 G国道、S省道": 新建道路时默认使用的分级代码，如 G国道、S省道
+"地图瓦片提供者模式": 地图瓦片提供者模式
+"G国道宽度": G国道宽度
+"G高速宽度": G高速宽度
+"S省道宽度": S省道宽度
+"S高架宽度": S高架宽度
+"X乡道宽度": X乡道宽度
+"Y县道宽度": Y县道宽度
+"C村道宽度": C村道宽度
+"切换道路录制开关": 切换道路录制开关
+"打开导航菜单": 打开导航菜单
