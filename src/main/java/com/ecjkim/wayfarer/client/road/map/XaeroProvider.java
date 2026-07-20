@@ -58,6 +58,11 @@ public class XaeroProvider implements MapProvider {
     private Method mapProcessorGetLeafMapRegionMethod;
     private Method mapProcessorGetMapSaveLoadMethod;
     private Method mapSaveLoadRequestLoadMethod;
+    private Method mapSaveLoadLoadRegionMethod;
+    private Method mapProcessorGetWorldBlockLookupMethod;
+    private Method mapProcessorGetWorldBlockRegistryMethod;
+    private Field mapProcessorWorldFluidRegistryField;
+    private Field mapProcessorBiomeGetterField;
     private Object mapProcessor;
     private final Set<Long> pendingRegionLoads = ConcurrentHashMap.newKeySet();
 
@@ -157,7 +162,12 @@ public class XaeroProvider implements MapProvider {
                         Object region = mapProcessorGetLeafMapRegionMethod.invoke(processor, 0, regionX, regionZ, true);
                         if (region != null) {
                             Object saveLoad = mapProcessorGetMapSaveLoadMethod.invoke(processor);
-                            mapSaveLoadRequestLoadMethod.invoke(saveLoad, region, "Wayfarer");
+                            Object blockLookup = mapProcessorGetWorldBlockLookupMethod.invoke(processor);
+                            Object blockRegistry = mapProcessorGetWorldBlockRegistryMethod.invoke(processor);
+                            Object fluidRegistry = mapProcessorWorldFluidRegistryField.get(processor);
+                            Object biomeGetter = mapProcessorBiomeGetterField.get(processor);
+                            mapSaveLoadLoadRegionMethod.invoke(saveLoad, region, blockLookup, blockRegistry,
+                                fluidRegistry, biomeGetter, false, 0);
                         }
                     }
                 }
@@ -194,6 +204,16 @@ public class XaeroProvider implements MapProvider {
             Class<?> mapSaveLoadClass = Class.forName("xaero.map.file.MapSaveLoad");
             mapSaveLoadRequestLoadMethod =
                 mapSaveLoadClass.getMethod("requestLoad", Class.forName("xaero.map.region.MapRegion"), String.class);
+            mapSaveLoadLoadRegionMethod = mapSaveLoadClass.getMethod("loadRegion",
+                Class.forName("xaero.map.region.MapRegion"), Class.forName("net.minecraft.core.HolderLookup"),
+                Class.forName("net.minecraft.core.Registry"), Class.forName("net.minecraft.core.Registry"),
+                Class.forName("xaero.map.biome.BiomeGetter"), boolean.class, int.class);
+            mapProcessorGetWorldBlockLookupMethod = mapProcessorClass.getMethod("getWorldBlockLookup");
+            mapProcessorGetWorldBlockRegistryMethod = mapProcessorClass.getMethod("getWorldBlockRegistry");
+            mapProcessorWorldFluidRegistryField = mapProcessorClass.getDeclaredField("worldFluidRegistry");
+            mapProcessorWorldFluidRegistryField.setAccessible(true);
+            mapProcessorBiomeGetterField = mapProcessorClass.getDeclaredField("biomeGetter");
+            mapProcessorBiomeGetterField.setAccessible(true);
             xaeroAvailable = true;
             LOGGER.info("XaeroProvider: MapProcessor.getMapTile probe succeeded");
         } catch (ReflectiveOperationException e) {
