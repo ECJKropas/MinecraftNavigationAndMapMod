@@ -787,6 +787,16 @@ public class RoadPreviewServer {
                 // Chunk grid background layer (administrative reference lines)
                 var chunkGridLayer = L.layerGroup({zIndex:50});
                 chunkGridLayer._layerId = 'administrative';
+                map.on('moveend zoomend', function(){
+                  if(map.hasLayer(chunkGridLayer)){
+                    renderChunkGrid(chunkGridLayer, map.getBounds());
+                  }
+                });
+                map.on('overlayadd', function(e){
+                  if(e.layer === chunkGridLayer){
+                    renderChunkGrid(chunkGridLayer, map.getBounds());
+                  }
+                });
 
                 // Map tile layers via /api/tiles/{dim}/{zoom}/{x}/{y}.png
                 var overworldTiles = L.tileLayer('/api/tiles/0/{z}/{x}/{y}.png', {
@@ -929,10 +939,9 @@ public class RoadPreviewServer {
                         var b=geoJsonLayer.getBounds();
                         if(b.isValid()){
                           map.fitBounds(b.pad(0.15),{maxZoom:14});
-                          renderChunkGrid(chunkGridLayer, b);
                         }
-                      }else{
                       }
+                      renderChunkGrid(chunkGridLayer, map.getBounds());
                     })
                     .catch(function(err){
                       console.error('Wayfarer load error',err);
