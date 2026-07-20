@@ -768,7 +768,7 @@ public class RoadPreviewServer {
                     var t=L.DomUtil.create('canvas','');
                     t.width=256;t.height=256;
                     var ctx=t.getContext('2d');
-                    ctx.fillStyle='#fff';ctx.fillRect(0,0,256,256);
+                    ctx.clearRect(0,0,256,256);
                     ctx.strokeStyle='rgba(0,0,0,0.08)';ctx.lineWidth=0.5;
                     var gs=256;
                     if(c.z>=14) gs=16; else if(c.z>=12) gs=32; else if(c.z>=10) gs=64; else if(c.z>=8) gs=128;
@@ -784,19 +784,61 @@ public class RoadPreviewServer {
                   }
                 }).addTo(map);
 
-                // Chunk grid background layer (administrative reference lines)
-                var chunkGridLayer = L.layerGroup({zIndex:50});
+                // Chunk grid canvas overlay — covers entire viewport on any pan/zoom
+                var ChunkGridCanvas = L.Layer.extend({
+                  onAdd: function(map) {
+                    this._map = map;
+                    var canvas = this._canvas = L.DomUtil.create('canvas', '');
+                    canvas.style.position = 'absolute';
+                    canvas.style.pointerEvents = 'none';
+                    canvas.style.zIndex = '50';
+                    map.getPane('overlayPane').appendChild(canvas);
+                    this._resize();
+                    this._draw();
+                    map.on('moveend zoomend resize', this._draw, this);
+                  },
+                  onRemove: function(map) {
+                    L.DomUtil.remove(this._canvas);
+                    map.off('moveend zoomend resize', this._draw, this);
+                    this._map = null;
+                  },
+                  _resize: function() {
+                    var s = this._map.getSize();
+                    this._canvas.width = s.x;
+                    this._canvas.height = s.y;
+                    this._canvas.style.width = s.x + 'px';
+                    this._canvas.style.height = s.y + 'px';
+                  },
+                  _draw: function() {
+                    if (!this._map) return;
+                    this._resize();
+                    var ctx = this._canvas.getContext('2d');
+                    ctx.clearRect(0, 0, this._canvas.width, this._canvas.height);
+                    var b = this._map.getBounds();
+                    var CHUNK = 16;
+                    var sw = b.getSouthWest(), ne = b.getNorthEast();
+                    var minX = sw.lng, maxX = ne.lng, minY = sw.lat, maxY = ne.lat;
+                    var cx0 = Math.floor(minX / CHUNK) * CHUNK;
+                    var cy0 = Math.floor(minY / CHUNK) * CHUNK;
+                    ctx.strokeStyle = 'rgba(0,0,0,0.08)';
+                    ctx.lineWidth = 1;
+                    ctx.setLineDash([2, 4]);
+                    // vertical lines
+                    for (var x = cx0; x <= maxX; x += CHUNK) {
+                      var a = this._map.latLngToContainerPoint([minY, x]);
+                      var d = this._map.latLngToContainerPoint([maxY, x]);
+                      ctx.beginPath(); ctx.moveTo(a.x, a.y); ctx.lineTo(d.x, d.y); ctx.stroke();
+                    }
+                    // horizontal lines
+                    for (var y = cy0; y <= maxY; y += CHUNK) {
+                      var a = this._map.latLngToContainerPoint([y, minX]);
+                      var d = this._map.latLngToContainerPoint([y, maxX]);
+                      ctx.beginPath(); ctx.moveTo(a.x, a.y); ctx.lineTo(d.x, d.y); ctx.stroke();
+                    }
+                  }
+                });
+                var chunkGridLayer = new ChunkGridCanvas();
                 chunkGridLayer._layerId = 'administrative';
-                map.on('moveend zoomend', function(){
-                  if(map.hasLayer(chunkGridLayer)){
-                    renderChunkGrid(chunkGridLayer, map.getBounds());
-                  }
-                });
-                map.on('overlayadd', function(e){
-                  if(e.layer === chunkGridLayer){
-                    renderChunkGrid(chunkGridLayer, map.getBounds());
-                  }
-                });
 
                 // Single dynamic tile layer auto-following player dimension
                 var currentDim = 0;
@@ -819,29 +861,6 @@ public class RoadPreviewServer {
                 }
                 setInterval(pollDimension, 2000);
                 pollDimension();
-
-                // Draw 16x16 block (1 chunk) grid lines within bounds, padded by 2 chunks
-                function renderChunkGrid(layer, bounds){
-                  layer.clearLayers();
-                  if(!bounds || !bounds.isValid()) return;
-                  var CHUNK = 16;          // 1 chunk = 16 blocks
-                  var PAD = 2 * CHUNK;     // 2-chunk margin
-                  var sw = bounds.getSouthWest();
-                  var ne = bounds.getNorthEast();
-                  var minX = Math.floor((sw.lng - PAD) / CHUNK) * CHUNK;
-                  var maxX = Math.ceil((ne.lng + PAD) / CHUNK) * CHUNK;
-                  var minY = Math.floor((sw.lat - PAD) / CHUNK) * CHUNK;
-                  var maxY = Math.ceil((ne.lat + PAD) / CHUNK) * CHUNK;
-                  var lineStyle = {color:'rgba(0,0,0,0.08)', weight:1, dashArray:'2,4', interactive:false};
-                  // vertical lines (constant X)
-                  for(var x = minX; x <= maxX; x += CHUNK){
-                    L.polyline([[minY, x],[maxY, x]], lineStyle).addTo(layer);
-                  }
-                  // horizontal lines (constant Y)
-                  for(var y = minY; y <= maxY; y += CHUNK){
-                    L.polyline([[y, minX],[y, maxX]], lineStyle).addTo(layer);
-                  }
-                }
 
                 L.control.layers({},{
                   '\u536B\u661F\u5730\u56FE': satTiles,
