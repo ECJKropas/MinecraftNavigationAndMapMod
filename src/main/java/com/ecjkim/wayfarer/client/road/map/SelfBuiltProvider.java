@@ -36,10 +36,9 @@ import net.minecraft.world.level.Level;
 import net.minecraft.world.level.chunk.LevelChunk;
 import net.minecraft.world.level.levelgen.Heightmap;
 import net.minecraft.world.level.material.MapColor;
+import net.minecraft.world.phys.BlockHitResult;
 
 import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientChunkEvents;
-import net.fabricmc.fabric.api.event.player.PlayerBlockBreakEvents;
-import net.fabricmc.fabric.api.event.player.UseBlockCallback;
 
 /**
  * Self-built tile provider (Scheme B). Listens to chunk load events and renders tiles using vanilla MapColor. Does not
@@ -112,19 +111,45 @@ public class SelfBuiltProvider implements MapProvider {
         chunkListenerRegistered = true;
         ClientChunkEvents.CHUNK_LOAD.register((world, chunk) -> onChunkLoad(chunk));
 
-        // Block break → invalidate tile so map reflects mined blocks
-        PlayerBlockBreakEvents.AFTER.register((world, player, pos, state, entity) -> {
-            invalidateBlockPos(pos);
-        });
+        // Block break → invalidate tile (reflection for 1.20.1 compat)
+        try {
+            Class<?> breakEventsClass = Class.forName("net.fabricmc.fabric.api.event.player.PlayerBlockBreakEvents");
+            Object afterEvent = breakEventsClass.getField("AFTER").get(null);
+            Class<?> afterBreakIf =
+                Class.forName("net.fabricmc.fabric.api.event.player.PlayerBlockBreakEvents$AfterBlockBreak");
+            Object listener = java.lang.reflect.Proxy.newProxyInstance(afterBreakIf.getClassLoader(),
+                new Class<?>[] {afterBreakIf}, (proxy, method, args) -> {
+                    if (method.getName().equals("afterBlockBreak"))
+                        invalidateBlockPos((BlockPos)args[2]);
+                    return null;
+                });
+            afterEvent.getClass().getMethod("register", Object.class).invoke(afterEvent, listener);
+        } catch (ClassNotFoundException | NoClassDefFoundError ignored) {
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
 
-        // Block place (right-click) → invalidate tile after a 1-tick delay
-        UseBlockCallback.EVENT.register((player, world, hand, hitResult) -> {
-            if (!world.isClientSide())
-                return InteractionResult.PASS;
-            BlockPos placePos = hitResult.getBlockPos().relative(hitResult.getDirection());
-            Minecraft.getInstance().execute(() -> invalidateBlockPos(placePos));
-            return InteractionResult.PASS;
-        });
+        // Block place → invalidate tile (reflection for 1.20.1 compat)
+        try {
+            Class<?> useBlockClass = Class.forName("net.fabricmc.fabric.api.event.player.UseBlockCallback");
+            Object eventField = useBlockClass.getField("EVENT").get(null);
+            Object listener = java.lang.reflect.Proxy.newProxyInstance(useBlockClass.getClassLoader(),
+                new Class<?>[] {useBlockClass}, (proxy, method, args) -> {
+                    if (method.getName().equals("interact")) {
+                        if (!((Level)args[1]).isClientSide())
+                            return InteractionResult.PASS;
+                        BlockHitResult hitResult = (BlockHitResult)args[3];
+                        BlockPos placePos = hitResult.getBlockPos().relative(hitResult.getDirection());
+                        Minecraft.getInstance().execute(() -> invalidateBlockPos(placePos));
+                        return InteractionResult.PASS;
+                    }
+                    return null;
+                });
+            eventField.getClass().getMethod("register", Object.class).invoke(eventField, listener);
+        } catch (ClassNotFoundException | NoClassDefFoundError ignored) {
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
     }
 
     private void invalidateBlockPos(BlockPos pos) {
