@@ -350,7 +350,7 @@ public class RoadPreviewServer {
                 // Tile not yet rendered: ask providers to render it asynchronously and return a
                 // transparent placeholder. no-cache tells the browser to retry immediately so that
                 // once the worker thread finishes rendering, the next request hits the cache.
-                providerManager.requestTileRender(dim, tileX, tileY);
+                providerManager.requestTileRender(dim, zoom, tileX, tileY);
                 sendNoCacheTransparentPng(exchange);
                 return;
             }

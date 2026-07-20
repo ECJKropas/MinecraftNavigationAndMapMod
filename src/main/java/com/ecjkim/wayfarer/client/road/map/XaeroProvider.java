@@ -25,6 +25,7 @@ import java.util.HashMap;
 import java.util.IdentityHashMap;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
@@ -54,7 +55,11 @@ public class XaeroProvider implements MapProvider {
     private Method mapTileGetBlockMethod;
     private Method mapBlockGetStateMethod;
     private Method mapBlockGetHeightMethod;
+    private Method mapProcessorGetLeafMapRegionMethod;
+    private Method mapProcessorGetMapSaveLoadMethod;
+    private Method mapSaveLoadRequestLoadMethod;
     private Object mapProcessor;
+    private final Set<Long> pendingRegionLoads = ConcurrentHashMap.newKeySet();
 
     @Override
     public boolean isAvailable() {
@@ -119,6 +124,52 @@ public class XaeroProvider implements MapProvider {
     public void invalidate(ChunkPos chunk) {}
 
     @Override
+    public void requestTileRender(int dimension, int zoom, int tileX, int tileY) {
+        Object processor = findMapProcessor();
+        if (processor == null)
+            return;
+
+        long requestKey = (((long)zoom & 0xFFL) << 56) ^ (((long)tileX) << 28) ^ (tileY & 0x0FFFFFFFL);
+        if (!pendingRegionLoads.add(requestKey))
+            return;
+
+        Minecraft.getInstance().execute(() -> {
+            try {
+                int scale = zoom >= 0 ? 1 << zoom : 1;
+                int step = zoom < 0 ? 1 << -zoom : 1;
+                int minBlockX = zoom >= 0 ? Math.floorDiv(tileX * TILE_SIZE, scale) : tileX * TILE_SIZE * step;
+                int minBlockZ = zoom >= 0 ? Math.floorDiv(tileY * TILE_SIZE, scale) : tileY * TILE_SIZE * step;
+                int maxBlockX = zoom >= 0 ? Math.floorDiv(tileX * TILE_SIZE + TILE_SIZE - 1, scale) :
+                    minBlockX + TILE_SIZE * step - 1;
+                int maxBlockZ = zoom >= 0 ? Math.floorDiv(tileY * TILE_SIZE + TILE_SIZE - 1, scale) :
+                    minBlockZ + TILE_SIZE * step - 1;
+                int minRegionX = Math.floorDiv(Math.floorDiv(minBlockX, 16), 8);
+                int minRegionZ = Math.floorDiv(Math.floorDiv(minBlockZ, 16), 8);
+                int maxRegionX = Math.floorDiv(Math.floorDiv(maxBlockX, 16), 8);
+                int maxRegionZ = Math.floorDiv(Math.floorDiv(maxBlockZ, 16), 8);
+
+                long regionCount = (long)(maxRegionX - minRegionX + 1) * (maxRegionZ - minRegionZ + 1);
+                if (regionCount > 256)
+                    return;
+
+                for (int regionZ = minRegionZ; regionZ <= maxRegionZ; regionZ++) {
+                    for (int regionX = minRegionX; regionX <= maxRegionX; regionX++) {
+                        Object region = mapProcessorGetLeafMapRegionMethod.invoke(processor, 0, regionX, regionZ, true);
+                        if (region != null) {
+                            Object saveLoad = mapProcessorGetMapSaveLoadMethod.invoke(processor);
+                            mapSaveLoadRequestLoadMethod.invoke(saveLoad, region, "Wayfarer");
+                        }
+                    }
+                }
+            } catch (Exception e) {
+                LOGGER.log(Level.FINE, "Xaero region load request failed", e);
+            } finally {
+                pendingRegionLoads.remove(requestKey);
+            }
+        });
+    }
+
+    @Override
     public String getName() {
         return "Xaero";
     }
@@ -137,6 +188,11 @@ public class XaeroProvider implements MapProvider {
             mapTileGetBlockMethod = mapTileClass.getMethod("getBlock", int.class, int.class);
             mapBlockGetStateMethod = mapBlockClass.getMethod("getState");
             mapBlockGetHeightMethod = mapBlockClass.getMethod("getHeight");
+            mapProcessorGetLeafMapRegionMethod =
+                mapProcessorClass.getMethod("getLeafMapRegion", int.class, int.class, int.class, boolean.class);
+            mapProcessorGetMapSaveLoadMethod = mapProcessorClass.getMethod("getMapSaveLoad");
+            Class<?> mapSaveLoadClass = Class.forName("xaero.map.file.MapSaveLoad");
+            mapSaveLoadRequestLoadMethod = mapSaveLoadClass.getMethod("requestLoad", Class.forName("xaero.map.region.MapRegion"), String.class);
             xaeroAvailable = true;
             LOGGER.info("XaeroProvider: MapProcessor.getMapTile probe succeeded");
         } catch (ReflectiveOperationException e) {
