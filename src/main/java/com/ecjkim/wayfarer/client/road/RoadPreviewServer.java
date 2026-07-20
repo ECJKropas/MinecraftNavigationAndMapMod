@@ -798,17 +798,27 @@ public class RoadPreviewServer {
                   }
                 });
 
-                // Map tile layers via /api/tiles/{dim}/{zoom}/{x}/{y}.png
-                var overworldTiles = L.tileLayer('/api/tiles/0/{z}/{x}/{y}.png', {
+                // Single dynamic tile layer auto-following player dimension
+                var currentDim = 0;
+                var satTiles = L.tileLayer('/api/tiles/' + currentDim + '/{z}/{x}/{y}.png', {
                   minZoom: 0, maxZoom: 18, maxNativeZoom: 0, tileSize: 256, noWrap: true,
                   opacity: 0.85, zIndex: 0,
                   errorTileUrl: '', attribution: 'Wayfarer Tiles'
-                });
-                var netherTiles = L.tileLayer('/api/tiles/-1/{z}/{x}/{y}.png', {
-                  minZoom: 0, maxZoom: 18, maxNativeZoom: 0, tileSize: 256, noWrap: true,
-                  opacity: 0.85, zIndex: 0,
-                  errorTileUrl: '', attribution: 'Wayfarer Tiles (Nether)'
-                });
+                }).addTo(map);
+
+                function pollDimension(){
+                  fetch('/api/player-dimension',{cache:'no-store'})
+                    .then(function(r){return r.ok ? r.json() : null;})
+                    .then(function(data){
+                      if(data && data.dimension !== undefined && data.dimension !== currentDim){
+                        currentDim = data.dimension;
+                        satTiles.setUrl('/api/tiles/' + currentDim + '/{z}/{x}/{y}.png');
+                      }
+                    })
+                    .catch(function(){});
+                }
+                setInterval(pollDimension, 2000);
+                pollDimension();
 
                 // Draw 16x16 block (1 chunk) grid lines within bounds, padded by 2 chunks
                 function renderChunkGrid(layer, bounds){
@@ -834,8 +844,7 @@ public class RoadPreviewServer {
                 }
 
                 L.control.layers({},{
-                  '\u4E3B\u4E16\u754C\u5730\u5F62': overworldTiles,
-                  '\u5730\u72F1\u5730\u5F62': netherTiles,
+                  '\u536B\u661F\u5730\u56FE': satTiles,
                   '\u9053\u8DEF\u8DEF\u7F51':geoJsonLayer,
                   '\u4EA4\u53C9\u53E3':intersectionLayer,
                   '\u533A\u5757\u7F51\u683C':chunkGridLayer
