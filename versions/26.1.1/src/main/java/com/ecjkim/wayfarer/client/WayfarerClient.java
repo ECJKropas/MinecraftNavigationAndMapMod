@@ -58,7 +58,7 @@ public class WayfarerClient implements ClientModInitializer {
 
         // Enable background tile pre-rendering: listen to chunk loads so that newly explored
         // chunks automatically trigger tile rendering in worker threads.
-        selfBuilt.registerChunkListener();
+        selfBuilt.registerListeners();
 
         XaeroMapOverlay.register();
         var lifecycles = net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientLifecycleEvents.CLIENT_STOPPING;
