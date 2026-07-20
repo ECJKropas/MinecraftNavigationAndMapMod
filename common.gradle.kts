@@ -102,6 +102,7 @@ dependencies {
     includeDependency(autoImplementation(libs.conditional.mixin.get()))
 
     autoImplementation(fabricApiDependency("fabric-lifecycle-events-v1"))
+    autoImplementation(fabricApiDependency("fabric-resource-loader-v0"))
     autoImplementation(fabricApiDependency("fabric-screen-api-v1"))
     autoImplementation(fabricApiDependency(if (unobfuscated) "fabric-key-mapping-api-v1" else "fabric-key-binding-api-v1"))
 
