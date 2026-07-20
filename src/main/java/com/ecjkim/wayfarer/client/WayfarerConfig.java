@@ -99,13 +99,19 @@ public class WayfarerConfig {
         public HotkeyBind(ConfigHotkey hotkey) {
             IKeybind keybind = hotkey.getKeybind();
             java.util.List<Integer> keys = keybind.getKeys();
-            if (!keys.isEmpty()) {
-                this.key = keys.get(0);
-            } else {
+            int size = keys.size();
+            if (size == 0) {
                 this.key = -1;
+                this.modifierKey = -1;
+            } else if (size == 1) {
+                this.key = keys.get(0);
+                this.modifierKey = -1;
+            } else {
+                // 组合键：最后一个键为主键，前面的为修饰键
+                this.key = keys.get(size - 1);
+                this.modifierKey = keys.get(0);
             }
             this.scanCode = 0;
-            this.modifierKey = -1;
         }
     }
 }
