@@ -849,7 +849,7 @@ public class RoadPreviewServer {
                     var b = this._map.getBounds();
                     var z = this._map.getZoom();
                     // chunk (16 blocks) above z=-3, region (256 blocks) below
-                    var STEP = z >= -3 ? 16 : 256;
+                    var STEP = z >= -3 ? 16 : z >= -7 ? 256 : 4096;
                     var sw = b.getSouthWest(), ne = b.getNorthEast();
                     var minX = sw.lng, maxX = ne.lng, minY = sw.lat, maxY = ne.lat;
                     var cx0 = Math.floor(minX / STEP) * STEP;
@@ -877,7 +877,7 @@ public class RoadPreviewServer {
                 // Single dynamic tile layer auto-following player dimension
                 var currentDim = 0;
                 var satTiles = L.tileLayer('/api/tiles/' + currentDim + '/{z}/{x}/{y}.png', {
-                  minZoom: -7, maxZoom: 18, maxNativeZoom: 0, tileSize: 256, noWrap: true,
+                  minZoom: -14, maxZoom: 18, maxNativeZoom: 0, tileSize: 256, noWrap: true,
                   opacity: 0.85, zIndex: 0,
                   errorTileUrl: '', attribution: 'Wayfarer Tiles'
                 }).addTo(map);
