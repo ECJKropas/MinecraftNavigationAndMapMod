@@ -68,6 +68,33 @@ jobs:
           git commit -m "chore(release): bump version to v${{ steps.version.outputs.new_version }}"
           git push
 
+      - name: Download malilib dependencies
+        if: steps.version.outputs.skip != 'true'
+        run: |
+          mkdir -p docs/other_mods
+
+          download_malilib() {
+            mc_ver="$1"
+            ver="$2"
+            echo "Fetching malilib ${ver} for MC ${mc_ver}..."
+            URL=$(curl -s "https://api.modrinth.com/v2/project/malilib/version?loaders=[\"fabric\"]&game_versions=[\"${mc_ver}\"]" \
+              | jq -r ".[] | select(.version_number == \"${ver}\") | .files[0].url")
+            if [ -z "${URL}" ] || [ "${URL}" = "null" ]; then
+              echo "ERROR: Could not find malilib ${ver} for MC ${mc_ver}"
+              exit 1
+            fi
+            curl -sS -L -o "docs/other_mods/malilib-fabric-${mc_ver}-${ver}.jar" "${URL}"
+            echo "  -> malilib-fabric-${mc_ver}-${ver}.jar"
+          }
+
+          download_malilib "1.20.1" "0.16.3"
+          download_malilib "26.1.1" "0.28.9"
+          download_malilib "26.2"  "0.29.3"
+
+          echo ""
+          echo "Downloaded jars:"
+          ls -lh docs/other_mods/
+
       - name: Build
         if: steps.version.outputs.skip != 'true'
         env:
