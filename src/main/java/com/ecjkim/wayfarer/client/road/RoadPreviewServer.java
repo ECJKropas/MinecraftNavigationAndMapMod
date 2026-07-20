@@ -78,6 +78,7 @@ public class RoadPreviewServer {
             server.createContext("/api/xaero/tiles/", this::handleXaeroTile);
             server.createContext("/api/tiles/", this::handleTile);
             server.createContext("/api/player-dimension", this::handlePlayerDimension);
+            server.createContext("/api/player-position", this::handlePlayerPosition);
             server.setExecutor(Executors.newSingleThreadExecutor(runnable -> {
                 Thread thread = new Thread(runnable, "Wayfarer Preview");
                 thread.setDaemon(true);
@@ -134,6 +135,26 @@ public class RoadPreviewServer {
             sendText(exchange, 200, "{\"dimension\":" + dim + "}", "application/json; charset=utf-8");
         } catch (Exception exception) {
             LOGGER.log(Level.SEVERE, "Player dimension error", exception);
+            sendText(exchange, 500, jsonError("INTERNAL_ERROR", exception.getMessage()));
+        }
+    }
+
+    /** GET /api/player-position — returns player block coordinates */
+    private void handlePlayerPosition(HttpExchange exchange) throws IOException {
+        if (!"GET".equalsIgnoreCase(exchange.getRequestMethod())) {
+            sendText(exchange, 405, "Method Not Allowed");
+            return;
+        }
+        try {
+            double x = 0, z = 0;
+            var player = Minecraft.getInstance().player;
+            if (player != null) {
+                x = player.getX();
+                z = player.getZ();
+            }
+            sendText(exchange, 200, "{\"x\":" + x + ",\"z\":" + z + "}", "application/json; charset=utf-8");
+        } catch (Exception exception) {
+            LOGGER.log(Level.SEVERE, "Player position error", exception);
             sendText(exchange, 500, jsonError("INTERNAL_ERROR", exception.getMessage()));
         }
     }
@@ -711,6 +732,12 @@ public class RoadPreviewServer {
                   infinite: true
                 });
                 var map = L.map('map',{crs:crs,zoomControl:true,attributionControl:false});
+
+                // Center on player position immediately
+                fetch('/api/player-position',{cache:'no-store'})
+                  .then(function(r){return r.ok ? r.json() : null;})
+                  .then(function(pos){if(pos){map.setView([pos.z, pos.x], 0);}})
+                  .catch(function(){});
 
                 var recenterBtn = L.control({position:'topleft'});
                 recenterBtn.onAdd = function(){
