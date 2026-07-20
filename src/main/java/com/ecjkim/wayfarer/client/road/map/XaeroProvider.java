@@ -19,97 +19,102 @@ package com.ecjkim.wayfarer.client.road.map;
 import java.awt.image.BufferedImage;
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;
+import java.lang.reflect.Modifier;
+import java.util.Collections;
+import java.util.IdentityHashMap;
+import java.util.Set;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
 import net.minecraft.client.Minecraft;
+import net.minecraft.core.BlockPos;
 import net.minecraft.world.level.ChunkPos;
+import net.minecraft.world.level.block.state.BlockState;
 
 /**
- * Xaero World Map provider (Scheme A). Reads tile pixel data from Xaero's in-memory tile cache via reflection. Does not
- * parse any disk files; falls back gracefully if reflection fails.
+ * Xaero World Map provider.
+ *
+ * <p>Xaero stores map data in its own region files and exposes the loaded data as MapTile/MapBlock objects. This class
+ * reads those objects through reflection so Xaero remains an optional dependency; it never rebuilds the map from
+ * Minecraft chunks.
  */
 public class XaeroProvider implements MapProvider {
 
     private static final Logger LOGGER = Logger.getLogger("Wayfarer|XaeroProvider");
     private static final int TILE_SIZE = 256;
 
-    // Cached reflection handles — populated once on first use
     private boolean reflectionProbed;
     private boolean xaeroAvailable;
-    private Field guiMapProcessorField;
-    private Method mapProcessorGetWorldMethod;
-    private Method mapWorldGetTileMethod;
-
-    private String savePath; // for logging only
-
-    public XaeroProvider() {}
-
-    // --- MapProvider ---
+    private Class<?> mapProcessorClass;
+    private Method mapProcessorGetMapTileMethod;
+    private Method mapTileIsLoadedMethod;
+    private Method mapTileGetBlockMethod;
+    private Method mapBlockGetStateMethod;
+    private Object mapProcessor;
 
     @Override
     public boolean isAvailable() {
         probeReflection();
-        if (!xaeroAvailable)
-            return false;
-        // GuiMap must be the current screen for live tile access
-        Minecraft mc = Minecraft.getInstance();
-        if (mc.screen == null)
-            return false;
-        return mc.screen.getClass().getName().equals("xaero.map.gui.GuiMap");
+        return xaeroAvailable && findMapProcessor() != null;
     }
 
     @Override
     public BufferedImage getTile(int dimension, int zoom, int tileX, int tileY) {
-        if (!isAvailable())
-            return null;
         probeReflection();
-        if (guiMapProcessorField == null)
+        Object processor = findMapProcessor();
+        Minecraft mc = Minecraft.getInstance();
+        if (processor == null || mc.level == null || zoom != 0)
             return null;
 
         try {
-            Minecraft mc = Minecraft.getInstance();
-            Object guiMap = mc.screen;
+            BufferedImage image = new BufferedImage(TILE_SIZE, TILE_SIZE, BufferedImage.TYPE_INT_ARGB);
+            boolean hasData = false;
+            int firstChunkX = tileX * 16;
+            int firstChunkZ = tileY * 16;
 
-            // GuiMap.mapProcessor -> MapProcessor
-            Object mapProcessor = guiMapProcessorField.get(guiMap);
-            if (mapProcessor == null)
-                return null;
+            synchronized (processor) {
+                for (int chunkZ = 0; chunkZ < 16; chunkZ++) {
+                    for (int chunkX = 0; chunkX < 16; chunkX++) {
+                        int worldChunkX = firstChunkX + chunkX;
+                        int worldChunkZ = firstChunkZ + chunkZ;
+                        Object xaeroTile =
+                            mapProcessorGetMapTileMethod.invoke(processor, worldChunkX, worldChunkZ, 0);
+                        if (xaeroTile == null || !(Boolean)mapTileIsLoadedMethod.invoke(xaeroTile))
+                            continue;
 
-            // MapProcessor.getMapWorld() -> MapWorld
-            Object mapWorld =
-                mapProcessorGetWorldMethod != null ? mapProcessorGetWorldMethod.invoke(mapProcessor) : null;
-            if (mapWorld == null)
-                return null;
+                        for (int blockZ = 0; blockZ < 16; blockZ++) {
+                            for (int blockX = 0; blockX < 16; blockX++) {
+                                Object xaeroBlock = mapTileGetBlockMethod.invoke(xaeroTile, blockX, blockZ);
+                                if (xaeroBlock == null)
+                                    continue;
+                                BlockState state = (BlockState)mapBlockGetStateMethod.invoke(xaeroBlock);
+                                if (state == null)
+                                    continue;
 
-            // MapWorld.getTile() or read tile cache field -> int[]
-            int[] pixels = null;
-            if (mapWorldGetTileMethod != null) {
-                pixels = (int[])mapWorldGetTileMethod.invoke(mapWorld, tileX, tileY);
+                                int worldX = worldChunkX * 16 + blockX;
+                                int worldZ = worldChunkZ * 16 + blockZ;
+                                int color = state.getMapColor(mc.level, new BlockPos(worldX, 0, worldZ)).col;
+                                image.setRGB(chunkX * 16 + blockX, chunkZ * 16 + blockZ, 0xFF000000 | color);
+                                hasData = true;
+                            }
+                        }
+                    }
+                }
             }
-            if (pixels == null)
-                return null;
-
-            BufferedImage img = new BufferedImage(TILE_SIZE, TILE_SIZE, BufferedImage.TYPE_INT_ARGB);
-            img.setRGB(0, 0, TILE_SIZE, TILE_SIZE, pixels, 0, TILE_SIZE);
-            return img;
+            return hasData ? image : null;
         } catch (Exception e) {
-            LOGGER.log(Level.FINE, "Xaero tile reflection failed", e);
+            LOGGER.log(Level.FINE, "Xaero tile read failed", e);
             return null;
         }
     }
 
     @Override
-    public void invalidate(ChunkPos chunk) {
-        // Xaero maintains its own tile cache; nothing to invalidate here.
-    }
+    public void invalidate(ChunkPos chunk) {}
 
     @Override
     public String getName() {
         return "Xaero";
     }
-
-    // --- reflection probing ---
 
     private void probeReflection() {
         if (reflectionProbed)
@@ -117,50 +122,90 @@ public class XaeroProvider implements MapProvider {
         reflectionProbed = true;
 
         try {
-            // verify Xaero is on classpath
-            Class.forName("xaero.map.gui.GuiMap");
+            Class<?> mapTileClass = Class.forName("xaero.map.region.MapTile");
+            Class<?> mapBlockClass = Class.forName("xaero.map.region.MapBlock");
+            mapProcessorClass = Class.forName("xaero.map.MapProcessor");
+            mapProcessorGetMapTileMethod = mapProcessorClass.getMethod("getMapTile", int.class, int.class, int.class);
+            mapTileIsLoadedMethod = mapTileClass.getMethod("isLoaded");
+            mapTileGetBlockMethod = mapTileClass.getMethod("getBlock", int.class, int.class);
+            mapBlockGetStateMethod = mapBlockClass.getMethod("getState");
             xaeroAvailable = true;
-        } catch (ClassNotFoundException e) {
+            LOGGER.info("XaeroProvider: MapProcessor.getMapTile probe succeeded");
+        } catch (ReflectiveOperationException e) {
             xaeroAvailable = false;
-            return;
         }
+    }
+
+    private Object findMapProcessor() {
+        if (!xaeroAvailable)
+            return null;
+        if (mapProcessor != null && mapProcessorClass.isInstance(mapProcessor))
+            return mapProcessor;
 
         try {
-            Class<?> guiMapClass = Class.forName("xaero.map.gui.GuiMap");
-            guiMapProcessorField = guiMapClass.getDeclaredField("mapProcessor");
-            guiMapProcessorField.setAccessible(true);
-
-            // probe MapProcessor for getMapWorld or mapWorld field
-            Class<?> mapProcessorClass = Class.forName("xaero.map.MapProcessor");
-            try {
-                mapProcessorGetWorldMethod = mapProcessorClass.getMethod("getMapWorld");
-            } catch (NoSuchMethodException e) {
-                // try field "mapWorld" instead
-                Field worldField = mapProcessorClass.getDeclaredField("mapWorld");
-                worldField.setAccessible(true);
-                mapProcessorGetWorldMethod = null;
+            Object screen = currentScreen();
+            if (screen != null && screen.getClass().getName().equals("xaero.map.gui.GuiMap")) {
+                Method getter = screen.getClass().getMethod("getMapProcessor");
+                mapProcessor = getter.invoke(screen);
+                if (mapProcessor != null)
+                    return mapProcessor;
             }
 
-            // probe MapWorld for tile cache
-            Class<?> mapWorldClass = Class.forName("xaero.map.world.MapWorld");
-            try {
-                mapWorldGetTileMethod = mapWorldClass.getMethod("getTile", int.class, int.class);
-            } catch (NoSuchMethodException e) {
-                mapWorldGetTileMethod = null;
+            Class<?> worldMapClass = Class.forName("xaero.map.WorldMap");
+            Object instance = worldMapClass.getField("INSTANCE").get(null);
+            Set<Object> visited = Collections.newSetFromMap(new IdentityHashMap<>());
+            mapProcessor = findObject(instance, 5, visited);
+            if (mapProcessor == null) {
+                for (Field field : worldMapClass.getDeclaredFields()) {
+                    if (!Modifier.isStatic(field.getModifiers()) || field.getType().isPrimitive())
+                        continue;
+                    field.setAccessible(true);
+                    mapProcessor = findObject(field.get(null), 5, visited);
+                    if (mapProcessor != null)
+                        break;
+                }
             }
-
-            // get save path for debugging
-            try {
-                Field saveField = mapProcessorClass.getDeclaredField("currentSavePath");
-                saveField.setAccessible(true);
-                // savePath is read lazily
-            } catch (NoSuchFieldException ignored) {
-            }
-
-            LOGGER.info("XaeroProvider: reflection probes succeeded");
-        } catch (Exception e) {
-            LOGGER.log(Level.WARNING, "XaeroProvider: reflection probing failed", e);
-            xaeroAvailable = false;
+        } catch (ReflectiveOperationException e) {
+            LOGGER.log(Level.FINE, "Xaero MapProcessor lookup failed", e);
         }
+        return mapProcessor;
+    }
+
+    private Object currentScreen() throws ReflectiveOperationException {
+        Minecraft minecraft = Minecraft.getInstance();
+        try {
+            Field field = Minecraft.class.getDeclaredField("screen");
+            field.setAccessible(true);
+            return field.get(minecraft);
+        } catch (NoSuchFieldException ignored) {
+            Field guiField = Minecraft.class.getDeclaredField("gui");
+            guiField.setAccessible(true);
+            Object gui = guiField.get(minecraft);
+            return gui.getClass().getMethod("screen").invoke(gui);
+        }
+    }
+
+    private Object findObject(Object value, int depth, Set<Object> visited) throws IllegalAccessException {
+        if (value == null || depth < 0 || !visited.add(value))
+            return null;
+        if (mapProcessorClass.isInstance(value))
+            return value;
+        if (!value.getClass().getName().startsWith("xaero.map"))
+            return null;
+
+        for (Class<?> type = value.getClass(); type != null; type = type.getSuperclass()) {
+            for (Field field : type.getDeclaredFields()) {
+                if (Modifier.isStatic(field.getModifiers()) || field.getType().isPrimitive())
+                    continue;
+                try {
+                    field.setAccessible(true);
+                    Object child = findObject(field.get(value), depth - 1, visited);
+                    if (child != null)
+                        return child;
+                } catch (RuntimeException ignored) {
+                }
+            }
+        }
+        return null;
     }
 }
