@@ -21,7 +21,9 @@ import java.lang.reflect.Field;
 import java.lang.reflect.Method;
 import java.lang.reflect.Modifier;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.IdentityHashMap;
+import java.util.Map;
 import java.util.Set;
 import java.util.logging.Level;
 import java.util.logging.Logger;
@@ -51,6 +53,7 @@ public class XaeroProvider implements MapProvider {
     private Method mapTileIsLoadedMethod;
     private Method mapTileGetBlockMethod;
     private Method mapBlockGetStateMethod;
+    private Method mapBlockGetHeightMethod;
     private Object mapProcessor;
 
     @Override
@@ -64,40 +67,44 @@ public class XaeroProvider implements MapProvider {
         probeReflection();
         Object processor = findMapProcessor();
         Minecraft mc = Minecraft.getInstance();
-        if (processor == null || mc.level == null || zoom != 0)
+        if (processor == null || mc.level == null || zoom < -14 || zoom > 18)
             return null;
 
         try {
             BufferedImage image = new BufferedImage(TILE_SIZE, TILE_SIZE, BufferedImage.TYPE_INT_ARGB);
             boolean hasData = false;
-            int firstChunkX = tileX * 16;
-            int firstChunkZ = tileY * 16;
+            Map<Long, Object> tileCache = new HashMap<>();
+            int scale = zoom >= 0 ? 1 << zoom : 1;
+            int step = zoom < 0 ? 1 << -zoom : 1;
 
             synchronized (processor) {
-                for (int chunkZ = 0; chunkZ < 16; chunkZ++) {
-                    for (int chunkX = 0; chunkX < 16; chunkX++) {
-                        int worldChunkX = firstChunkX + chunkX;
-                        int worldChunkZ = firstChunkZ + chunkZ;
-                        Object xaeroTile = mapProcessorGetMapTileMethod.invoke(processor, worldChunkX, worldChunkZ, 0);
+                for (int pixelZ = 0; pixelZ < TILE_SIZE; pixelZ++) {
+                    for (int pixelX = 0; pixelX < TILE_SIZE; pixelX++) {
+                        int mapX = tileX * TILE_SIZE + pixelX;
+                        int mapZ = tileY * TILE_SIZE + pixelZ;
+                        int worldX = zoom >= 0 ? Math.floorDiv(mapX, scale) : mapX * step;
+                        int worldZ = zoom >= 0 ? Math.floorDiv(mapZ, scale) : mapZ * step;
+                        int chunkX = Math.floorDiv(worldX, 16);
+                        int chunkZ = Math.floorDiv(worldZ, 16);
+                        long tileKey = ((long)chunkX << 32) ^ (chunkZ & 0xFFFFFFFFL);
+                        Object xaeroTile = tileCache.get(tileKey);
+                        if (xaeroTile == null && !tileCache.containsKey(tileKey)) {
+                            xaeroTile = mapProcessorGetMapTileMethod.invoke(processor, chunkX, chunkZ, 0);
+                            tileCache.put(tileKey, xaeroTile);
+                        }
                         if (xaeroTile == null || !(Boolean)mapTileIsLoadedMethod.invoke(xaeroTile))
                             continue;
 
-                        for (int blockZ = 0; blockZ < 16; blockZ++) {
-                            for (int blockX = 0; blockX < 16; blockX++) {
-                                Object xaeroBlock = mapTileGetBlockMethod.invoke(xaeroTile, blockX, blockZ);
-                                if (xaeroBlock == null)
-                                    continue;
-                                BlockState state = (BlockState)mapBlockGetStateMethod.invoke(xaeroBlock);
-                                if (state == null)
-                                    continue;
-
-                                int worldX = worldChunkX * 16 + blockX;
-                                int worldZ = worldChunkZ * 16 + blockZ;
-                                int color = state.getMapColor(mc.level, new BlockPos(worldX, 0, worldZ)).col;
-                                image.setRGB(chunkX * 16 + blockX, chunkZ * 16 + blockZ, 0xFF000000 | color);
-                                hasData = true;
-                            }
-                        }
+                        Object xaeroBlock = mapTileGetBlockMethod.invoke(xaeroTile, worldX & 15, worldZ & 15);
+                        if (xaeroBlock == null)
+                            continue;
+                        BlockState state = (BlockState)mapBlockGetStateMethod.invoke(xaeroBlock);
+                        if (state == null)
+                            continue;
+                        int height = (Integer)mapBlockGetHeightMethod.invoke(xaeroBlock);
+                        int color = state.getMapColor(mc.level, new BlockPos(worldX, height, worldZ)).col;
+                        image.setRGB(pixelX, pixelZ, 0xFF000000 | color);
+                        hasData = true;
                     }
                 }
             }
@@ -129,6 +136,7 @@ public class XaeroProvider implements MapProvider {
             mapTileIsLoadedMethod = mapTileClass.getMethod("isLoaded");
             mapTileGetBlockMethod = mapTileClass.getMethod("getBlock", int.class, int.class);
             mapBlockGetStateMethod = mapBlockClass.getMethod("getState");
+            mapBlockGetHeightMethod = mapBlockClass.getMethod("getHeight");
             xaeroAvailable = true;
             LOGGER.info("XaeroProvider: MapProcessor.getMapTile probe succeeded");
         } catch (ReflectiveOperationException e) {

@@ -83,7 +83,7 @@ public class ProviderManager {
                     return tile;
             }
         }
-        return nullProvider.getTile(dimension, zoom, tileX, tileY);
+        return null;
     }
 
     public void invalidate(ChunkPos chunk) {

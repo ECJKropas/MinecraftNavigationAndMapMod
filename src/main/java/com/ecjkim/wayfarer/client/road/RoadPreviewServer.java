@@ -333,7 +333,7 @@ public class RoadPreviewServer {
             int tileY = Integer.parseInt(parts[3]);
 
             // Try disk cache first
-            Path cachePath = tileCachePath(dim, zoom, tileX, tileY);
+            Path cachePath = tileCachePath(providerManager.getMode(), dim, zoom, tileX, tileY);
             if (Files.exists(cachePath)) {
                 byte[] cachedBytes = Files.readAllBytes(cachePath);
                 exchange.getResponseHeaders().set("Content-Type", "image/png");
@@ -418,9 +418,9 @@ public class RoadPreviewServer {
     // Helpers
     // ------------------------------------------------------------------
 
-    private static Path tileCachePath(int dim, int zoom, int tileX, int tileY) {
+    private static Path tileCachePath(ProviderManager.Mode mode, int dim, int zoom, int tileX, int tileY) {
         return Minecraft.getInstance().gameDirectory.toPath().resolve("wayfarer/tilecache").resolve(String.valueOf(dim))
-            .resolve(String.valueOf(zoom)).resolve(tileX + "_" + tileY + ".png");
+            .resolve(mode.name()).resolve(String.valueOf(zoom)).resolve(tileX + "_" + tileY + ".png");
     }
 
     private void sendText(HttpExchange exchange, int statusCode, String content) throws IOException {
