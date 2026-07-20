@@ -63,6 +63,21 @@ public class RoadPreviewServer {
         this.providerManager = providerManager;
     }
 
+    public void clearTileCache() {
+        Path cacheRoot = Minecraft.getInstance().gameDirectory.toPath().resolve("wayfarer/tilecache");
+        if (!Files.exists(cacheRoot))
+            return;
+        try (var paths = Files.walk(cacheRoot)) {
+            paths.sorted((left, right) -> right.compareTo(left)).forEach(path -> {
+                try {
+                    Files.deleteIfExists(path);
+                } catch (IOException ignored) {
+                }
+            });
+        } catch (IOException ignored) {
+        }
+    }
+
     public synchronized void start() {
         if (server != null)
             return;

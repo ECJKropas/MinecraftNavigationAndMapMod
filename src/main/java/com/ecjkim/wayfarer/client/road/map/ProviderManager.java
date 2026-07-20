@@ -39,7 +39,7 @@ public class ProviderManager {
 
     private final List<MapProvider> providers = new ArrayList<>();
     private final MapProvider nullProvider = new NullProvider();
-    private final Mode mode;
+    private volatile Mode mode;
 
     public ProviderManager() {
         this(Mode.AUTO);
@@ -47,6 +47,14 @@ public class ProviderManager {
 
     public ProviderManager(Mode mode) {
         this.mode = mode;
+    }
+
+    public void setMode(Mode mode) {
+        this.mode = mode;
+    }
+
+    public Mode getMode() {
+        return mode;
     }
 
     public void add(MapProvider provider) {
@@ -67,6 +75,8 @@ public class ProviderManager {
      */
     public BufferedImage getTile(int dimension, int zoom, int tileX, int tileY) {
         for (MapProvider provider : providers) {
+            if (!isEnabled(provider))
+                continue;
             if (provider.isAvailable()) {
                 BufferedImage tile = provider.getTile(dimension, zoom, tileX, tileY);
                 if (tile != null)
@@ -78,6 +88,8 @@ public class ProviderManager {
 
     public void invalidate(ChunkPos chunk) {
         for (MapProvider provider : providers) {
+            if (!isEnabled(provider))
+                continue;
             provider.invalidate(chunk);
         }
     }
@@ -93,6 +105,8 @@ public class ProviderManager {
     /** Zoom-aware variant. */
     public void requestTileRender(int dimension, int zoom, int tileX, int tileY) {
         for (MapProvider provider : providers) {
+            if (!isEnabled(provider))
+                continue;
             if (provider.isAvailable()) {
                 provider.requestTileRender(dimension, zoom, tileX, tileY);
             }
@@ -106,6 +120,14 @@ public class ProviderManager {
                 ((SelfBuiltProvider)provider).shutdown();
             }
         }
+    }
+
+    private boolean isEnabled(MapProvider provider) {
+        return switch (mode) {
+            case AUTO -> true;
+            case XAERO_ONLY -> provider instanceof XaeroProvider;
+            case SELF_BUILT -> provider instanceof SelfBuiltProvider;
+        };
     }
 
     /** Fallback provider that always returns a transparent 256x256 tile. */

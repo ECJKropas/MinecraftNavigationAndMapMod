@@ -34,7 +34,8 @@ import net.minecraft.world.level.block.state.BlockState;
 /**
  * Xaero World Map provider.
  *
- * <p>Xaero stores map data in its own region files and exposes the loaded data as MapTile/MapBlock objects. This class
+ * <p>
+ * Xaero stores map data in its own region files and exposes the loaded data as MapTile/MapBlock objects. This class
  * reads those objects through reflection so Xaero remains an optional dependency; it never rebuilds the map from
  * Minecraft chunks.
  */
@@ -77,8 +78,7 @@ public class XaeroProvider implements MapProvider {
                     for (int chunkX = 0; chunkX < 16; chunkX++) {
                         int worldChunkX = firstChunkX + chunkX;
                         int worldChunkZ = firstChunkZ + chunkZ;
-                        Object xaeroTile =
-                            mapProcessorGetMapTileMethod.invoke(processor, worldChunkX, worldChunkZ, 0);
+                        Object xaeroTile = mapProcessorGetMapTileMethod.invoke(processor, worldChunkX, worldChunkZ, 0);
                         if (xaeroTile == null || !(Boolean)mapTileIsLoadedMethod.invoke(xaeroTile))
                             continue;
 

@@ -157,7 +157,9 @@ public class SettingsScreen extends Screen {
         String tileLabel = TILE_MODE_LABELS.get(tileModeIdx);
         tileModeBtn = Button.builder(Component.literal(tileLabel), btn -> {
             tileModeIdx = (tileModeIdx + 1) % TILE_MODES.size();
+            String mode = TILE_MODES.get(tileModeIdx);
             btn.setMessage(Component.literal(TILE_MODE_LABELS.get(tileModeIdx)));
+            WayfarerClient.setTileProviderMode(mode);
         }).bounds(valueX, hotkeySectionY + 14, VALUE_W, 20).build();
         addRenderableWidget(tileModeBtn);
 

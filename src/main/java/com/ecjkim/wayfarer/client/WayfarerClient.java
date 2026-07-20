@@ -43,6 +43,7 @@ public class WayfarerClient implements ClientModInitializer {
     private static final RoadDataStore ROAD_DATA_STORE = new RoadDataStore();
     private static final RoadPreviewServer PREVIEW_SERVER = new RoadPreviewServer(ROAD_DATA_STORE);
     private static final RoadRecordingManager ROAD_MANAGER = new RoadRecordingManager(ROAD_DATA_STORE);
+    private static ProviderManager PROVIDER_MANAGER;
 
     private final IntSet keysDownLastTick = new IntOpenHashSet();
 
@@ -53,6 +54,7 @@ public class WayfarerClient implements ClientModInitializer {
         // init tile providers
         ProviderManager pm =
             new ProviderManager(ProviderManager.Mode.valueOf(WayfarerConfig.getInstance().tileProviderMode));
+        PROVIDER_MANAGER = pm;
         pm.add(new XaeroProvider());
         SelfBuiltProvider selfBuilt = new SelfBuiltProvider();
         pm.add(selfBuilt);
@@ -76,6 +78,20 @@ public class WayfarerClient implements ClientModInitializer {
     }
 
     public static void reloadHotkeys() {}
+
+    public static void setTileProviderMode(String mode) {
+        ProviderManager.Mode providerMode;
+        try {
+            providerMode = ProviderManager.Mode.valueOf(mode);
+        } catch (IllegalArgumentException e) {
+            providerMode = ProviderManager.Mode.AUTO;
+        }
+        WayfarerConfig.getInstance().tileProviderMode = providerMode.name();
+        if (PROVIDER_MANAGER != null) {
+            PROVIDER_MANAGER.setMode(providerMode);
+            PREVIEW_SERVER.clearTileCache();
+        }
+    }
 
     private void handleClientTick(Minecraft client) {
         ROAD_DATA_STORE.syncToCurrentContext();
