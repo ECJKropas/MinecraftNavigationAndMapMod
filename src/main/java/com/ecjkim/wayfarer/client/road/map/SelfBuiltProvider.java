@@ -150,7 +150,9 @@ public class SelfBuiltProvider implements MapProvider {
                         invalidateBlockPos((BlockPos)args[2]);
                     return null;
                 });
-            afterEvent.getClass().getMethod("register", Object.class).invoke(afterEvent, listener);
+            var registerMethod = afterEvent.getClass().getMethod("register", Object.class);
+            registerMethod.setAccessible(true);
+            registerMethod.invoke(afterEvent, listener);
         } catch (ClassNotFoundException | NoClassDefFoundError ignored) {
         } catch (Exception e) {
             e.printStackTrace();
@@ -172,7 +174,9 @@ public class SelfBuiltProvider implements MapProvider {
                     }
                     return null;
                 });
-            eventField.getClass().getMethod("register", Object.class).invoke(eventField, listener);
+            var registerMethod = eventField.getClass().getMethod("register", Object.class);
+            registerMethod.setAccessible(true);
+            registerMethod.invoke(eventField, listener);
         } catch (ClassNotFoundException | NoClassDefFoundError ignored) {
         } catch (Exception e) {
             e.printStackTrace();

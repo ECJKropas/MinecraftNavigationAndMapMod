@@ -113,7 +113,7 @@ spotless {
 
         prettier(
             mapOf(
-                // "nodeExecutable" to "/Users/cjkim/.nvm/versions/node/v22.17.1/bin/node",
+                "nodeExecutable" to "/Users/cjkim/.nvm/versions/node/v22.17.1/bin/node",
                 "npmExecutable" to "/Users/cjkim/.nvm/versions/node/v22.17.1/bin/npm",
                 "prettier" to libs.versions.prettier.get(),
                 "prettier-plugin-toml" to

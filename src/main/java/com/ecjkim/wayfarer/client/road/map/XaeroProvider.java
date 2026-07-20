@@ -20,14 +20,21 @@ import java.awt.image.BufferedImage;
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;
 import java.lang.reflect.Modifier;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.IdentityHashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.logging.Level;
 import java.util.logging.Logger;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 import net.minecraft.client.Minecraft;
 import net.minecraft.core.BlockPos;
@@ -65,6 +72,9 @@ public class XaeroProvider implements MapProvider {
     private Field mapProcessorBiomeGetterField;
     private Object mapProcessor;
     private final Set<Long> pendingRegionLoads = ConcurrentHashMap.newKeySet();
+    private volatile Object scannedProcessor;
+    private volatile boolean fullScanStarted;
+    private static final Pattern REGION_FILE = Pattern.compile("(-?\\d+)_(-?\\d+)(?:\\.zip|\\.xaero)?");
 
     @Override
     public boolean isAvailable() {
@@ -140,6 +150,7 @@ public class XaeroProvider implements MapProvider {
 
         Minecraft.getInstance().execute(() -> {
             try {
+                startFullRegionScan(processor);
                 int scale = zoom >= 0 ? 1 << zoom : 1;
                 int step = zoom < 0 ? 1 << -zoom : 1;
                 int minBlockX = zoom >= 0 ? Math.floorDiv(tileX * TILE_SIZE, scale) : tileX * TILE_SIZE * step;
@@ -159,16 +170,7 @@ public class XaeroProvider implements MapProvider {
 
                 for (int regionZ = minRegionZ; regionZ <= maxRegionZ; regionZ++) {
                     for (int regionX = minRegionX; regionX <= maxRegionX; regionX++) {
-                        Object region = mapProcessorGetLeafMapRegionMethod.invoke(processor, 0, regionX, regionZ, true);
-                        if (region != null) {
-                            Object saveLoad = mapProcessorGetMapSaveLoadMethod.invoke(processor);
-                            Object blockLookup = mapProcessorGetWorldBlockLookupMethod.invoke(processor);
-                            Object blockRegistry = mapProcessorGetWorldBlockRegistryMethod.invoke(processor);
-                            Object fluidRegistry = mapProcessorWorldFluidRegistryField.get(processor);
-                            Object biomeGetter = mapProcessorBiomeGetterField.get(processor);
-                            mapSaveLoadLoadRegionMethod.invoke(saveLoad, region, blockLookup, blockRegistry,
-                                fluidRegistry, biomeGetter, false, 0);
-                        }
+                        loadRegion(processor, regionX, regionZ);
                     }
                 }
             } catch (Exception e) {
@@ -177,6 +179,78 @@ public class XaeroProvider implements MapProvider {
                 pendingRegionLoads.remove(requestKey);
             }
         });
+    }
+
+    private void startFullRegionScan(Object processor) {
+        if (fullScanStarted && scannedProcessor == processor)
+            return;
+        synchronized (this) {
+            if (fullScanStarted && scannedProcessor == processor)
+                return;
+            fullScanStarted = true;
+            scannedProcessor = processor;
+        }
+
+        try {
+            Method getMapWorld = mapProcessorClass.getMethod("getMapWorld");
+            Object mapWorld = getMapWorld.invoke(processor);
+            Object dimension = mapWorld.getClass().getMethod("getCurrentDimension").invoke(mapWorld);
+            Path dimensionPath = (Path)dimension.getClass().getMethod("getMainFolderPath").invoke(dimension);
+            String multiworld = (String)dimension.getClass().getMethod("getCurrentMultiworld").invoke(dimension);
+            Path mapPath = multiworld == null ? dimensionPath : dimensionPath.resolve(multiworld);
+
+            CompletableFuture.runAsync(() -> {
+                List<Long> regions = new ArrayList<>();
+                try (var files = Files.list(mapPath)) {
+                    files.filter(Files::isRegularFile).forEach(path -> {
+                        Matcher matcher = REGION_FILE.matcher(path.getFileName().toString());
+                        if (matcher.matches()) {
+                            int regionX = Integer.parseInt(matcher.group(1));
+                            int regionZ = Integer.parseInt(matcher.group(2));
+                            regions.add(((long)regionX << 32) ^ (regionZ & 0xFFFFFFFFL));
+                        }
+                    });
+                } catch (Exception e) {
+                    LOGGER.log(Level.FINE, "Xaero region scan failed: " + mapPath, e);
+                    return;
+                }
+                loadRegionBatch(processor, regions, 0);
+            });
+        } catch (Exception e) {
+            LOGGER.log(Level.FINE, "Xaero map path lookup failed", e);
+        }
+    }
+
+    private void loadRegionBatch(Object processor, List<Long> regions, int offset) {
+        Minecraft.getInstance().execute(() -> {
+            int end = Math.min(offset + 16, regions.size());
+            for (int i = offset; i < end; i++) {
+                long key = regions.get(i);
+                loadRegion(processor, (int)(key >> 32), (int)key);
+            }
+            if (end < regions.size())
+                loadRegionBatch(processor, regions, end);
+        });
+    }
+
+    private void loadRegion(Object processor, int regionX, int regionZ) {
+        try {
+            Object region = mapProcessorGetLeafMapRegionMethod.invoke(processor, 0, regionX, regionZ, true);
+            if (region == null)
+                return;
+            Object saveLoad = mapProcessorGetMapSaveLoadMethod.invoke(processor);
+            Object blockLookup = mapProcessorGetWorldBlockLookupMethod.invoke(processor);
+            Object blockRegistry = mapProcessorGetWorldBlockRegistryMethod.invoke(processor);
+            Object fluidRegistry = mapProcessorWorldFluidRegistryField.get(processor);
+            Object biomeGetter = mapProcessorBiomeGetterField.get(processor);
+            Object loaded = mapSaveLoadLoadRegionMethod.invoke(saveLoad, region, blockLookup, blockRegistry,
+                fluidRegistry, biomeGetter, false, 0);
+            if (Boolean.FALSE.equals(loaded)) {
+                LOGGER.warning("Xaero region file was not loaded: " + regionX + "," + regionZ);
+            }
+        } catch (Exception e) {
+            LOGGER.log(Level.WARNING, "Xaero region load failed: " + regionX + "," + regionZ, e);
+        }
     }
 
     @Override

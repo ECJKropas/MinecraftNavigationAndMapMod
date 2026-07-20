@@ -53,6 +53,7 @@ public class RoadPreviewServer {
     private final LayerManager layerManager;
     private ProviderManager providerManager;
     private HttpServer server;
+    private volatile long tileCacheVersion = System.currentTimeMillis();
 
     public RoadPreviewServer(RoadDataStore roadDataStore) {
         this.roadDataStore = roadDataStore;
@@ -64,6 +65,7 @@ public class RoadPreviewServer {
     }
 
     public void clearTileCache() {
+        tileCacheVersion++;
         Path cacheRoot = Minecraft.getInstance().gameDirectory.toPath().resolve("wayfarer/tilecache");
         if (!Files.exists(cacheRoot))
             return;
@@ -94,6 +96,7 @@ public class RoadPreviewServer {
             server.createContext("/api/tiles/", this::handleTile);
             server.createContext("/api/player-dimension", this::handlePlayerDimension);
             server.createContext("/api/player-position", this::handlePlayerPosition);
+            server.createContext("/api/provider-status", this::handleProviderStatus);
             server.setExecutor(Executors.newSingleThreadExecutor(runnable -> {
                 Thread thread = new Thread(runnable, "Wayfarer Preview");
                 thread.setDaemon(true);
@@ -172,6 +175,20 @@ public class RoadPreviewServer {
             LOGGER.log(Level.SEVERE, "Player position error", exception);
             sendText(exchange, 500, jsonError("INTERNAL_ERROR", exception.getMessage()));
         }
+    }
+
+    private void handleProviderStatus(HttpExchange exchange) throws IOException {
+        if (!"GET".equalsIgnoreCase(exchange.getRequestMethod())) {
+            sendText(exchange, 405, "Method Not Allowed");
+            return;
+        }
+        ProviderManager manager = providerManager;
+        String mode = manager == null ? "UNINITIALIZED" : manager.getMode().name();
+        String active = manager == null ? "None" : manager.getActiveProviderName();
+        sendText(exchange, 200,
+            "{\"mode\":\"" + mode + "\",\"active\":\"" + active + "\",\"version\":"
+                + tileCacheVersion + "}",
+            "application/json; charset=utf-8");
     }
 
     /** GET / — Leaflet SPA */
@@ -333,7 +350,7 @@ public class RoadPreviewServer {
             int tileY = Integer.parseInt(parts[3]);
 
             // Try disk cache first
-            Path cachePath = tileCachePath(providerManager.getMode(), dim, zoom, tileX, tileY);
+            Path cachePath = tileCachePath(providerManager.getMode(), tileCacheVersion, dim, zoom, tileX, tileY);
             if (Files.exists(cachePath)) {
                 byte[] cachedBytes = Files.readAllBytes(cachePath);
                 exchange.getResponseHeaders().set("Content-Type", "image/png");
@@ -347,12 +364,22 @@ public class RoadPreviewServer {
 
             BufferedImage img = providerManager.getTile(dim, zoom, tileX, tileY);
             if (img == null) {
-                // Tile not yet rendered: ask providers to render it asynchronously and return a
-                // transparent placeholder. no-cache tells the browser to retry immediately so that
-                // once the worker thread finishes rendering, the next request hits the cache.
                 providerManager.requestTileRender(dim, zoom, tileX, tileY);
-                sendNoCacheTransparentPng(exchange);
-                return;
+                for (int attempt = 0; attempt < 20; attempt++) {
+                    try {
+                        Thread.sleep(50L);
+                    } catch (InterruptedException interrupted) {
+                        Thread.currentThread().interrupt();
+                        break;
+                    }
+                    img = providerManager.getTile(dim, zoom, tileX, tileY);
+                    if (img != null)
+                        break;
+                }
+                if (img == null) {
+                    sendNoCacheTransparentPng(exchange);
+                    return;
+                }
             }
 
             ByteArrayOutputStream baos = new ByteArrayOutputStream();
@@ -418,9 +445,10 @@ public class RoadPreviewServer {
     // Helpers
     // ------------------------------------------------------------------
 
-    private static Path tileCachePath(ProviderManager.Mode mode, int dim, int zoom, int tileX, int tileY) {
+    private static Path tileCachePath(ProviderManager.Mode mode, long version, int dim, int zoom, int tileX, int tileY) {
         return Minecraft.getInstance().gameDirectory.toPath().resolve("wayfarer/tilecache").resolve(String.valueOf(dim))
-            .resolve(mode.name()).resolve(String.valueOf(zoom)).resolve(tileX + "_" + tileY + ".png");
+            .resolve(mode.name()).resolve(String.valueOf(version)).resolve(String.valueOf(zoom))
+            .resolve(tileX + "_" + tileY + ".png");
     }
 
     private void sendText(HttpExchange exchange, int statusCode, String content) throws IOException {
@@ -918,7 +946,8 @@ public class RoadPreviewServer {
 
                 // Single dynamic tile layer auto-following player dimension
                 var currentDim = 0;
-                var satTiles = L.tileLayer('/api/tiles/' + currentDim + '/{z}/{x}/{y}.png', {
+                var providerVersion = 0;
+                var satTiles = L.tileLayer('/api/tiles/' + currentDim + '/{z}/{x}/{y}.png?v=' + providerVersion, {
                   minZoom: -14, maxZoom: 18, tileSize: 256,
                   opacity: 0.85, zIndex: 0,
                   attribution: 'Wayfarer Tiles'
@@ -930,13 +959,29 @@ public class RoadPreviewServer {
                     .then(function(data){
                       if(data && data.dimension !== undefined && data.dimension !== currentDim){
                         currentDim = data.dimension;
-                        satTiles.setUrl('/api/tiles/' + currentDim + '/{z}/{x}/{y}.png');
+                        satTiles.setUrl('/api/tiles/' + currentDim + '/{z}/{x}/{y}.png?v=' + providerVersion);
                       }
                     })
                     .catch(function(){});
                 }
                 setInterval(pollDimension, 2000);
                 pollDimension();
+
+                function pollProvider(){
+                  fetch('/api/provider-status',{cache:'no-store'})
+                    .then(function(r){return r.ok ? r.json() : null;})
+                    .then(function(data){
+                      if(!data) return;
+                      if(data.version !== providerVersion){
+                        providerVersion = data.version;
+                        satTiles.setUrl('/api/tiles/' + currentDim + '/{z}/{x}/{y}.png?v=' + providerVersion);
+                        satTiles.redraw();
+                      }
+                    })
+                    .catch(function(){});
+                }
+                setInterval(pollProvider, 1000);
+                pollProvider();
 
                 L.control.layers({},{
                   '\u536B\u661F\u5730\u56FE': satTiles,

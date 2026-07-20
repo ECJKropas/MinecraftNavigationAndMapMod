@@ -57,6 +57,14 @@ public class ProviderManager {
         return mode;
     }
 
+    public String getActiveProviderName() {
+        for (MapProvider provider : providers) {
+            if (isEnabled(provider) && provider.isAvailable())
+                return provider.getName();
+        }
+        return "None";
+    }
+
     public void add(MapProvider provider) {
         providers.add(provider);
     }
