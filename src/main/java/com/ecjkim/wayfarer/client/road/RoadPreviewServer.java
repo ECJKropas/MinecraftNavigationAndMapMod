@@ -822,12 +822,18 @@ public class RoadPreviewServer {
                     map.getPane('overlayPane').appendChild(canvas);
                     this._resize();
                     this._draw();
-                    map.on('moveend zoomend resize', this._draw, this);
+                    map.on('moveend zoomend', this._draw, this);
+                    map.on('resize', this._onResize, this);
                   },
                   onRemove: function(map) {
                     L.DomUtil.remove(this._canvas);
-                    map.off('moveend zoomend resize', this._draw, this);
+                    map.off('moveend zoomend', this._draw, this);
+                    map.off('resize', this._onResize, this);
                     this._map = null;
+                  },
+                  _onResize: function() {
+                    this._resize();
+                    this._draw();
                   },
                   _resize: function() {
                     var s = this._map.getSize();
@@ -838,7 +844,6 @@ public class RoadPreviewServer {
                   },
                   _draw: function() {
                     if (!this._map) return;
-                    this._resize();
                     var ctx = this._canvas.getContext('2d');
                     ctx.clearRect(0, 0, this._canvas.width, this._canvas.height);
                     var b = this._map.getBounds();
@@ -996,7 +1001,7 @@ public class RoadPreviewServer {
                           map.fitBounds(b.pad(0.15),{maxZoom:14});
                         }
                       }
-                      renderChunkGrid(chunkGridLayer, map.getBounds());
+                      // ChunkGridCanvas auto-redraws via moveend/zoomend events
                     })
                     .catch(function(err){
                       console.error('Wayfarer load error',err);
