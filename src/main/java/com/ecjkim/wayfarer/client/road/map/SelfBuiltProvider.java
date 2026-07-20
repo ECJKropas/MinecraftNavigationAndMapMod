@@ -30,6 +30,7 @@ import javax.imageio.ImageIO;
 
 import net.minecraft.client.Minecraft;
 import net.minecraft.core.BlockPos;
+import net.minecraft.world.InteractionResult;
 import net.minecraft.world.level.ChunkPos;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.chunk.LevelChunk;
@@ -37,6 +38,8 @@ import net.minecraft.world.level.levelgen.Heightmap;
 import net.minecraft.world.level.material.MapColor;
 
 import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientChunkEvents;
+import net.fabricmc.fabric.api.event.player.PlayerBlockBreakEvents;
+import net.fabricmc.fabric.api.event.player.UseBlockCallback;
 
 /**
  * Self-built tile provider (Scheme B). Listens to chunk load events and renders tiles using vanilla MapColor. Does not
@@ -50,9 +53,11 @@ public class SelfBuiltProvider implements MapProvider {
 
     private static final int TILE_SIZE = 256;
     private static final int DEFAULT_GRAY = 0xFFC0C0C0;
+    private static final long DEBOUNCE_MS = 100;
 
     private final Map<Long, SoftReference<int[]>> tileCache = new ConcurrentHashMap<>();
     private final Set<Long> dirtyTileSet = ConcurrentHashMap.newKeySet();
+    private final Map<Long, Long> lastInvalidateTime = new ConcurrentHashMap<>();
 
     private boolean chunkListenerRegistered;
 
@@ -92,12 +97,6 @@ public class SelfBuiltProvider implements MapProvider {
         int tileZ = Math.floorDiv(chunk.getMinBlockZ(), TILE_SIZE);
         long key = tileKey(tileX, tileZ);
         dirtyTileSet.add(key);
-        for (int dim : new int[] {0, -1, 1}) {
-            try {
-                Files.deleteIfExists(cachePath(dim, tileX, tileZ));
-            } catch (IOException ignored) {
-            }
-        }
     }
 
     @Override
@@ -107,11 +106,38 @@ public class SelfBuiltProvider implements MapProvider {
 
     // --- lifecycle ---
 
-    public void registerChunkListener() {
+    public void registerListeners() {
         if (chunkListenerRegistered)
             return;
         chunkListenerRegistered = true;
         ClientChunkEvents.CHUNK_LOAD.register((world, chunk) -> onChunkLoad(chunk));
+
+        // Block break → invalidate tile so map reflects mined blocks
+        PlayerBlockBreakEvents.AFTER.register((world, player, pos, state, entity) -> {
+            invalidateBlockPos(pos);
+        });
+
+        // Block place (right-click) → invalidate tile after a 1-tick delay
+        UseBlockCallback.EVENT.register((player, world, hand, hitResult) -> {
+            if (!world.isClientSide())
+                return InteractionResult.PASS;
+            BlockPos placePos = hitResult.getBlockPos().relative(hitResult.getDirection());
+            Minecraft.getInstance().execute(() -> invalidateBlockPos(placePos));
+            return InteractionResult.PASS;
+        });
+    }
+
+    private void invalidateBlockPos(BlockPos pos) {
+        int tileX = Math.floorDiv(pos.getX(), TILE_SIZE);
+        int tileY = Math.floorDiv(pos.getZ(), TILE_SIZE);
+        long key = tileKey(tileX, tileY);
+        long now = System.currentTimeMillis();
+        Long last = lastInvalidateTime.get(key);
+        if (last != null && now - last < DEBOUNCE_MS)
+            return;
+        lastInvalidateTime.put(key, now);
+        dirtyTileSet.add(key);
+        scheduleDirtyProcessing();
     }
 
     private void onChunkLoad(LevelChunk chunk) {
@@ -194,7 +220,7 @@ public class SelfBuiltProvider implements MapProvider {
             int tileX = (int)(key >> 32);
             int tileY = (int)key;
             int[] pixels = renderTile(0, tileX, tileY);
-            if (pixels != null) {
+            if (pixels != null && hasTerrainData(pixels)) {
                 tileCache.put(key, new SoftReference<>(pixels));
                 writeTileToDisk(0, tileX, tileY, pixels);
             }
@@ -215,6 +241,15 @@ public class SelfBuiltProvider implements MapProvider {
 
     private static long tileKey(int tileX, int tileY) {
         return ((long)tileX << 32) | (tileY & 0xFFFFFFFFL);
+    }
+
+    /** Returns true if at least one pixel has real MapColor (not DEFAULT_GRAY). */
+    private static boolean hasTerrainData(int[] pixels) {
+        for (int p : pixels) {
+            if (p != DEFAULT_GRAY)
+                return true;
+        }
+        return false;
     }
 
     // --- disk cache ---

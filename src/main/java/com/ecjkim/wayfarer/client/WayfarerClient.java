@@ -60,7 +60,7 @@ public class WayfarerClient implements ClientModInitializer {
 
         // Enable background tile pre-rendering: listen to chunk loads so that newly explored
         // chunks automatically trigger tile rendering in worker threads.
-        selfBuilt.registerChunkListener();
+        selfBuilt.registerListeners();
 
         XaeroMapOverlay.register();
         ClientLifecycleEvents.CLIENT_STOPPING.register(client -> {
