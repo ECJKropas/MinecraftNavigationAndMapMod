@@ -17,11 +17,16 @@
 package com.ecjkim.wayfarer.client.road.map;
 
 import java.awt.image.BufferedImage;
+import java.io.IOException;
 import java.lang.ref.SoftReference;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
+
+import javax.imageio.ImageIO;
 
 import net.minecraft.client.Minecraft;
 import net.minecraft.core.BlockPos;
@@ -87,6 +92,12 @@ public class SelfBuiltProvider implements MapProvider {
         int tileZ = Math.floorDiv(chunk.getMinBlockZ(), TILE_SIZE);
         long key = tileKey(tileX, tileZ);
         dirtyTileSet.add(key);
+        for (int dim : new int[] {0, -1, 1}) {
+            try {
+                Files.deleteIfExists(cachePath(dim, tileX, tileZ));
+            } catch (IOException ignored) {
+            }
+        }
     }
 
     @Override
@@ -181,6 +192,7 @@ public class SelfBuiltProvider implements MapProvider {
             int[] pixels = renderTile(0, tileX, tileY);
             if (pixels != null) {
                 tileCache.put(key, new SoftReference<>(pixels));
+                writeTileToDisk(0, tileX, tileY, pixels);
             }
         }
 
@@ -199,5 +211,23 @@ public class SelfBuiltProvider implements MapProvider {
 
     private static long tileKey(int tileX, int tileY) {
         return ((long)tileX << 32) | (tileY & 0xFFFFFFFFL);
+    }
+
+    // --- disk cache ---
+
+    private Path cachePath(int dimension, int tileX, int tileY) {
+        return Minecraft.getInstance().gameDirectory.toPath().resolve("wayfarer/tilecache")
+            .resolve(String.valueOf(dimension)).resolve(tileX + "_" + tileY + ".png");
+    }
+
+    private void writeTileToDisk(int dimension, int tileX, int tileY, int[] pixels) {
+        try {
+            Path p = cachePath(dimension, tileX, tileY);
+            Files.createDirectories(p.getParent());
+            BufferedImage img = new BufferedImage(TILE_SIZE, TILE_SIZE, BufferedImage.TYPE_INT_ARGB);
+            img.setRGB(0, 0, TILE_SIZE, TILE_SIZE, pixels, 0, TILE_SIZE);
+            ImageIO.write(img, "PNG", p.toFile());
+        } catch (IOException ignored) {
+        }
     }
 }

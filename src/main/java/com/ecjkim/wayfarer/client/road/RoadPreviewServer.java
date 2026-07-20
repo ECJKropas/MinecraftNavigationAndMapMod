@@ -22,6 +22,8 @@ import java.io.IOException;
 import java.io.OutputStream;
 import java.net.InetSocketAddress;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -294,6 +296,19 @@ public class RoadPreviewServer {
             int tileX = Integer.parseInt(parts[2]);
             int tileY = Integer.parseInt(parts[3]);
 
+            // Try disk cache first
+            Path cachePath = tileCachePath(dim, tileX, tileY);
+            if (Files.exists(cachePath)) {
+                byte[] cachedBytes = Files.readAllBytes(cachePath);
+                exchange.getResponseHeaders().set("Content-Type", "image/png");
+                exchange.getResponseHeaders().set("Cache-Control", "public, max-age=60");
+                exchange.sendResponseHeaders(200, cachedBytes.length);
+                try (OutputStream os = exchange.getResponseBody()) {
+                    os.write(cachedBytes);
+                }
+                return;
+            }
+
             BufferedImage img = providerManager.getTile(dim, zoom, tileX, tileY);
             if (img == null) {
                 // Tile not yet rendered: ask providers to render it asynchronously and return a
@@ -307,6 +322,13 @@ public class RoadPreviewServer {
             ByteArrayOutputStream baos = new ByteArrayOutputStream();
             ImageIO.write(img, "PNG", baos);
             byte[] pngBytes = baos.toByteArray();
+
+            // Write to disk cache
+            try {
+                Files.createDirectories(cachePath.getParent());
+                Files.write(cachePath, pngBytes);
+            } catch (IOException ignored) {
+            }
 
             exchange.getResponseHeaders().set("Content-Type", "image/png");
             exchange.getResponseHeaders().set("Cache-Control", "public, max-age=10");
@@ -359,6 +381,11 @@ public class RoadPreviewServer {
     // ------------------------------------------------------------------
     // Helpers
     // ------------------------------------------------------------------
+
+    private static Path tileCachePath(int dim, int tileX, int tileY) {
+        return Minecraft.getInstance().gameDirectory.toPath().resolve("wayfarer/tilecache").resolve(String.valueOf(dim))
+            .resolve(tileX + "_" + tileY + ".png");
+    }
 
     private void sendText(HttpExchange exchange, int statusCode, String content) throws IOException {
         sendText(exchange, statusCode, content, "text/plain; charset=utf-8");
