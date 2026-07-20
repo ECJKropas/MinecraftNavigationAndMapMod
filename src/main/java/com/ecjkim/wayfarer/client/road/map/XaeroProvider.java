@@ -139,10 +139,10 @@ public class XaeroProvider implements MapProvider {
                 int step = zoom < 0 ? 1 << -zoom : 1;
                 int minBlockX = zoom >= 0 ? Math.floorDiv(tileX * TILE_SIZE, scale) : tileX * TILE_SIZE * step;
                 int minBlockZ = zoom >= 0 ? Math.floorDiv(tileY * TILE_SIZE, scale) : tileY * TILE_SIZE * step;
-                int maxBlockX = zoom >= 0 ? Math.floorDiv(tileX * TILE_SIZE + TILE_SIZE - 1, scale) :
-                    minBlockX + TILE_SIZE * step - 1;
-                int maxBlockZ = zoom >= 0 ? Math.floorDiv(tileY * TILE_SIZE + TILE_SIZE - 1, scale) :
-                    minBlockZ + TILE_SIZE * step - 1;
+                int maxBlockX = zoom >= 0 ? Math.floorDiv(tileX * TILE_SIZE + TILE_SIZE - 1, scale)
+                    : minBlockX + TILE_SIZE * step - 1;
+                int maxBlockZ = zoom >= 0 ? Math.floorDiv(tileY * TILE_SIZE + TILE_SIZE - 1, scale)
+                    : minBlockZ + TILE_SIZE * step - 1;
                 int minRegionX = Math.floorDiv(Math.floorDiv(minBlockX, 16), 8);
                 int minRegionZ = Math.floorDiv(Math.floorDiv(minBlockZ, 16), 8);
                 int maxRegionX = Math.floorDiv(Math.floorDiv(maxBlockX, 16), 8);
@@ -192,7 +192,8 @@ public class XaeroProvider implements MapProvider {
                 mapProcessorClass.getMethod("getLeafMapRegion", int.class, int.class, int.class, boolean.class);
             mapProcessorGetMapSaveLoadMethod = mapProcessorClass.getMethod("getMapSaveLoad");
             Class<?> mapSaveLoadClass = Class.forName("xaero.map.file.MapSaveLoad");
-            mapSaveLoadRequestLoadMethod = mapSaveLoadClass.getMethod("requestLoad", Class.forName("xaero.map.region.MapRegion"), String.class);
+            mapSaveLoadRequestLoadMethod =
+                mapSaveLoadClass.getMethod("requestLoad", Class.forName("xaero.map.region.MapRegion"), String.class);
             xaeroAvailable = true;
             LOGGER.info("XaeroProvider: MapProcessor.getMapTile probe succeeded");
         } catch (ReflectiveOperationException e) {
