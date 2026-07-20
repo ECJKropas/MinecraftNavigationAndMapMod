@@ -63,8 +63,10 @@ public class XaeroProvider implements MapProvider {
     private Method mapBlockGetStateMethod;
     private Method mapBlockGetHeightMethod;
     private Method mapProcessorGetLeafMapRegionMethod;
+    private Method mapProcessorGetLeveledRegionMethod;
     private Method mapProcessorGetMapSaveLoadMethod;
     private Method mapSaveLoadRequestLoadMethod;
+    private Method mapSaveLoadRequestBranchCacheMethod;
     private Method mapSaveLoadLoadRegionMethod;
     private Method mapProcessorGetWorldBlockLookupMethod;
     private Method mapProcessorGetWorldBlockRegistryMethod;
@@ -201,6 +203,7 @@ public class XaeroProvider implements MapProvider {
 
             CompletableFuture.runAsync(() -> {
                 List<Long> regions = new ArrayList<>();
+                List<long[]> caches = new ArrayList<>();
                 try (var files = Files.list(mapPath)) {
                     files.filter(Files::isRegularFile).forEach(path -> {
                         Matcher matcher = REGION_FILE.matcher(path.getFileName().toString());
@@ -214,11 +217,58 @@ public class XaeroProvider implements MapProvider {
                     LOGGER.log(Level.FINE, "Xaero region scan failed: " + mapPath, e);
                     return;
                 }
+                try (var files = Files.walk(mapPath)) {
+                    files.filter(Files::isRegularFile).forEach(path -> {
+                        String fileName = path.getFileName().toString();
+                        if (!fileName.endsWith(".xwmc"))
+                            return;
+                        Path levelPath = path.getParent();
+                        Path cachePath = levelPath == null ? null : levelPath.getParent();
+                        if (cachePath == null || !cachePath.getFileName().toString().startsWith("cache"))
+                            return;
+                        try {
+                            int level = Integer.parseInt(levelPath.getFileName().toString());
+                            Matcher matcher = REGION_FILE.matcher(fileName.substring(0, fileName.length() - 5));
+                            if (matcher.matches()) {
+                                caches.add(new long[] {Integer.parseInt(matcher.group(1)),
+                                    Integer.parseInt(matcher.group(2)), level});
+                            }
+                        } catch (NumberFormatException ignored) {
+                        }
+                    });
+                } catch (Exception e) {
+                    LOGGER.log(Level.FINE, "Xaero region scan failed: " + mapPath, e);
+                    return;
+                }
+                requestBranchCaches(processor, caches, 0);
                 loadRegionBatch(processor, regions, 0);
             });
         } catch (Exception e) {
             LOGGER.log(Level.FINE, "Xaero map path lookup failed", e);
         }
+    }
+
+    private void requestBranchCaches(Object processor, List<long[]> caches, int offset) {
+        Minecraft.getInstance().execute(() -> {
+            int end = Math.min(offset + 16, caches.size());
+            for (int i = offset; i < end; i++) {
+                long[] cache = caches.get(i);
+                try {
+                    Object region = mapProcessorGetLeveledRegionMethod.invoke(processor, (int)cache[0], (int)cache[1],
+                        (int)cache[2], 0);
+                    if (region != null && mapSaveLoadRequestBranchCacheMethod.getParameterTypes()[0].isInstance(region))
+                        mapSaveLoadRequestBranchCacheMethod.invoke(processorMapSaveLoad(processor), region, "Wayfarer");
+                } catch (Exception e) {
+                    LOGGER.log(Level.FINE, "Xaero cache load request failed", e);
+                }
+            }
+            if (end < caches.size())
+                requestBranchCaches(processor, caches, end);
+        });
+    }
+
+    private Object processorMapSaveLoad(Object processor) throws ReflectiveOperationException {
+        return mapProcessorGetMapSaveLoadMethod.invoke(processor);
     }
 
     private void loadRegionBatch(Object processor, List<Long> regions, int offset) {
@@ -274,6 +324,8 @@ public class XaeroProvider implements MapProvider {
             mapBlockGetHeightMethod = mapBlockClass.getMethod("getHeight");
             mapProcessorGetLeafMapRegionMethod =
                 mapProcessorClass.getMethod("getLeafMapRegion", int.class, int.class, int.class, boolean.class);
+            mapProcessorGetLeveledRegionMethod =
+                mapProcessorClass.getMethod("getLeveledRegion", int.class, int.class, int.class, int.class);
             mapProcessorGetMapSaveLoadMethod = mapProcessorClass.getMethod("getMapSaveLoad");
             Class<?> mapSaveLoadClass = Class.forName("xaero.map.file.MapSaveLoad");
             mapSaveLoadRequestLoadMethod =
@@ -282,6 +334,8 @@ public class XaeroProvider implements MapProvider {
                 Class.forName("xaero.map.region.MapRegion"), Class.forName("net.minecraft.core.HolderLookup"),
                 Class.forName("net.minecraft.core.Registry"), Class.forName("net.minecraft.core.Registry"),
                 Class.forName("xaero.map.biome.BiomeGetter"), boolean.class, int.class);
+            mapSaveLoadRequestBranchCacheMethod = mapSaveLoadClass.getMethod("requestBranchCache",
+                Class.forName("xaero.map.region.BranchLeveledRegion"), String.class);
             mapProcessorGetWorldBlockLookupMethod = mapProcessorClass.getMethod("getWorldBlockLookup");
             mapProcessorGetWorldBlockRegistryMethod = mapProcessorClass.getMethod("getWorldBlockRegistry");
             mapProcessorWorldFluidRegistryField = mapProcessorClass.getDeclaredField("worldFluidRegistry");
@@ -340,6 +394,8 @@ public class XaeroProvider implements MapProvider {
             Field guiField = Minecraft.class.getDeclaredField("gui");
             guiField.setAccessible(true);
             Object gui = guiField.get(minecraft);
+            if (gui == null)
+                return null;
             return gui.getClass().getMethod("screen").invoke(gui);
         }
     }
