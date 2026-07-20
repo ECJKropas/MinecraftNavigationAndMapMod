@@ -847,22 +847,24 @@ public class RoadPreviewServer {
                     var ctx = this._canvas.getContext('2d');
                     ctx.clearRect(0, 0, this._canvas.width, this._canvas.height);
                     var b = this._map.getBounds();
-                    var CHUNK = 16;
+                    var z = this._map.getZoom();
+                    // chunk (16 blocks) above z=-3, region (256 blocks) below
+                    var STEP = z >= -3 ? 16 : 256;
                     var sw = b.getSouthWest(), ne = b.getNorthEast();
                     var minX = sw.lng, maxX = ne.lng, minY = sw.lat, maxY = ne.lat;
-                    var cx0 = Math.floor(minX / CHUNK) * CHUNK;
-                    var cy0 = Math.floor(minY / CHUNK) * CHUNK;
+                    var cx0 = Math.floor(minX / STEP) * STEP;
+                    var cy0 = Math.floor(minY / STEP) * STEP;
                     ctx.strokeStyle = 'rgba(0,0,0,0.08)';
                     ctx.lineWidth = 1;
                     ctx.setLineDash([2, 4]);
                     // vertical lines
-                    for (var x = cx0; x <= maxX; x += CHUNK) {
+                    for (var x = cx0; x <= maxX; x += STEP) {
                       var a = this._map.latLngToContainerPoint([minY, x]);
                       var d = this._map.latLngToContainerPoint([maxY, x]);
                       ctx.beginPath(); ctx.moveTo(a.x, a.y); ctx.lineTo(d.x, d.y); ctx.stroke();
                     }
                     // horizontal lines
-                    for (var y = cy0; y <= maxY; y += CHUNK) {
+                    for (var y = cy0; y <= maxY; y += STEP) {
                       var a = this._map.latLngToContainerPoint([y, minX]);
                       var d = this._map.latLngToContainerPoint([y, maxX]);
                       ctx.beginPath(); ctx.moveTo(a.x, a.y); ctx.lineTo(d.x, d.y); ctx.stroke();
@@ -875,7 +877,7 @@ public class RoadPreviewServer {
                 // Single dynamic tile layer auto-following player dimension
                 var currentDim = 0;
                 var satTiles = L.tileLayer('/api/tiles/' + currentDim + '/{z}/{x}/{y}.png', {
-                  minZoom: 0, maxZoom: 18, maxNativeZoom: 0, tileSize: 256, noWrap: true,
+                  minZoom: -7, maxZoom: 18, maxNativeZoom: 0, tileSize: 256, noWrap: true,
                   opacity: 0.85, zIndex: 0,
                   errorTileUrl: '', attribution: 'Wayfarer Tiles'
                 }).addTo(map);
