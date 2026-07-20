@@ -31,10 +31,11 @@ import java.util.logging.Logger;
 
 import javax.imageio.ImageIO;
 
+import net.minecraft.client.Minecraft;
+
 import com.ecjkim.wayfarer.client.road.layer.LayerManager;
 import com.ecjkim.wayfarer.client.road.layer.MapLayer;
 import com.ecjkim.wayfarer.client.road.map.ProviderManager;
-import net.minecraft.client.Minecraft;
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
 import com.sun.net.httpserver.HttpExchange;
@@ -591,21 +592,21 @@ public class RoadPreviewServer {
               <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
               <style>
                 *{margin:0;padding:0;box-sizing:border-box}
-                html,body{height:100%;overflow:hidden;background:#1a1a1a;color:#e0e0e0;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif}
+                html,body{height:100%;overflow:hidden;background:#f0f4f8;color:#333;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif}
                 #app{display:flex;height:100%}
-                #map{flex:1;min-width:0;background:#2a2a2a}
-                #sidebar{width:340px;background:#1e1e1e;border-left:1px solid #333;display:flex;flex-direction:column;overflow:hidden;box-shadow:-2px 0 8px rgba(0,0,0,0.3)}
-                #sidebar-header{padding:14px 16px;border-bottom:1px solid #333;background:#252525}
-                #sidebar-header h2{font-size:16px;color:#e0e0e0;margin-bottom:6px}
+                #map{flex:1;min-width:0;background:#fff}
+                #sidebar{width:340px;background:#fff;border-left:1px solid #e0e0e0;display:flex;flex-direction:column;overflow:hidden;box-shadow:-2px 0 8px rgba(0,0,0,0.08)}
+                #sidebar-header{padding:14px 16px;border-bottom:1px solid #e0e0e0;background:#f8f8f8}
+                #sidebar-header h2{font-size:16px;color:#333;margin-bottom:6px}
                 #sidebar-header .meta{font-size:11px;color:#999;line-height:1.6}
                 #search-box{margin:10px 16px}
-                #search-box input{width:100%;padding:8px 12px;border-radius:6px;border:1px solid #444;background:#2a2a2a;color:#e0e0e0;font-size:13px;outline:none}
-                #search-box input:focus{border-color:#4a90d9;box-shadow:0 0 0 3px rgba(74,144,217,0.15)}
+                #search-box input{width:100%;padding:8px 12px;border-radius:6px;border:1px solid #ddd;background:#fff;color:#333;font-size:13px;outline:none}
+                #search-box input:focus{border-color:#4a90d9;box-shadow:0 0 0 3px rgba(74,144,217,0.2)}
                 #road-list{flex:1;overflow-y:auto;padding:0 8px 16px}
                 .road-item{padding:10px 12px;margin:2px 0;border-radius:6px;cursor:pointer;transition:background .15s;border-left:3px solid transparent}
-                .road-item:hover{background:rgba(255,255,255,0.05)}
-                .road-item.active{background:rgba(255,255,255,0.08);border-left-color:#4a90d9}
-                .road-item .road-name{font-size:13px;font-weight:600;color:#e0e0e0}
+                .road-item:hover{background:rgba(74,144,217,0.06)}
+                .road-item.active{background:rgba(74,144,217,0.08);border-left-color:#4a90d9}
+                .road-item .road-name{font-size:13px;font-weight:600;color:#333}
                 .road-item .road-meta{font-size:11px;color:#888;margin-top:2px}
                 .badge{display:inline-block;padding:1px 6px;border-radius:10px;font-size:10px;font-weight:700;margin-right:6px}
                 .badge-G{background:#e63946;color:#fff}
@@ -613,21 +614,21 @@ public class RoadPreviewServer {
                 .badge-X{background:#808080;color:#fff}
                 .badge-Y{background:#999999;color:#fff}
                 .badge-C{background:#bbbbbb;color:#333}
-                #info-card{display:none;position:absolute;bottom:16px;left:16px;z-index:1000;background:#1e1e1e;border:1px solid #444;border-radius:8px;padding:14px 16px;max-width:280px;font-size:12px;color:#ddd;box-shadow:0 2px 12px rgba(0,0,0,0.5)}
-                #info-card h3{font-size:14px;color:#e0e0e0;margin-bottom:8px}
+                #info-card{display:none;position:absolute;bottom:16px;left:16px;z-index:1000;background:#fff;border:1px solid #e0e0e0;border-radius:8px;padding:14px 16px;max-width:280px;font-size:12px;color:#555;box-shadow:0 2px 12px rgba(0,0,0,0.1)}
+                #info-card h3{font-size:14px;color:#333;margin-bottom:8px}
                 #info-card .close-btn{position:absolute;top:6px;right:10px;background:none;border:none;color:#999;cursor:pointer;font-size:18px}
                 #info-card p{margin:3px 0}
-                #stats-bar{padding:6px 16px;border-top:1px solid #333;font-size:11px;color:#888;background:#252525}
-                .leaflet-control-layers{background:#1e1e1e !important;border:1px solid #444 !important;border-radius:6px !important;color:#ddd !important;box-shadow:0 2px 6px rgba(0,0,0,0.3) !important}
-                .leaflet-control-layers label{color:#ddd !important}
-                .leaflet-control-layers-overlays label span{color:#ddd !important}
-                .leaflet-control-zoom a{background:#1e1e1e !important;color:#ddd !important;border-color:#444 !important}
-                .leaflet-popup-content-wrapper{background:#1e1e1e !important;color:#ddd !important;border:1px solid #444 !important;border-radius:8px !important;box-shadow:0 2px 12px rgba(0,0,0,0.5) !important}
-                .leaflet-popup-tip{background:#1e1e1e !important}
-                .leaflet-container{background:#2a2a2a !important}
-                .recenter-btn{padding:6px 12px;background:#1e1e1e;border:1px solid #444;border-radius:6px;color:#ddd;cursor:pointer;font-size:13px}
-                .recenter-btn:hover{background:#333}
-                .legend{position:absolute;bottom:24px;left:16px;z-index:1000;background:rgba(30,30,30,0.85);border-radius:8px;padding:10px 14px;font-size:11px;color:#ccc;line-height:1.8}
+                #stats-bar{padding:6px 16px;border-top:1px solid #e0e0e0;font-size:11px;color:#888;background:#f8f8f8}
+                .leaflet-control-layers{background:#fff !important;border:1px solid #e0e0e0 !important;border-radius:6px !important;color:#333 !important;box-shadow:0 2px 6px rgba(0,0,0,0.1) !important}
+                .leaflet-control-layers label{color:#333 !important}
+                .leaflet-control-layers-overlays label span{color:#333 !important}
+                .leaflet-control-zoom a{background:#fff !important;color:#333 !important;border-color:#ccc !important}
+                .leaflet-popup-content-wrapper{background:#fff !important;color:#333 !important;border:1px solid #e0e0e0 !important;border-radius:8px !important;box-shadow:0 2px 12px rgba(0,0,0,0.1) !important}
+                .leaflet-popup-tip{background:#fff !important}
+                .leaflet-container{background:#fff !important}
+                .recenter-btn{padding:6px 12px;background:#fff;border:1px solid #ddd;border-radius:6px;color:#333;cursor:pointer;font-size:13px}
+                .recenter-btn:hover{background:#e8e8e8}
+                .legend{position:absolute;bottom:24px;left:16px;z-index:1000;background:rgba(255,255,255,0.9);border-radius:8px;padding:10px 14px;font-size:11px;color:#555;line-height:1.8}
                 .legend-item{display:flex;align-items:center;gap:6px}
                 .legend-line{display:inline-block;width:24px;height:3px;border-radius:2px}
                 #cdn-error{display:none;position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);background:rgba(217,67,43,0.9);color:#fff;padding:12px 20px;border-radius:8px;font-size:14px;z-index:2000;text-align:center}
@@ -699,62 +700,63 @@ public class RoadPreviewServer {
                 };
                 recenterBtn.addTo(map);
 
-                var geoJsonLayer = L.geoJSON(null,{
-                  filter:function(f){return f.geometry&&f.geometry.type==='LineString';},
-                  onEachFeature:function(feature,layer){
-                    var p=feature.properties;
-                    var cls=p.classification||'C';
-                    var s=ROAD_STYLES[cls]||ROAD_STYLES.C;
-                    var coords=feature.geometry.coordinates.map(function(c){return [c[1],c[0]];});
-                    var group=L.layerGroup([
-                      L.polyline(coords,{color:s.stroke,weight:s.strokeW,opacity:1,lineCap:'round',lineJoin:'round'}),
-                      L.polyline(coords,{color:s.fill,weight:s.fillW,opacity:1,lineCap:'round',lineJoin:'round'})
-                    ]);
-                    group.feature=feature;
-                    geoJsonLayer.removeLayer(layer);
-                    geoJsonLayer.addLayer(group);
-                    // popup
-                    var popupContent='<div style="font-size:13px">'+
-                      '<strong><span class="badge badge-'+cls+'">'+cls+'</span>'+(p.name||'未命名道路')+'</strong><br>'+
-                      '编号: '+(p.number||'-')+' &nbsp; 长度: '+(p.length||0).toFixed(0)+' 格'+
-                      '</div>';
-                    group.bindPopup(popupContent);
-                    // click
-                    group.on('click',function(e){
-                      L.DomEvent.stopPropagation(e);
-                      showInfoCard(feature);
-                      highlightSidebar(p.id);
-                      map.flyTo(e.latlng,Math.max(map.getZoom(),12));
-                    });
-                    // horizontal road labels (no rotation)
-                    var labelHtml='';
-                    var number=p.number||'';
-                    var coords=feature.geometry.coordinates;
-                    var midIdx=Math.floor(coords.length/2);
-                    var mid=coords[midIdx];
-                    var latlng=[mid[1],mid[0]];
-                    if(cls==='G'||cls==='S'){
-                      var labelText=cls+number;
-                      if(p.name===number){
-                        labelHtml='<div style="color:#aaa;font-size:10px;white-space:nowrap;text-shadow:0 0 3px #fff">'+labelText+'</div>';
-                      }else{
-                        if(cls==='G'){
-                          labelHtml='<div style="background:#E85D2C;color:#fff;padding:2px 8px;border-radius:4px;border:2px solid #fff;font-weight:bold;font-size:12px;white-space:nowrap;box-shadow:0 2px 4px rgba(0,0,0,0.25)">'+labelText+'</div>';
-                        }else{
-                          labelHtml='<div style="background:#F0A030;color:#000;padding:2px 8px;border-radius:4px;border:2px solid #D98A20;font-weight:bold;font-size:12px;white-space:nowrap;box-shadow:0 2px 4px rgba(0,0,0,0.25)">'+labelText+'</div>';
-                        }
-                        if(p.name&&p.name!==number){
-                          labelHtml+='<div style="color:#777;font-size:10px;white-space:nowrap;margin-top:2px;text-shadow:0 0 3px #fff">'+p.name+'</div>';
-                        }
-                      }
-                    }else{
-                      labelHtml='<div style="color:#555;font-size:10px;white-space:nowrap;text-shadow:0 0 3px #fff">'+(p.name||p.number||'')+'</div>';
-                    }
-                    if(labelHtml){
-                      L.marker(latlng,{icon:L.divIcon({className:'road-label-icon',html:labelHtml,iconSize:null,iconAnchor:[0,0]}),interactive:false}).addTo(labelLayer);
-                    }
+                var geoJsonLayer = L.featureGroup().addTo(map);
+
+                function addRoadFeature(feature){
+                  if(!feature.geometry||feature.geometry.type!=='LineString')return;
+                  var p=feature.properties;
+                  var cls=p.classification||'C';
+                  var s=ROAD_STYLES[cls]||ROAD_STYLES.C;
+                  var coords=feature.geometry.coordinates.map(function(c){return [c[1],c[0]];});
+                  var strokeLine=L.polyline(coords,{color:s.stroke,weight:s.strokeW,opacity:1,lineCap:'round',lineJoin:'round'});
+                  var fillLine=L.polyline(coords,{color:s.fill,weight:s.fillW,opacity:1,lineCap:'round',lineJoin:'round'});
+                  fillLine.feature=feature;
+                  geoJsonLayer.addLayer(strokeLine);
+                  geoJsonLayer.addLayer(fillLine);
+                  // popup
+                  var popupContent='<div style="font-size:13px">'+
+                    '<strong><span class="badge badge-'+cls+'">'+cls+'</span>'+(p.name||'未命名道路')+'</strong><br>'+
+                    '编号: '+(p.number||'-')+' &nbsp; 长度: '+(p.length||0).toFixed(0)+' 格'+
+                    '</div>';
+                  strokeLine.bindPopup(popupContent);
+                  fillLine.bindPopup(popupContent);
+                  // click
+                  function onClick(e){
+                    L.DomEvent.stopPropagation(e);
+                    showInfoCard(feature);
+                    highlightSidebar(p.id);
+                    map.flyTo(e.latlng,Math.max(map.getZoom(),12));
                   }
-                }).addTo(map);
+                  strokeLine.on('click',onClick);
+                  fillLine.on('click',onClick);
+                  // horizontal road labels (no rotation)
+                  var labelHtml='';
+                  var number=p.number||'';
+                  var geomCoords=feature.geometry.coordinates;
+                  var midIdx=Math.floor(geomCoords.length/2);
+                  var mid=geomCoords[midIdx];
+                  var latlng=[mid[1],mid[0]];
+                  if(cls==='G'||cls==='S'){
+                    var labelText=cls+number;
+                    if(p.name===number){
+                      labelHtml='<div style="color:#333;font-size:10px;white-space:nowrap">'+labelText+'</div>';
+                    }else{
+                      if(cls==='G'){
+                        labelHtml='<div style="background:#E85D2C;color:#fff;padding:2px 8px;border-radius:4px;border:2px solid #fff;font-weight:bold;font-size:12px;white-space:nowrap;box-shadow:0 2px 4px rgba(0,0,0,0.25)">'+labelText+'</div>';
+                      }else{
+                        labelHtml='<div style="background:#F0A030;color:#000;padding:2px 8px;border-radius:4px;border:2px solid #D98A20;font-weight:bold;font-size:12px;white-space:nowrap;box-shadow:0 2px 4px rgba(0,0,0,0.25)">'+labelText+'</div>';
+                      }
+                      if(p.name&&p.name!==number){
+                        labelHtml+='<div style="color:#555;font-size:10px;white-space:nowrap;margin-top:2px">'+p.name+'</div>';
+                      }
+                    }
+                  }else{
+                    labelHtml='<div style="color:#333;font-size:10px;white-space:nowrap">'+(p.name||p.number||'')+'</div>';
+                  }
+                  if(labelHtml){
+                    L.marker(latlng,{icon:L.divIcon({className:'road-label-icon',html:labelHtml,iconSize:null,iconAnchor:[0,0]}),interactive:false}).addTo(labelLayer);
+                  }
+                }
 
                 var labelLayer = L.layerGroup().addTo(map);
 
@@ -767,13 +769,13 @@ public class RoadPreviewServer {
                     t.width=256;t.height=256;
                     var ctx=t.getContext('2d');
                     ctx.fillStyle='#fff';ctx.fillRect(0,0,256,256);
-                    ctx.strokeStyle='rgba(180,190,200,0.4)';ctx.lineWidth=0.5;
+                    ctx.strokeStyle='rgba(0,0,0,0.08)';ctx.lineWidth=0.5;
                     var gs=256;
                     if(c.z>=14) gs=16; else if(c.z>=12) gs=32; else if(c.z>=10) gs=64; else if(c.z>=8) gs=128;
                     for(var x=gs;x<256;x+=gs){ctx.beginPath();ctx.moveTo(x,0);ctx.lineTo(x,256);ctx.stroke();}
                     for(var y=gs;y<256;y+=gs){ctx.beginPath();ctx.moveTo(0,y);ctx.lineTo(256,y);ctx.stroke();}
                     if(c.z>=12){
-                      ctx.fillStyle='rgba(100,110,120,0.35)';ctx.font='8px monospace';
+                      ctx.fillStyle='rgba(0,0,0,0.25)';ctx.font='8px monospace';
                       var nwX=c.x*256,nwY=c.y*256,seX=(c.x+1)*256,seY=(c.y+1)*256;
                       ctx.fillText(nwX.toFixed(0)+','+nwY.toFixed(0),4,14);
                       ctx.fillText(seX.toFixed(0)+','+seY.toFixed(0),4,246);
@@ -810,7 +812,7 @@ public class RoadPreviewServer {
                   var maxX = Math.ceil((ne.lng + PAD) / CHUNK) * CHUNK;
                   var minY = Math.floor((sw.lat - PAD) / CHUNK) * CHUNK;
                   var maxY = Math.ceil((ne.lat + PAD) / CHUNK) * CHUNK;
-                  var lineStyle = {color:'rgba(180,190,200,0.3)', weight:1, dashArray:'2,4', interactive:false};
+                  var lineStyle = {color:'rgba(0,0,0,0.08)', weight:1, dashArray:'2,4', interactive:false};
                   // vertical lines (constant X)
                   for(var x = minX; x <= maxX; x += CHUNK){
                     L.polyline([[minY, x],[maxY, x]], lineStyle).addTo(layer);
@@ -919,7 +921,7 @@ public class RoadPreviewServer {
                       allFeatures=geo.features||[];
                       geoJsonLayer.clearLayers();
                       labelLayer.clearLayers();
-                      geoJsonLayer.addData(geo);
+                      allFeatures.forEach(addRoadFeature);
                       var layerCount=geoJsonLayer.getLayers().length;
                       renderIntersections(allFeatures);
                       renderSidebar(allFeatures);
