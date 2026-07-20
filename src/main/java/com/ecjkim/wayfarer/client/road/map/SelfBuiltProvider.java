@@ -115,6 +115,10 @@ public class SelfBuiltProvider implements MapProvider {
     }
 
     private void onChunkLoad(LevelChunk chunk) {
+        // Skip empty chunks (no terrain data): ChunkLoadEvent fires for the entire
+        // square render distance, but actual terrain only exists in the inscribed circle.
+        if (chunk.isEmpty())
+            return;
         ChunkPos pos = chunk.getPos();
         invalidate(pos);
         scheduleDirtyProcessing();
