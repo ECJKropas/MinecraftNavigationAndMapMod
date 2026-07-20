@@ -297,7 +297,7 @@ public class RoadPreviewServer {
             int tileY = Integer.parseInt(parts[3]);
 
             // Try disk cache first
-            Path cachePath = tileCachePath(dim, tileX, tileY);
+            Path cachePath = tileCachePath(dim, zoom, tileX, tileY);
             if (Files.exists(cachePath)) {
                 byte[] cachedBytes = Files.readAllBytes(cachePath);
                 exchange.getResponseHeaders().set("Content-Type", "image/png");
@@ -382,9 +382,9 @@ public class RoadPreviewServer {
     // Helpers
     // ------------------------------------------------------------------
 
-    private static Path tileCachePath(int dim, int tileX, int tileY) {
+    private static Path tileCachePath(int dim, int zoom, int tileX, int tileY) {
         return Minecraft.getInstance().gameDirectory.toPath().resolve("wayfarer/tilecache").resolve(String.valueOf(dim))
-            .resolve(tileX + "_" + tileY + ".png");
+            .resolve(String.valueOf(zoom)).resolve(tileX + "_" + tileY + ".png");
     }
 
     private void sendText(HttpExchange exchange, int statusCode, String content) throws IOException {
@@ -877,9 +877,9 @@ public class RoadPreviewServer {
                 // Single dynamic tile layer auto-following player dimension
                 var currentDim = 0;
                 var satTiles = L.tileLayer('/api/tiles/' + currentDim + '/{z}/{x}/{y}.png', {
-                  minZoom: -14, maxZoom: 18, maxNativeZoom: 0, tileSize: 256, noWrap: true,
+                  minZoom: -14, maxZoom: 18, tileSize: 256,
                   opacity: 0.85, zIndex: 0,
-                  errorTileUrl: '', attribution: 'Wayfarer Tiles'
+                  attribution: 'Wayfarer Tiles'
                 }).addTo(map);
 
                 function pollDimension(){

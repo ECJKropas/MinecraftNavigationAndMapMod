@@ -21,6 +21,7 @@ import java.io.IOException;
 import java.lang.ref.SoftReference;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
@@ -71,6 +72,17 @@ public class SelfBuiltProvider implements MapProvider {
 
     @Override
     public BufferedImage getTile(int dimension, int zoom, int tileX, int tileY) {
+        // zoom != 0: disk cache only (in-memory cache is zoom-0 only)
+        if (zoom != 0) {
+            Path p = cachePath(dimension, zoom, tileX, tileY);
+            if (Files.exists(p)) {
+                try {
+                    return ImageIO.read(p.toFile());
+                } catch (IOException ignored) {
+                }
+            }
+            return null;
+        }
         long key = tileKey(tileX, tileY);
         SoftReference<int[]> ref = tileCache.get(key);
         int[] pixels = ref != null ? ref.get() : null;
@@ -88,6 +100,21 @@ public class SelfBuiltProvider implements MapProvider {
             return;
         dirtyTileSet.add(key);
         scheduleDirtyProcessing();
+    }
+
+    @Override
+    public void requestTileRender(int dimension, int zoom, int tileX, int tileY) {
+        if (zoom == 0) {
+            requestTileRender(dimension, tileX, tileY);
+            return;
+        }
+        // zoom != 0: render directly on main thread, write to disk cache
+        Minecraft.getInstance().execute(() -> {
+            int[] pixels = renderTile(dimension, zoom, tileX, tileY);
+            if (pixels != null && hasTerrainData(pixels)) {
+                writeTileToDisk(dimension, zoom, tileX, tileY, pixels);
+            }
+        });
     }
 
     @Override
@@ -180,37 +207,68 @@ public class SelfBuiltProvider implements MapProvider {
     /**
      * Render a tile synchronously from the current client world. Returns null if the world is not available or
      * dimension mismatch.
+     *
+     * @param zoom &lt;= 0: tile covers {@code 256 * 2^(-zoom)} blocks, sampling every {@code 2^(-zoom)} blocks. &gt; 0:
+     *            same as zoom 0.
      */
-    private int[] renderTile(int dimension, int tileX, int tileY) {
+    private int[] renderTile(int dimension, int zoom, int tileX, int tileY) {
         Minecraft mc = Minecraft.getInstance();
         Level level = mc.level;
         if (level == null)
             return null;
 
-        // dimension check: overlay worlds freely since we serve what we have
+        int step = zoom <= 0 ? (1 << (-zoom)) : 1;
+        int blockSpan = TILE_SIZE * step;
+        int originX = tileX * blockSpan;
+        int originZ = tileY * blockSpan;
+
         int[] pixels = new int[TILE_SIZE * TILE_SIZE];
-        int originX = tileX * TILE_SIZE;
-        int originZ = tileY * TILE_SIZE;
 
-        for (int dz = 0; dz < TILE_SIZE; dz++) {
-            int worldZ = originZ + dz;
-            int rowBase = dz * TILE_SIZE;
-            for (int dx = 0; dx < TILE_SIZE; dx++) {
-                int worldX = originX + dx;
-                int chunkX = worldX >> 4;
-                int chunkZ = worldZ >> 4;
-                int color = DEFAULT_GRAY;
-
-                LevelChunk chunk = level.getChunkSource().getChunkNow(chunkX, chunkZ);
-                if (chunk != null) {
-                    int inChunkX = worldX & 15;
-                    int inChunkZ = worldZ & 15;
-                    int surfaceY = chunk.getHeight(Heightmap.Types.WORLD_SURFACE, inChunkX, inChunkZ);
-                    BlockPos pos = new BlockPos(worldX, surfaceY, worldZ);
-                    MapColor mapColor = level.getBlockState(pos).getMapColor(level, pos);
-                    color = 0xFF000000 | mapColor.col;
+        if (zoom <= -4) {
+            // Chunk color-block mode: each pixel covers ≥1 chunk; cache chunk colors
+            Map<Long, Integer> chunkColors = new HashMap<>();
+            int halfStep = step / 2;
+            for (int py = 0; py < TILE_SIZE; py++) {
+                int centerZ = originZ + py * step + halfStep;
+                int rowBase = py * TILE_SIZE;
+                for (int px = 0; px < TILE_SIZE; px++) {
+                    int centerX = originX + px * step + halfStep;
+                    int chunkX = centerX >> 4;
+                    int chunkZ = centerZ >> 4;
+                    long key = ((long)chunkX << 32) | (chunkZ & 0xFFFFFFFFL);
+                    int color = chunkColors.computeIfAbsent(key, k -> {
+                        LevelChunk chunk = level.getChunkSource().getChunkNow(chunkX, chunkZ);
+                        if (chunk == null)
+                            return DEFAULT_GRAY;
+                        int h = chunk.getHeight(Heightmap.Types.WORLD_SURFACE, 8, 8);
+                        BlockPos bp = new BlockPos((chunkX << 4) + 8, h, (chunkZ << 4) + 8);
+                        MapColor mapColor = level.getBlockState(bp).getMapColor(level, bp);
+                        return 0xFF000000 | mapColor.col;
+                    });
+                    pixels[rowBase + px] = color;
                 }
-                pixels[rowBase + dx] = color;
+            }
+        } else {
+            // Block-level rendering for zoom > -4
+            for (int py = 0; py < TILE_SIZE; py++) {
+                int worldZ = originZ + py * step;
+                int rowBase = py * TILE_SIZE;
+                for (int px = 0; px < TILE_SIZE; px++) {
+                    int worldX = originX + px * step;
+                    int chunkX = worldX >> 4;
+                    int chunkZ = worldZ >> 4;
+                    int color = DEFAULT_GRAY;
+                    LevelChunk chunk = level.getChunkSource().getChunkNow(chunkX, chunkZ);
+                    if (chunk != null) {
+                        int inChunkX = worldX & 15;
+                        int inChunkZ = worldZ & 15;
+                        int surfaceY = chunk.getHeight(Heightmap.Types.WORLD_SURFACE, inChunkX, inChunkZ);
+                        BlockPos pos = new BlockPos(worldX, surfaceY, worldZ);
+                        MapColor mapColor = level.getBlockState(pos).getMapColor(level, pos);
+                        color = 0xFF000000 | mapColor.col;
+                    }
+                    pixels[rowBase + px] = color;
+                }
             }
         }
         return pixels;
@@ -244,10 +302,10 @@ public class SelfBuiltProvider implements MapProvider {
         for (long key : batch) {
             int tileX = (int)(key >> 32);
             int tileY = (int)key;
-            int[] pixels = renderTile(0, tileX, tileY);
+            int[] pixels = renderTile(0, 0, tileX, tileY);
             if (pixels != null && hasTerrainData(pixels)) {
                 tileCache.put(key, new SoftReference<>(pixels));
-                writeTileToDisk(0, tileX, tileY, pixels);
+                writeTileToDisk(0, 0, tileX, tileY, pixels);
             }
         }
 
@@ -279,14 +337,14 @@ public class SelfBuiltProvider implements MapProvider {
 
     // --- disk cache ---
 
-    private Path cachePath(int dimension, int tileX, int tileY) {
+    private Path cachePath(int dimension, int zoom, int tileX, int tileY) {
         return Minecraft.getInstance().gameDirectory.toPath().resolve("wayfarer/tilecache")
-            .resolve(String.valueOf(dimension)).resolve(tileX + "_" + tileY + ".png");
+            .resolve(String.valueOf(dimension)).resolve(String.valueOf(zoom)).resolve(tileX + "_" + tileY + ".png");
     }
 
-    private void writeTileToDisk(int dimension, int tileX, int tileY, int[] pixels) {
+    private void writeTileToDisk(int dimension, int zoom, int tileX, int tileY, int[] pixels) {
         try {
-            Path p = cachePath(dimension, tileX, tileY);
+            Path p = cachePath(dimension, zoom, tileX, tileY);
             Files.createDirectories(p.getParent());
             BufferedImage img = new BufferedImage(TILE_SIZE, TILE_SIZE, BufferedImage.TYPE_INT_ARGB);
             img.setRGB(0, 0, TILE_SIZE, TILE_SIZE, pixels, 0, TILE_SIZE);

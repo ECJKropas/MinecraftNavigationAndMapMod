@@ -87,9 +87,14 @@ public class ProviderManager {
      * this and returns a transparent placeholder, then the providers render the tile in the background.
      */
     public void requestTileRender(int dimension, int tileX, int tileY) {
+        requestTileRender(dimension, 0, tileX, tileY);
+    }
+
+    /** Zoom-aware variant. */
+    public void requestTileRender(int dimension, int zoom, int tileX, int tileY) {
         for (MapProvider provider : providers) {
             if (provider.isAvailable()) {
-                provider.requestTileRender(dimension, tileX, tileY);
+                provider.requestTileRender(dimension, zoom, tileX, tileY);
             }
         }
     }

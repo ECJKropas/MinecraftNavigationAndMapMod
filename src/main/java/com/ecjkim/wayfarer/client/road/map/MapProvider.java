@@ -51,6 +51,13 @@ public interface MapProvider {
      */
     default void requestTileRender(int dimension, int tileX, int tileY) {}
 
+    /**
+     * Zoom-aware variant. Defaults to the zoom-0 path for backward compatibility.
+     */
+    default void requestTileRender(int dimension, int zoom, int tileX, int tileY) {
+        requestTileRender(dimension, tileX, tileY);
+    }
+
     /** Mark the tile(s) covering this chunk as dirty for re-render. */
     void invalidate(ChunkPos chunk);
 
