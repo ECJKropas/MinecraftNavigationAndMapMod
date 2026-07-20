@@ -45,6 +45,9 @@ repositories {
         url = uri("https://maven.fallenbreath.me/releases")
         content { includeGroup("me.fallenbreath") }
     }
+    flatDir {
+        dirs(rootProject.file("docs/other_mods"))
+    }
 }
 
 val loomExtension = extensions.getByType(LoomGradleExtensionAPI::class)
@@ -101,6 +104,9 @@ dependencies {
     autoImplementation(fabricApiDependency("fabric-lifecycle-events-v1"))
     autoImplementation(fabricApiDependency("fabric-screen-api-v1"))
     autoImplementation(fabricApiDependency(if (unobfuscated) "fabric-key-mapping-api-v1" else "fabric-key-binding-api-v1"))
+
+    // malilib (local jar from docs/other_mods)
+    autoImplementation(":${gradleProperty("malilibDep")}")
 }
 
 val langDir = "assets/mcnav/lang"

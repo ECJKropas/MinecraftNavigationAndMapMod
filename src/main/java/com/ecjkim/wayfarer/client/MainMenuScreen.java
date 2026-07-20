@@ -23,6 +23,7 @@ import net.minecraft.client.gui.components.Button;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.network.chat.Component;
 
+import com.ecjkim.wayfarer.client.gui.WayfarerConfigScreen;
 import com.ecjkim.wayfarer.client.road.RoadDataStore;
 import com.ecjkim.wayfarer.client.road.RoadListScreen;
 import com.ecjkim.wayfarer.client.road.RoadPreviewServer;
@@ -61,7 +62,7 @@ public class MainMenuScreen extends Screen {
         y += BUTTON_HEIGHT + BUTTON_GAP;
 
         addRenderableWidget(Button.builder(Component.literal("设置"), btn -> {
-            this.minecraft.setScreen(new SettingsScreen(this));
+            WayfarerConfigScreen.openConfigScreen();
         }).bounds(btnX, y, BUTTON_WIDTH, BUTTON_HEIGHT).build());
     }
 

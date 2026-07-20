@@ -186,8 +186,7 @@ public class RoadPreviewServer {
         String mode = manager == null ? "UNINITIALIZED" : manager.getMode().name();
         String active = manager == null ? "None" : manager.getActiveProviderName();
         sendText(exchange, 200,
-            "{\"mode\":\"" + mode + "\",\"active\":\"" + active + "\",\"version\":"
-                + tileCacheVersion + "}",
+            "{\"mode\":\"" + mode + "\",\"active\":\"" + active + "\",\"version\":" + tileCacheVersion + "}",
             "application/json; charset=utf-8");
     }
 
@@ -365,21 +364,8 @@ public class RoadPreviewServer {
             BufferedImage img = providerManager.getTile(dim, zoom, tileX, tileY);
             if (img == null) {
                 providerManager.requestTileRender(dim, zoom, tileX, tileY);
-                for (int attempt = 0; attempt < 20; attempt++) {
-                    try {
-                        Thread.sleep(50L);
-                    } catch (InterruptedException interrupted) {
-                        Thread.currentThread().interrupt();
-                        break;
-                    }
-                    img = providerManager.getTile(dim, zoom, tileX, tileY);
-                    if (img != null)
-                        break;
-                }
-                if (img == null) {
-                    sendNoCacheTransparentPng(exchange);
-                    return;
-                }
+                sendNoCacheTransparentPng(exchange);
+                return;
             }
 
             ByteArrayOutputStream baos = new ByteArrayOutputStream();
@@ -433,7 +419,8 @@ public class RoadPreviewServer {
     // Helpers
     // ------------------------------------------------------------------
 
-    private static Path tileCachePath(ProviderManager.Mode mode, long version, int dim, int zoom, int tileX, int tileY) {
+    private static Path tileCachePath(ProviderManager.Mode mode, long version, int dim, int zoom, int tileX,
+        int tileY) {
         return Minecraft.getInstance().gameDirectory.toPath().resolve("wayfarer/tilecache").resolve(String.valueOf(dim))
             .resolve(mode.name()).resolve(String.valueOf(version)).resolve(String.valueOf(zoom))
             .resolve(tileX + "_" + tileY + ".png");
@@ -946,7 +933,7 @@ public class RoadPreviewServer {
                   tileRetryTimer = setTimeout(function(){
                     tileRetryTimer = null;
                     satTiles.redraw();
-                  }, 500);
+                  }, 1200);
                 });
 
                 function pollDimension(){

@@ -19,7 +19,8 @@
     "minecraft": "${minecraft_dependency}",
     "fabric-lifecycle-events-v1": "*",
     "fabric-key-binding-api-v1": "*",
-    "fabric-screen-api-v1": "*"
+    "fabric-screen-api-v1": "*",
+    "malilib": "*"
   },
   "mixins": ["wayfarer.mixins.json"],
   "custom": {

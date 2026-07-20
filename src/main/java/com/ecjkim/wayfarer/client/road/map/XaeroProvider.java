@@ -20,6 +20,7 @@ import java.awt.image.BufferedImage;
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;
 import java.lang.reflect.Modifier;
+import java.nio.ByteBuffer;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
@@ -64,12 +65,16 @@ public class XaeroProvider implements MapProvider {
     private Method mapBlockGetHeightMethod;
     private Method mapProcessorGetLeafMapRegionMethod;
     private Method mapProcessorGetLeveledRegionMethod;
+    private Method leveledRegionGetTextureMethod;
     private Method mapProcessorGetMapSaveLoadMethod;
     private Method mapSaveLoadRequestLoadMethod;
     private Method mapSaveLoadRequestBranchCacheMethod;
+    private Method regionTextureGetDirectColorBufferMethod;
     private Method mapSaveLoadLoadRegionMethod;
     private Method mapProcessorGetWorldBlockLookupMethod;
     private Method mapProcessorGetWorldBlockRegistryMethod;
+    private Method worldMapSessionGetCurrentSessionMethod;
+    private Method worldMapSessionGetMapProcessorMethod;
     private Field mapProcessorWorldFluidRegistryField;
     private Field mapProcessorBiomeGetterField;
     private Object mapProcessor;
@@ -130,11 +135,73 @@ public class XaeroProvider implements MapProvider {
                     }
                 }
             }
-            return hasData ? image : null;
+            if (hasData)
+                return image;
+            return getCachedTextureTile(processor, zoom, tileX, tileY);
         } catch (Exception e) {
             LOGGER.log(Level.FINE, "Xaero tile read failed", e);
             return null;
         }
+    }
+
+    private BufferedImage getCachedTextureTile(Object processor, int zoom, int tileX, int tileY) {
+        int blockSpan = zoom < 0 ? TILE_SIZE << Math.min(-zoom, 20) : TILE_SIZE;
+        int level = 1;
+        int regionSpan = 1024;
+        while (regionSpan < blockSpan && level < 8) {
+            regionSpan <<= 1;
+            level++;
+        }
+        int textureScale = 1 << (level - 1);
+        int blockPerTexturePixel = textureScale;
+        BufferedImage image = new BufferedImage(TILE_SIZE, TILE_SIZE, BufferedImage.TYPE_INT_ARGB);
+        boolean hasData = false;
+
+        try {
+            synchronized (processor) {
+                for (int pixelZ = 0; pixelZ < TILE_SIZE; pixelZ++) {
+                    for (int pixelX = 0; pixelX < TILE_SIZE; pixelX++) {
+                        int mapX = tileX * TILE_SIZE + pixelX;
+                        int mapZ = tileY * TILE_SIZE + pixelZ;
+                        int worldX = zoom >= 0 ? Math.floorDiv(mapX, 1 << zoom) : mapX << -zoom;
+                        int worldZ = zoom >= 0 ? Math.floorDiv(mapZ, 1 << zoom) : mapZ << -zoom;
+                        int regionX = Math.floorDiv(worldX, regionSpan);
+                        int regionZ = Math.floorDiv(worldZ, regionSpan);
+                        int localX = Math.floorMod(worldX, regionSpan) / blockPerTexturePixel;
+                        int localZ = Math.floorMod(worldZ, regionSpan) / blockPerTexturePixel;
+                        int textureX = localX / 128;
+                        int textureZ = localZ / 128;
+                        Object region =
+                            mapProcessorGetLeveledRegionMethod.invoke(processor, regionX, regionZ, level, 0);
+                        if (region == null)
+                            continue;
+                        Object texture = leveledRegionGetTextureMethod.invoke(region, textureX, textureZ);
+                        if (texture == null)
+                            continue;
+                        ByteBuffer buffer = (ByteBuffer)regionTextureGetDirectColorBufferMethod.invoke(texture);
+                        if (buffer == null)
+                            continue;
+                        int bufferX = localX & 127;
+                        int bufferZ = localZ & 127;
+                        int offset = (bufferZ * 128 + bufferX) * 4;
+                        if (offset + 3 >= buffer.limit())
+                            continue;
+                        int red = buffer.get(offset) & 0xFF;
+                        int green = buffer.get(offset + 1) & 0xFF;
+                        int blue = buffer.get(offset + 2) & 0xFF;
+                        int alpha = buffer.get(offset + 3) & 0xFF;
+                        if (alpha == 0)
+                            continue;
+                        image.setRGB(pixelX, pixelZ, (alpha << 24) | (red << 16) | (green << 8) | blue);
+                        hasData = true;
+                    }
+                }
+            }
+        } catch (Exception e) {
+            LOGGER.log(Level.FINE, "Xaero cached texture read failed", e);
+            return null;
+        }
+        return hasData ? image : null;
     }
 
     @Override
@@ -152,7 +219,7 @@ public class XaeroProvider implements MapProvider {
 
         Minecraft.getInstance().execute(() -> {
             try {
-                startFullRegionScan(processor);
+                requestCachedTextureRegions(processor, zoom, tileX, tileY);
                 int scale = zoom >= 0 ? 1 << zoom : 1;
                 int step = zoom < 0 ? 1 << -zoom : 1;
                 int minBlockX = zoom >= 0 ? Math.floorDiv(tileX * TILE_SIZE, scale) : tileX * TILE_SIZE * step;
@@ -181,6 +248,42 @@ public class XaeroProvider implements MapProvider {
                 pendingRegionLoads.remove(requestKey);
             }
         });
+    }
+
+    private void requestCachedTextureRegions(Object processor, int zoom, int tileX, int tileY) {
+        int blockSpan = zoom < 0 ? TILE_SIZE << Math.min(-zoom, 20) : TILE_SIZE;
+        int level = 1;
+        int regionSpan = 1024;
+        while (regionSpan < blockSpan && level < 8) {
+            regionSpan <<= 1;
+            level++;
+        }
+        int minBlockX = zoom >= 0 ? Math.floorDiv(tileX * TILE_SIZE, 1 << zoom) : tileX * blockSpan;
+        int minBlockZ = zoom >= 0 ? Math.floorDiv(tileY * TILE_SIZE, 1 << zoom) : tileY * blockSpan;
+        int maxBlockX =
+            zoom >= 0 ? Math.floorDiv(tileX * TILE_SIZE + TILE_SIZE - 1, 1 << zoom) : minBlockX + blockSpan - 1;
+        int maxBlockZ =
+            zoom >= 0 ? Math.floorDiv(tileY * TILE_SIZE + TILE_SIZE - 1, 1 << zoom) : minBlockZ + blockSpan - 1;
+        int minRegionX = Math.floorDiv(minBlockX, regionSpan);
+        int minRegionZ = Math.floorDiv(minBlockZ, regionSpan);
+        int maxRegionX = Math.floorDiv(maxBlockX, regionSpan);
+        int maxRegionZ = Math.floorDiv(maxBlockZ, regionSpan);
+        int requested = 0;
+        try {
+            Object saveLoad = processorMapSaveLoad(processor);
+            for (int regionZ = minRegionZ; regionZ <= maxRegionZ && requested < 16; regionZ++) {
+                for (int regionX = minRegionX; regionX <= maxRegionX && requested < 16; regionX++) {
+                    Object region = mapProcessorGetLeveledRegionMethod.invoke(processor, regionX, regionZ, level, 0);
+                    if (region != null
+                        && mapSaveLoadRequestBranchCacheMethod.getParameterTypes()[0].isInstance(region)) {
+                        mapSaveLoadRequestBranchCacheMethod.invoke(saveLoad, region, "Wayfarer");
+                        requested++;
+                    }
+                }
+            }
+        } catch (Exception e) {
+            LOGGER.log(Level.FINE, "Xaero visible cache request failed", e);
+        }
     }
 
     private void startFullRegionScan(Object processor) {
@@ -326,6 +429,8 @@ public class XaeroProvider implements MapProvider {
                 mapProcessorClass.getMethod("getLeafMapRegion", int.class, int.class, int.class, boolean.class);
             mapProcessorGetLeveledRegionMethod =
                 mapProcessorClass.getMethod("getLeveledRegion", int.class, int.class, int.class, int.class);
+            Class<?> leveledRegionClass = Class.forName("xaero.map.region.LeveledRegion");
+            leveledRegionGetTextureMethod = leveledRegionClass.getMethod("getTexture", int.class, int.class);
             mapProcessorGetMapSaveLoadMethod = mapProcessorClass.getMethod("getMapSaveLoad");
             Class<?> mapSaveLoadClass = Class.forName("xaero.map.file.MapSaveLoad");
             mapSaveLoadRequestLoadMethod =
@@ -336,8 +441,13 @@ public class XaeroProvider implements MapProvider {
                 Class.forName("xaero.map.biome.BiomeGetter"), boolean.class, int.class);
             mapSaveLoadRequestBranchCacheMethod = mapSaveLoadClass.getMethod("requestBranchCache",
                 Class.forName("xaero.map.region.BranchLeveledRegion"), String.class);
+            regionTextureGetDirectColorBufferMethod =
+                Class.forName("xaero.map.region.texture.RegionTexture").getMethod("getDirectColorBuffer");
             mapProcessorGetWorldBlockLookupMethod = mapProcessorClass.getMethod("getWorldBlockLookup");
             mapProcessorGetWorldBlockRegistryMethod = mapProcessorClass.getMethod("getWorldBlockRegistry");
+            Class<?> worldMapSessionClass = Class.forName("xaero.map.WorldMapSession");
+            worldMapSessionGetCurrentSessionMethod = worldMapSessionClass.getMethod("getCurrentSession");
+            worldMapSessionGetMapProcessorMethod = worldMapSessionClass.getMethod("getMapProcessor");
             mapProcessorWorldFluidRegistryField = mapProcessorClass.getDeclaredField("worldFluidRegistry");
             mapProcessorWorldFluidRegistryField.setAccessible(true);
             mapProcessorBiomeGetterField = mapProcessorClass.getDeclaredField("biomeGetter");
@@ -356,6 +466,13 @@ public class XaeroProvider implements MapProvider {
             return mapProcessor;
 
         try {
+            Object session = worldMapSessionGetCurrentSessionMethod.invoke(null);
+            if (session != null) {
+                mapProcessor = worldMapSessionGetMapProcessorMethod.invoke(session);
+                if (mapProcessor != null)
+                    return mapProcessor;
+            }
+
             Object screen = currentScreen();
             if (screen != null && screen.getClass().getName().equals("xaero.map.gui.GuiMap")) {
                 Method getter = screen.getClass().getMethod("getMapProcessor");

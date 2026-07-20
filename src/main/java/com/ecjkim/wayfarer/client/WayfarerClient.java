@@ -36,6 +36,7 @@ import com.ecjkim.wayfarer.client.road.model.RoadPath;
 
 import org.lwjgl.glfw.GLFW;
 
+import fi.dy.masa.malilib.event.InitializationHandler;
 import it.unimi.dsi.fastutil.ints.IntOpenHashSet;
 import it.unimi.dsi.fastutil.ints.IntSet;
 
@@ -49,6 +50,8 @@ public class WayfarerClient implements ClientModInitializer {
 
     @Override
     public void onInitializeClient() {
+        InitializationHandler.getInstance().registerInitializationHandler(new WayfarerInitHandler());
+
         PREVIEW_SERVER.start();
 
         // init tile providers
