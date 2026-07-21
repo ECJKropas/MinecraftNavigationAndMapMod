@@ -58,9 +58,9 @@ public class WayfarerClient implements ClientModInitializer {
         ProviderManager pm =
             new ProviderManager(ProviderManager.Mode.valueOf(WayfarerConfig.getInstance().tileProviderMode));
         PROVIDER_MANAGER = pm;
-        pm.add(new XaeroProvider());
         SelfBuiltProvider selfBuilt = new SelfBuiltProvider();
         pm.add(selfBuilt);
+        pm.add(new XaeroProvider());
         PREVIEW_SERVER.setProviderManager(pm);
 
         // Enable background tile pre-rendering: listen to chunk loads so that newly explored
