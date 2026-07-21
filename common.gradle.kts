@@ -131,7 +131,7 @@ val commonVmArgs =
         }
         add("-Dmixin.debug.export=true")
     }
-val commonClientArgs = listOf("--server", "localhost", "--port", "25565")
+val commonClientArgs = listOf("--quickPlayMultiplayer", "localhost:25565")
 loomExtension.runConfigs.configureEach {
     runDirectory.set(
         file(

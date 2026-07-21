@@ -326,11 +326,10 @@ public class XaeroProvider implements MapProvider {
                         if (!fileName.endsWith(".xwmc"))
                             return;
                         Path levelPath = path.getParent();
-                        Path cachePath = levelPath == null ? null : levelPath.getParent();
-                        if (cachePath == null || !cachePath.getFileName().toString().startsWith("cache"))
+                        if (levelPath == null || !levelPath.getFileName().toString().startsWith("cache"))
                             return;
                         try {
-                            int level = Integer.parseInt(levelPath.getFileName().toString());
+                            int level = Integer.parseInt(levelPath.getFileName().toString().substring(5));
                             Matcher matcher = REGION_FILE.matcher(fileName.substring(0, fileName.length() - 5));
                             if (matcher.matches()) {
                                 caches.add(new long[] {Integer.parseInt(matcher.group(1)),
@@ -469,16 +468,20 @@ public class XaeroProvider implements MapProvider {
             Object session = worldMapSessionGetCurrentSessionMethod.invoke(null);
             if (session != null) {
                 mapProcessor = worldMapSessionGetMapProcessorMethod.invoke(session);
-                if (mapProcessor != null)
+                if (mapProcessor != null) {
+                    startFullRegionScan(mapProcessor);
                     return mapProcessor;
+                }
             }
 
             Object screen = currentScreen();
             if (screen != null && screen.getClass().getName().equals("xaero.map.gui.GuiMap")) {
                 Method getter = screen.getClass().getMethod("getMapProcessor");
                 mapProcessor = getter.invoke(screen);
-                if (mapProcessor != null)
+                if (mapProcessor != null) {
+                    startFullRegionScan(mapProcessor);
                     return mapProcessor;
+                }
             }
 
             Class<?> worldMapClass = Class.forName("xaero.map.WorldMap");
@@ -494,6 +497,9 @@ public class XaeroProvider implements MapProvider {
                     if (mapProcessor != null)
                         break;
                 }
+            }
+            if (mapProcessor != null) {
+                startFullRegionScan(mapProcessor);
             }
         } catch (ReflectiveOperationException e) {
             LOGGER.log(Level.FINE, "Xaero MapProcessor lookup failed", e);

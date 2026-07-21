@@ -57,7 +57,11 @@ public class ProviderManager {
         return mode;
     }
 
+    private volatile String lastServingProvider = null;
+
     public String getActiveProviderName() {
+        if (lastServingProvider != null)
+            return lastServingProvider;
         for (MapProvider provider : providers) {
             if (isEnabled(provider) && provider.isAvailable())
                 return provider.getName();
@@ -87,8 +91,10 @@ public class ProviderManager {
                 continue;
             if (provider.isAvailable()) {
                 BufferedImage tile = provider.getTile(dimension, zoom, tileX, tileY);
-                if (tile != null)
+                if (tile != null) {
+                    lastServingProvider = provider.getName();
                     return tile;
+                }
             }
         }
         return null;

@@ -751,11 +751,8 @@ public class RoadPreviewServer {
                 });
                 var map = L.map('map',{crs:crs,zoomControl:true,attributionControl:false});
 
-                // Center on player position immediately
-                fetch('/api/player-position',{cache:'no-store'})
-                  .then(function(r){return r.ok ? r.json() : null;})
-                  .then(function(pos){if(pos){map.setView([pos.z, pos.x], 0);}})
-                  .catch(function(){});
+                // Defer initial view to loadData's fitBounds to avoid race condition
+                var initialViewPending = true;
 
                 var recenterBtn = L.control({position:'topleft'});
                 recenterBtn.onAdd = function(){
@@ -765,7 +762,7 @@ public class RoadPreviewServer {
                     L.DomEvent.stopPropagation(e);
                     if(allFeatures.length>0){
                       var b=geoJsonLayer.getBounds();
-                      if(b.isValid()){map.fitBounds(b.pad(0.15),{maxZoom:14});}
+                      if(b.isValid()){map.fitBounds(b.pad(0.15),{maxZoom:0});}
                     }
                   });
                   return div;
@@ -923,7 +920,7 @@ public class RoadPreviewServer {
                 var currentDim = 0;
                 var providerVersion = 0;
                 var satTiles = L.tileLayer('/api/tiles/' + currentDim + '/{z}/{x}/{y}.png?v=' + providerVersion, {
-                  minZoom: -14, maxZoom: 18, tileSize: 256,
+                  minZoom: -14, maxZoom: 18, maxNativeZoom: 0, tileSize: 256,
                   opacity: 0.85, zIndex: 0,
                   attribution: 'Wayfarer Tiles'
                 }).addTo(map);
@@ -1070,7 +1067,7 @@ public class RoadPreviewServer {
                       if(allFeatures.length>0){
                         var b=geoJsonLayer.getBounds();
                         if(b.isValid()){
-                          map.fitBounds(b.pad(0.15),{maxZoom:14});
+                          map.fitBounds(b.pad(0.15),{maxZoom:0});
                         }
                       }
                       // ChunkGridCanvas auto-redraws via moveend/zoomend events
