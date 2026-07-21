@@ -60,13 +60,21 @@ public class ProviderManager {
     private volatile String lastServingProvider = null;
 
     public String getActiveProviderName() {
-        if (lastServingProvider != null)
-            return lastServingProvider;
+        // Fast path: if Xaero is cached and still available, skip the scan.
+        if ("Xaero".equals(lastServingProvider)) {
+            for (MapProvider provider : providers) {
+                if ("Xaero".equals(provider.getName()) && provider.isAvailable())
+                    return "Xaero";
+            }
+        }
+        // Xaero not cached / became unavailable → full scan.
+        // This also handles the case where SelfBuilt was serving initially
+        // and Xaero becomes available later (e.g. WorldMapSession initialized).
         for (MapProvider provider : providers) {
             if (isEnabled(provider) && provider.isAvailable())
                 return provider.getName();
         }
-        return "None";
+        return lastServingProvider != null ? lastServingProvider : "None";
     }
 
     public void add(MapProvider provider) {

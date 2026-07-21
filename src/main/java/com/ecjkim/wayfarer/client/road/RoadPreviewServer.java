@@ -920,7 +920,7 @@ public class RoadPreviewServer {
                 var currentDim = 0;
                 var providerVersion = 0;
                 var satTiles = L.tileLayer('/api/tiles/' + currentDim + '/{z}/{x}/{y}.png?v=' + providerVersion, {
-                  minZoom: -14, maxZoom: 18, maxNativeZoom: 0, tileSize: 256,
+                  minZoom: -6, maxZoom: 18, maxNativeZoom: 0, tileSize: 256,
                   opacity: 0.85, zIndex: 0,
                   attribution: 'Wayfarer Tiles'
                 }).addTo(map);

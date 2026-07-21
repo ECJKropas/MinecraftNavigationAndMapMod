@@ -87,7 +87,8 @@ public class XaeroProvider implements MapProvider {
     @Override
     public boolean isAvailable() {
         probeReflection();
-        return xaeroAvailable && findMapProcessor() != null;
+        boolean available = xaeroAvailable && findMapProcessor() != null;
+        return available;
     }
 
     @Override
@@ -327,16 +328,35 @@ public class XaeroProvider implements MapProvider {
                         if (!fileName.endsWith(".xwmc"))
                             return;
                         Path levelPath = path.getParent();
-                        if (levelPath == null || !levelPath.getFileName().toString().startsWith("cache"))
+                        if (levelPath == null)
                             return;
-                        try {
-                            int level = Integer.parseInt(levelPath.getFileName().toString().substring(5));
-                            Matcher matcher = REGION_FILE.matcher(fileName.substring(0, fileName.length() - 5));
-                            if (matcher.matches()) {
-                                caches.add(new long[] {Integer.parseInt(matcher.group(1)),
-                                    Integer.parseInt(matcher.group(2)), level});
+                        String levelDirName = levelPath.getFileName().toString();
+                        int level = -1;
+                        if (levelDirName.startsWith("cache")) {
+                            // cache_N format: "cache_1" → level 1, "cache_3" → level 3
+                            String suffix = levelDirName.substring(5); // "_1" or "3" or ""
+                            try {
+                                level = suffix.isEmpty() ? 1 : Integer.parseInt(suffix.replace("_", ""));
+                            } catch (NumberFormatException ignored) {
                             }
-                        } catch (NumberFormatException ignored) {
+                        }
+                        // Walk one level deeper: cache/{level}/{x}_{y}.xwmc
+                        if (level <= 0 && levelPath.getParent() != null) {
+                            String grandDirName = levelPath.getParent().getFileName().toString();
+                            if (grandDirName.equals("cache") || grandDirName.startsWith("cache_")) {
+                                try {
+                                    level = Integer.parseInt(levelDirName);
+                                } catch (NumberFormatException ignored) {
+                                }
+                            }
+                        }
+                        if (level <= 0)
+                            return;
+                        String regionName = fileName.substring(0, fileName.length() - 5);
+                        Matcher matcher = REGION_FILE.matcher(regionName);
+                        if (matcher.matches()) {
+                            caches.add(new long[] {Integer.parseInt(matcher.group(1)),
+                                Integer.parseInt(matcher.group(2)), level});
                         }
                     });
                 } catch (Exception e) {
@@ -415,6 +435,7 @@ public class XaeroProvider implements MapProvider {
         if (reflectionProbed)
             return;
         reflectionProbed = true;
+        LOGGER.info("XaeroProvider: starting reflection probe...");
 
         try {
             Class<?> mapTileClass = Class.forName("xaero.map.region.MapTile");
@@ -457,6 +478,7 @@ public class XaeroProvider implements MapProvider {
             LOGGER.info("XaeroProvider: MapProcessor.getMapTile probe succeeded");
         } catch (ReflectiveOperationException e) {
             xaeroAvailable = false;
+            LOGGER.log(Level.WARNING, "XaeroProvider reflection probe failed", e);
         }
     }
 
