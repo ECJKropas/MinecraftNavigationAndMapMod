@@ -86,8 +86,16 @@ public class SelfBuiltProvider implements MapProvider {
         long key = tileKey(tileX, tileY);
         SoftReference<int[]> ref = tileCache.get(key);
         int[] pixels = ref != null ? ref.get() : null;
-        if (pixels == null)
+        if (pixels == null) {
+            Path p = cachePath(dimension, zoom, tileX, tileY);
+            if (Files.exists(p)) {
+                try {
+                    return ImageIO.read(p.toFile());
+                } catch (IOException ignored) {
+                }
+            }
             return null;
+        }
         BufferedImage img = new BufferedImage(TILE_SIZE, TILE_SIZE, BufferedImage.TYPE_INT_ARGB);
         img.setRGB(0, 0, TILE_SIZE, TILE_SIZE, pixels, 0, TILE_SIZE);
         return img;
@@ -96,8 +104,10 @@ public class SelfBuiltProvider implements MapProvider {
     @Override
     public void requestTileRender(int dimension, int tileX, int tileY) {
         long key = tileKey(tileX, tileY);
-        if (tileCache.containsKey(key))
-            return;
+        SoftReference<int[]> ref = tileCache.get(key);
+        if (ref != null && ref.get() != null) {
+            return; // 确实有像素，跳过
+        }
         dirtyTileSet.add(key);
         scheduleDirtyProcessing();
     }
