@@ -75,6 +75,7 @@ public class XaeroProvider implements MapProvider {
     private Method mapProcessorGetWorldBlockRegistryMethod;
     private Method worldMapSessionGetCurrentSessionMethod;
     private Method worldMapSessionGetMapProcessorMethod;
+    private static Class<?> worldMapSessionClass;
     private Field mapProcessorWorldFluidRegistryField;
     private Field mapProcessorBiomeGetterField;
     private Object mapProcessor;
@@ -444,9 +445,10 @@ public class XaeroProvider implements MapProvider {
                 Class.forName("xaero.map.region.texture.RegionTexture").getMethod("getDirectColorBuffer");
             mapProcessorGetWorldBlockLookupMethod = mapProcessorClass.getMethod("getWorldBlockLookup");
             mapProcessorGetWorldBlockRegistryMethod = mapProcessorClass.getMethod("getWorldBlockRegistry");
-            Class<?> worldMapSessionClass = Class.forName("xaero.map.WorldMapSession");
-            worldMapSessionGetCurrentSessionMethod = worldMapSessionClass.getMethod("getCurrentSession");
-            worldMapSessionGetMapProcessorMethod = worldMapSessionClass.getMethod("getMapProcessor");
+            Class<?> worldMapSessionClassLocal = Class.forName("xaero.map.WorldMapSession");
+            worldMapSessionClass = worldMapSessionClassLocal;
+            worldMapSessionGetCurrentSessionMethod = worldMapSessionClassLocal.getMethod("getCurrentSession");
+            worldMapSessionGetMapProcessorMethod = worldMapSessionClassLocal.getMethod("getMapProcessor");
             mapProcessorWorldFluidRegistryField = mapProcessorClass.getDeclaredField("worldFluidRegistry");
             mapProcessorWorldFluidRegistryField.setAccessible(true);
             mapProcessorBiomeGetterField = mapProcessorClass.getDeclaredField("biomeGetter");
@@ -471,6 +473,18 @@ public class XaeroProvider implements MapProvider {
                 if (mapProcessor != null) {
                     startFullRegionScan(mapProcessor);
                     return mapProcessor;
+                }
+                // 26.x: session exists but MapProcessor not yet created (lazy init);
+                // try to access the private field directly as fallback
+                try {
+                    Field mpField = worldMapSessionClass.getDeclaredField("mapProcessor");
+                    mpField.setAccessible(true);
+                    mapProcessor = mpField.get(session);
+                    if (mapProcessor != null && mapProcessorClass.isInstance(mapProcessor)) {
+                        startFullRegionScan(mapProcessor);
+                        return mapProcessor;
+                    }
+                } catch (NoSuchFieldException ignored) {
                 }
             }
 
