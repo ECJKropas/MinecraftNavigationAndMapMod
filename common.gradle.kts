@@ -120,7 +120,18 @@ val javaCompatibility =
         else -> JavaVersion.VERSION_1_8
     }
 
-val commonVmArgs = listOf("--sun-misc-unsafe-memory-access=allow", "-Dmixin.debug.export=true")
+val jdkVersion =
+    System.getProperty("java.version").let { v ->
+        v.substringBefore(".").substringBefore("+").toIntOrNull() ?: 21
+    }
+val commonVmArgs =
+    buildList<String> {
+        if (jdkVersion >= 23) {
+            add("--sun-misc-unsafe-memory-access=allow")
+        }
+        add("-Dmixin.debug.export=true")
+    }
+val commonClientArgs = listOf("--server", "localhost", "--port", "25565")
 loomExtension.runConfigs.configureEach {
     runDirectory.set(
         file(
@@ -128,6 +139,9 @@ loomExtension.runConfigs.configureEach {
         ),
     )
     jvmArguments.addAll(commonVmArgs)
+    if (name == "client") {
+        programArguments.addAll(commonClientArgs)
+    }
 }
 loomExtension.runs {
     val auditVmArgs = "-DmixinAuditor.audit=true"
