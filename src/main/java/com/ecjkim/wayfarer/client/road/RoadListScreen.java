@@ -16,586 +16,683 @@
  */
 package com.ecjkim.wayfarer.client.road;
 
-import java.awt.Desktop;
-import java.net.URI;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.UUID;
 import java.util.function.Consumer;
-import java.util.stream.Collectors;
 
-import net.minecraft.ChatFormatting;
-import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphics;
+import net.minecraft.client.gui.components.Button;
 import net.minecraft.client.gui.components.EditBox;
-import net.minecraft.client.gui.components.ObjectSelectionList;
 import net.minecraft.client.gui.screens.Screen;
-import net.minecraft.network.chat.ClickEvent;
-import net.minecraft.network.chat.Component;
-import net.minecraft.network.chat.HoverEvent;
-import net.minecraft.network.chat.Style;
-
-import com.ecjkim.wayfarer.client.road.model.RoadPath;
-
 import net.minecraft.client.resources.language.I18n;
+import net.minecraft.network.chat.Component;
 
+import com.ecjkim.wayfarer.client.road.data.RoadNetworkDatabase;
+import com.ecjkim.wayfarer.client.road.model.CornerType;
+import com.ecjkim.wayfarer.client.road.model.Node;
+import com.ecjkim.wayfarer.client.road.model.Road;
+import com.ecjkim.wayfarer.client.road.model.Segment;
+import com.ecjkim.wayfarer.client.road.model.Status;
+
+import org.lwjgl.glfw.GLFW;
+
+/**
+ * Three-column layout: Left (Roads) -> Middle (Segments) -> Right (Nodes).
+ *
+ * <pre>
+ * +------------------+----------------------------+---------------------------+
+ * |  1. Roads        |  2. Segments               |  3. Nodes                 |
+ * +------------------+----------------------------+---------------------------+
+ * | [Search]         |  Seg-01 (5 nodes) [USER]   |  N-01 (0,64,0) [SHARP]    |
+ * | Unfiled (3)      |  Seg-02 (3 nodes) [AUTO]   |  N-02 (10,64,5) [AUTO]    |
+ * | [G01] Highway A  |  Seg-03 (7 nodes) [USER]   |  N-03 (20,64,10) [ROUND]  |
+ * +------------------+----------------------------+---------------------------+
+ * | Status: Nodes X / Segments Y / Roads Z                                 |
+ * +------------------------------------------------------------------------+
+ * </pre>
+ */
 public class RoadListScreen extends Screen {
-    private static final int MARGIN = 16;
-    private static final int HEADER_TOP = 14;
-    private static final int PANEL_TOP = 56;
-    private static final int PANEL_BOTTOM = 40;
-    private static final int LEFT_PANEL_WIDTH = 304;
-    private static final int LIST_ROW_HEIGHT = 24; // 调整行高使间距更紧凑美观
 
-    private final RoadDataStore roadDataStore;
-    private final RoadPreviewServer previewServer;
-    private final Consumer<RoadPath> onContinueRecording;
-    private RoadEntryList roadList;
-    private RoadPath selectedRoad;
-    private Component statusText = Component.literal("");
-    private EditBox searchBox;
-    private String searchText = "";
-    private String renamingRoadId = null;
-    private EditBox renameBox;
-    private int detailButtonStartX, detailButtonStartY, detailButtonStartW;
-    private int detailButtonEndX, detailButtonEndY, detailButtonEndW;
-    private boolean detailButtonStartHovered, detailButtonEndHovered;
-
-    public RoadListScreen(RoadDataStore roadDataStore, RoadPreviewServer previewServer,
-        Consumer<RoadPath> onContinueRecording) {
-        super(Component.literal("路线列表"));
-        this.roadDataStore = roadDataStore;
-        this.previewServer = previewServer;
-        this.onContinueRecording = onContinueRecording;
+    public enum Mode {
+        LIST, SELECT
     }
+
+    private static final int SEARCH_H = 20;
+    private static final int HEADER_H = 16;
+    private static final int ITEM_H = 14;
+    private static final int BTN_H = 20;
+    private static final int STATUS_H = 12;
+    private static final int GAP = 4;
+
+    private final Mode mode;
+    private final Consumer<Road> onRoadSelected;
+    private final Runnable onCancel;
+    private final RoadNetworkDatabase db = RoadNetworkDatabase.getInstance();
+
+    // Layout
+    private int colLeftW, colMidW, colRightW;
+    private int colLeftX, colMidX, colRightX;
+    private int panelTop, panelBottom;
+
+    // Scroll
+    private int scrollLeft, scrollMid, scrollRight;
+
+    // Selection
+    private Road selectedRoad;
+    private Segment selectedSegment;
+    private Node selectedNode;
+
+    // Drag mode
+    private boolean dragMode;
+
+    // Search
+    private EditBox searchBox;
+    private String searchFilter = "";
+
+    // Cache
+    private final List<Road> filteredRoads = new ArrayList<>();
+    private final List<Segment> allUnfiled = new ArrayList<>();
+
+    // Buttons (set to null outside LIST mode)
+    private Button newRoadBtn;
+    private Button delRoadBtn;
+    private Button editSegBtn;
+    private Button delSegBtn;
+    private Button delNodeBtn;
+
+    // ----- Constructors -----
+
+    public RoadListScreen() {
+        this(null, null);
+    }
+
+    public RoadListScreen(Consumer<Road> onRoadSelected, Runnable onCancel) {
+        super(Component.literal(I18n.get("wayfarer.road.gui.title")));
+        this.mode = (onRoadSelected != null) ? Mode.SELECT : Mode.LIST;
+        this.onRoadSelected = onRoadSelected;
+        this.onCancel = onCancel;
+    }
+
+    // ----- Init -----
 
     @Override
     protected void init() {
-        int panelBottomY = this.height - PANEL_BOTTOM;
-        // 关键点1：精确计算List的顶部位置，防止文字和搜索框被列表项遮挡
-        int listTop = PANEL_TOP + 42;
-        int listHeight = panelBottomY - 6 - listTop;
+        computeLayout();
 
-        // 关键点2：将列表宽度完全贴合左侧面板内部
-        this.roadList = new RoadEntryList(this.minecraft, LEFT_PANEL_WIDTH - 12, listHeight, listTop, panelBottomY - 6,
-            LIST_ROW_HEIGHT);
-        this.roadList.setLeftPos(MARGIN + 6); // 居中居左对齐
-        this.roadList.setRenderBackground(false);
-        this.roadList.setRenderTopAndBottom(false);
-        this.addRenderableWidget(this.roadList);
+        searchBox = new EditBox(this.font, colLeftX + 2, 10, colLeftW - 4, SEARCH_H, Component.literal("Search"));
+        searchBox.setMaxLength(64);
+        searchBox.setResponder(t -> {
+            searchFilter = t.toLowerCase().trim();
+            scrollLeft = 0;
+            selectedRoad = null;
+            selectedSegment = null;
+            selectedNode = null;
+        });
+        addRenderableWidget(searchBox);
+        setInitialFocus(searchBox);
 
-        this.searchBox = new EditBox(this.font, MARGIN + 12, PANEL_TOP + 18, LEFT_PANEL_WIDTH - 24, 20,
-            Component.literal(I18n.get("wayfarer.road.gui.search_placeholder")));
-        this.searchBox.setMaxLength(64);
-        this.searchBox.setResponder(this::onSearchTextChanged);
-        this.addRenderableWidget(this.searchBox);
+        panelTop = 10 + SEARCH_H + GAP;
+        panelBottom = this.height - STATUS_H - (mode == Mode.LIST ? BTN_H + 4 : 2);
 
-        reloadEntries();
+        if (mode == Mode.LIST) {
+            int halfW = (colLeftW - 8) / 2;
+            newRoadBtn = Button.builder(Component.literal(I18n.get("wayfarer.road.gui.new_road")), b -> createNewRoad())
+                .bounds(colLeftX + 4, this.height - STATUS_H - BTN_H - 2, halfW, BTN_H).build();
+            addRenderableWidget(newRoadBtn);
+            delRoadBtn = Button.builder(Component.literal("Delete Road"), b -> deleteSelectedRoad())
+                .bounds(colLeftX + 8 + halfW, this.height - STATUS_H - BTN_H - 2, halfW, BTN_H).build();
+            addRenderableWidget(delRoadBtn);
+
+            editSegBtn = Button.builder(Component.literal("Edit"), b -> {
+            }).bounds(colMidX + 4, this.height - STATUS_H - BTN_H - 2, 45, BTN_H).build();
+            addRenderableWidget(editSegBtn);
+            delSegBtn = Button.builder(Component.literal("Delete"), b -> deleteSelectedSegment())
+                .bounds(colMidX + 53, this.height - STATUS_H - BTN_H - 2, 45, BTN_H).build();
+            addRenderableWidget(delSegBtn);
+
+            delNodeBtn = Button.builder(Component.literal("Delete"), b -> deleteSelectedNode())
+                .bounds(colRightX + 4, this.height - STATUS_H - BTN_H - 2, 45, BTN_H).build();
+            addRenderableWidget(delNodeBtn);
+        }
+
+        if (mode == Mode.SELECT) {
+            addRenderableWidget(
+                Button.builder(Component.literal(I18n.get("wayfarer.road.gui.metadata.button_cancel")), b -> {
+                    if (onCancel != null)
+                        onCancel.run();
+                    this.minecraft.setScreen(null);
+                }).bounds(colRightX + colRightW - 60, 8, 60, BTN_H).build());
+        }
     }
 
-    @Override
-    public void renderBackground(GuiGraphics graphics) {
-        // no-op
+    private void computeLayout() {
+        colLeftW = Math.max(130, (int)(this.width * 0.28));
+        colMidW = Math.max(150, (int)(this.width * 0.33));
+        colRightW = this.width - GAP * 3 - colLeftW - colMidW;
+        if (colRightW < 120) {
+            colRightW = 120;
+            colMidW = Math.max(120, this.width - GAP * 3 - colLeftW - colRightW);
+        }
+        colLeftX = GAP;
+        colMidX = colLeftX + colLeftW + GAP;
+        colRightX = colMidX + colMidW + GAP;
     }
 
+    // ----- Render -----
+
     @Override
-    public void renderDirtBackground(GuiGraphics graphics) {
-        // no-op
+    public void render(GuiGraphics g, int mouseX, int mouseY, float partialTick) {
+        renderBackground(g);
+        refreshCache();
+        updateButtonStates();
+        renderLeftColumn(g, mouseX, mouseY);
+        renderMidColumn(g, mouseX, mouseY);
+        renderRightColumn(g, mouseX, mouseY);
+        renderStatusBar(g);
+
+        if (mode == Mode.SELECT) {
+            g.drawCenteredString(this.font, Component.literal(I18n.get("wayfarer.road.gui.select_mode_title")),
+                (colMidX + colRightX + colRightW) / 2, 10, 0xFFFFCC00);
+        }
+
+        if (dragMode && selectedSegment != null) {
+            g.drawString(this.font, ">>> " + segShortLabel(selectedSegment), mouseX + 12, mouseY + 4, 0x88FFFF88,
+                false);
+        }
+
+        super.render(g, mouseX, mouseY, partialTick);
     }
 
-    @Override
-    public void render(GuiGraphics graphics, int mouseX, int mouseY, float partialTick) {
-        // 1. 绘制全屏半透明底色
-        graphics.fill(0, 0, this.width, this.height, 0xCC000000);
+    // ---- Left column ----
 
-        int panelBottomY = this.height - PANEL_BOTTOM;
-        int leftPanelX = MARGIN;
-        int leftPanelRight = leftPanelX + LEFT_PANEL_WIDTH;
-        int rightPanelX = leftPanelRight + 12;
-        int rightPanelRight = this.width - MARGIN;
+    private void renderLeftColumn(GuiGraphics g, int mx, int my) {
+        int x = colLeftX, xr = x + colLeftW, y = panelTop;
+        g.fill(x, y - 1, xr, y, 0xFF4E5768);
 
-        // 2. 绘制自定义的面板容器背景
-        drawPanel(graphics, leftPanelX, PANEL_TOP, leftPanelRight, panelBottomY, 0xCC1B1F28);
-        drawPanel(graphics, rightPanelX, PANEL_TOP, rightPanelRight, panelBottomY, 0xCC171B22);
+        int total = allUnfiled.isEmpty() ? filteredRoads.size() : 1 + filteredRoads.size();
+        int maxVis = (panelBottom - y) / ITEM_H;
+        clampScrollLeft(total, maxVis);
+        int idx = -scrollLeft, py = y;
 
-        // 3. 核心修复：先调用超级渲染来渲染列表（带有裁剪区），确保文字和页眉最后绘制，从而解决覆盖重叠问题
-        super.render(graphics, mouseX, mouseY, partialTick);
+        if (!allUnfiled.isEmpty()) {
+            idx++;
+            if (idx >= 0 && py + ITEM_H <= panelBottom) {
+                boolean sel = selectedRoad == null && selectedSegment != null && allUnfiled.contains(selectedSegment);
+                boolean hov = hit(mx, my, x, py, colLeftW, ITEM_H);
+                drawItem(g, x, py, colLeftW, ITEM_H, I18n.get("wayfarer.road.gui.unfiled_segments"),
+                    String.valueOf(allUnfiled.size()), 0xFFAA88FF, sel, hov);
+            }
+            py += ITEM_H;
+        }
 
-        // 4. 绘制所有文本（位于最上层，绝不会被滚动的列表条目遮挡）
-        graphics.drawString(this.font, this.title, MARGIN, HEADER_TOP, 16777215, false);
-        graphics.drawString(this.font,
-            Component.literal(
-                String.format(I18n.get("wayfarer.road.gui.context_label"), roadDataStore.getContextLabel())),
-            MARGIN, HEADER_TOP + 12, 11184810, false);
-        graphics.drawString(this.font, statusText, MARGIN, HEADER_TOP + 24, 8947848, false);
+        for (Road road : filteredRoads) {
+            idx++;
+            if (idx < 0)
+                continue;
+            if (py + ITEM_H > panelBottom)
+                break;
+            boolean sel = selectedRoad != null && selectedRoad.getId().equals(road.getId());
+            boolean hov = hit(mx, my, x, py, colLeftW, ITEM_H);
+            int n = road.getSegmentIds() != null ? road.getSegmentIds().size() : 0;
+            drawItem(g, x, py, colLeftW, ITEM_H, roadLabel(road), String.valueOf(n),
+                classificationColor(road.getClassification()), sel, hov);
+            py += ITEM_H;
+        }
 
-        // 面板头部小标题（调高了位置，使其不会和列表内容冲突）
-        graphics.drawString(this.font, Component.literal(I18n.get("wayfarer.road.gui.title")), leftPanelX + 12,
-            PANEL_TOP + 6, 16777215, false);
-        graphics.drawString(this.font, Component.literal(I18n.get("wayfarer.road.gui.detail_header")),
-            rightPanelX + 12, PANEL_TOP + 6, 16777215, false);
+        if (total > maxVis) {
+            String si = (scrollLeft + 1) + "-" + Math.min(scrollLeft + maxVis, total) + "/" + total;
+            g.drawString(this.font, si, x + 4, panelBottom - 10, 0xFF666666, false);
+        }
+    }
 
-        List<RoadPath> roads = roadDataStore.getRoads();
-        graphics.drawString(this.font,
-            Component.literal(String.format(I18n.get("wayfarer.road.gui.road_count"), roads.size())),
-            leftPanelX + 120, PANEL_TOP + 6, 11184810, false);
+    // ---- Middle column ----
 
-        graphics.drawString(this.font,
-            Component
-                .literal(String.format(I18n.get("wayfarer.road.gui.data_file"), roadDataStore.getDataFile())),
-            MARGIN, panelBottomY + 4, 8947848, false);
-        graphics.drawString(this.font,
-            Component.literal(String.format(I18n.get("wayfarer.road.gui.preview_url"), previewServer.getUrl())),
-            MARGIN, panelBottomY + 16, 8947848, false);
+    private void renderMidColumn(GuiGraphics g, int mx, int my) {
+        int x = colMidX, xr = x + colMidW, y = panelTop;
+        g.fill(x, y - 1, xr, y, 0xFF4E5768);
 
-        // 重命名模式下更新 EditBox 位置
-        if (renameBox != null && renamingRoadId != null && roadList != null) {
-            RoadEntry entry = roadList.findEntryById(renamingRoadId);
-            if (entry != null) {
-                int entryY = roadList.getEntryTop(entry);
-                int listLeft = roadList.getRowLeft();
-                int listWidth = roadList.getRowWidth();
-                int iconWidth = 56;
-                renameBox.setX(listLeft);
-                renameBox.setWidth(listWidth - iconWidth - 2);
-                renameBox.setY(entryY + (LIST_ROW_HEIGHT - 20) / 2);
+        List<Segment> segs = currentSegments();
+        int headerH = 0, py = y;
+        if (selectedRoad != null) {
+            g.drawString(this.font, "> " + selectedRoad.getName(), x + 4, y, 0xFFCCCCFF, false);
+            headerH = HEADER_H;
+            py += headerH;
+        } else if (!allUnfiled.isEmpty() && selectedRoad == null && selectedSegment != null) {
+            g.drawString(this.font, "> " + I18n.get("wayfarer.road.gui.unfiled_segments"), x + 4, y, 0xFFCCCCFF, false);
+            headerH = HEADER_H;
+            py += headerH;
+        }
+
+        int maxVis = (panelBottom - py) / ITEM_H;
+        int total = segs.size();
+        if (scrollMid > total - maxVis)
+            scrollMid = Math.max(0, total - maxVis);
+        if (scrollMid < 0)
+            scrollMid = 0;
+
+        int idx = -scrollMid;
+        for (Segment seg : segs) {
+            idx++;
+            if (idx < 0)
+                continue;
+            if (py + ITEM_H > panelBottom)
+                break;
+            boolean sel = selectedSegment != null && selectedSegment.getId().equals(seg.getId());
+            boolean hov = hit(mx, my, x, py, colMidW, ITEM_H);
+            int n = seg.getNodeIds() != null ? seg.getNodeIds().size() : 0;
+            String src = seg.getSource() != null ? seg.getSource().name() : "";
+            String st = seg.getStatus() != null ? " " + seg.getStatus().name() : "";
+            String label = "Seg-" + (segs.indexOf(seg) + 1) + " (" + n + "n)" + st + " [" + src + "]";
+            drawItem(g, x, py, colMidW, ITEM_H, label, null, sel ? 0xFF88FF88 : (hov ? 0xFFCCCCCC : 0xFFAAAAAA), sel,
+                hov);
+            py += ITEM_H;
+        }
+
+        if (segs.isEmpty() && selectedRoad != null) {
+            g.drawString(this.font, "(empty)", x + 8, py, 0xFF666666, false);
+        }
+    }
+
+    // ---- Right column ----
+
+    private void renderRightColumn(GuiGraphics g, int mx, int my) {
+        int x = colRightX, xr = x + colRightW, y = panelTop;
+        g.fill(x, y - 1, xr, y, 0xFF4E5768);
+
+        List<Node> nodes = currentNodes();
+        int headerH = 0, py = y;
+        if (selectedSegment != null) {
+            int n = nodes.size();
+            g.drawString(this.font, "Seg-" + (currentSegments().indexOf(selectedSegment) + 1) + " (" + n + " nodes)",
+                x + 4, y, 0xFFCCCCFF, false);
+            headerH = HEADER_H;
+            py += headerH;
+        }
+
+        int maxVis = (panelBottom - py) / ITEM_H;
+        int total = nodes.size();
+        if (scrollRight > total - maxVis)
+            scrollRight = Math.max(0, total - maxVis);
+        if (scrollRight < 0)
+            scrollRight = 0;
+
+        for (int i = 0; i < nodes.size(); i++) {
+            int di = i - scrollRight;
+            if (di < 0)
+                continue;
+            if (py + ITEM_H > panelBottom)
+                break;
+            Node node = nodes.get(i);
+            boolean sel = selectedNode != null && selectedNode.getId().equals(node.getId());
+            boolean hov = hit(mx, my, x, py, colRightW, ITEM_H);
+            String ct = node.getCornerType() != null ? node.getCornerType().name() : "?";
+            String label = "N-" + (i + 1) + " (" + fmt(node.getX()) + "," + fmt(node.getY()) + "," + fmt(node.getZ())
+                + ") [" + ct + "]";
+            drawItem(g, x, py, colRightW, ITEM_H, label, null, sel ? 0xFF88FFFF : (hov ? 0xFFDDDDDD : 0xFFFFFFFF), sel,
+                hov);
+            py += ITEM_H;
+        }
+    }
+
+    // ---- Status bar ----
+
+    private void renderStatusBar(GuiGraphics g) {
+        int sy = this.height - STATUS_H;
+        g.fill(0, sy - 1, this.width, sy, 0xFF4E5768);
+        int tn = 0, ts = 0, tr = 0;
+        for (Road r : db.getRoads()) {
+            tr++;
+            List<Segment> segs = db.getSegmentsForRoad(r.getId());
+            ts += segs.size();
+            for (Segment s : segs) {
+                if (s.getNodeIds() != null)
+                    tn += s.getNodeIds().size();
             }
         }
+        String text = "Nodes " + tn + " / Segments " + ts + " / Roads " + tr;
+        g.drawCenteredString(this.font, text, this.width / 2, sy + 1, 0xFF888888);
+    }
 
-        if (selectedRoad == null) {
-            graphics.drawString(this.font, Component.literal(I18n.get("wayfarer.road.gui.no_selection")),
-                rightPanelX + 12, PANEL_TOP + 24, 11184810, false);
-            return;
-        }
+    // ----- Mouse -----
 
-        List<Component> lines = buildDetailLines(selectedRoad);
-        int textX = rightPanelX + 12;
-        int textY = PANEL_TOP + 24;
-        int maxWidth = rightPanelRight - textX - 12;
-        for (int i = 0; i < lines.size(); i++) {
-            Component line = lines.get(i);
-            if (this.font.width(line) > maxWidth) {
-                String truncated = this.font.plainSubstrByWidth(line.getString(), maxWidth - this.font.width("..."));
-                line = Component.literal(truncated + "...");
+    @Override
+    public boolean mouseClicked(double mx, double my, int button) {
+        if (dragMode && button == 0) {
+            dragMode = false;
+            Road target = roadAtPos((int)mx, (int)my);
+            if (target != null && selectedSegment != null) {
+                moveSegmentToRoad(selectedSegment, target);
             }
-            graphics.drawString(this.font, line, textX, textY + i * 13, 11184810, false);
+            return true;
         }
 
-        detailButtonStartX = detailButtonStartY = detailButtonStartW = 0;
-        detailButtonEndX = detailButtonEndY = detailButtonEndW = 0;
-        if (!selectedRoad.points.isEmpty()) {
-            var first = selectedRoad.points.get(0);
-            var last = selectedRoad.points.get(selectedRoad.points.size() - 1);
-            int lineCount = lines.size();
-            int btnY = textY + (lineCount + 1) * 13;
+        int ix = (int)mx, iy = (int)my;
+        if (iy < panelTop || iy > panelBottom)
+            return super.mouseClicked(mx, my, button);
 
-            String startLabel = "◎ " + directionTo((float)(first.x - last.x), (float)(first.z - last.z));
-            String endLabel = "◎ " + directionTo((float)(last.x - first.x), (float)(last.z - first.z));
-
-            detailButtonStartX = textX;
-            detailButtonStartY = btnY;
-            detailButtonStartW = this.font.width(startLabel);
-            detailButtonEndX = textX;
-            detailButtonEndY = btnY + 13;
-            detailButtonEndW = this.font.width(endLabel);
-
-            detailButtonStartHovered = mouseX >= detailButtonStartX && mouseX <= detailButtonStartX + detailButtonStartW
-                && mouseY >= detailButtonStartY && mouseY <= detailButtonStartY + this.font.lineHeight;
-            detailButtonEndHovered = mouseX >= detailButtonEndX && mouseX <= detailButtonEndX + detailButtonEndW
-                && mouseY >= detailButtonEndY && mouseY <= detailButtonEndY + this.font.lineHeight;
-
-            int startColor = detailButtonStartHovered ? 0xFF55FFFF : 0xFF6699CC;
-            int endColor = detailButtonEndHovered ? 0xFF55FFFF : 0xFFCC9966;
-
-            graphics.drawString(this.font, Component.literal(startLabel), textX, btnY, startColor, false);
-            graphics.drawString(this.font, Component.literal(endLabel), textX, btnY + 13, endColor, false);
+        if (button == 0) {
+            if (ix >= colLeftX && ix <= colLeftX + colLeftW) {
+                clickLeft(ix, iy);
+                return true;
+            }
+            if (ix >= colMidX && ix <= colMidX + colMidW) {
+                clickMid(ix, iy);
+                return true;
+            }
+            if (ix >= colRightX && ix <= colRightX + colRightW) {
+                clickRight(ix, iy);
+                return true;
+            }
         }
-    }
-
-    private void drawPanel(GuiGraphics graphics, int left, int top, int right, int bottom, int fillColor) {
-        graphics.fill(left, top, right, bottom, fillColor);
-        graphics.fill(left, top, right, top + 1, 0xFF4E5768);
-        graphics.fill(left, bottom - 1, right, bottom, 0xFF1A1F27);
-        graphics.fill(left, top, left + 1, bottom, 0xFF1A1F27);
-        graphics.fill(right - 1, top, right, bottom, 0xFF1A1F27);
-    }
-
-    private List<Component> buildDetailLines(RoadPath road) {
-        List<Component> lines = new ArrayList<>();
-        lines.add(Component.literal(String.format(I18n.get("wayfarer.road.gui.detail.name"), safe(road.name))));
-        if (road.classification != null && !road.classification.isEmpty()
-            || road.number != null && !road.number.isEmpty()) {
-            String cls = road.classification != null && !road.classification.isEmpty()
-                ? road.classification.substring(0, 1) : "";
-            String cn = cls + (road.number != null ? road.number : "");
-            lines.add(Component.literal(String.format(I18n.get("wayfarer.road.gui.detail.number"),
-                cn.isEmpty() ? I18n.get("wayfarer.road.gui.detail.number_none") : cn)));
+        if (button == 1 && ix >= colMidX && ix <= colMidX + colMidW) {
+            rightClickMid(ix, iy);
+            return true;
         }
-        lines.add(Component
-            .literal(String.format(I18n.get("wayfarer.road.gui.detail.width"), String.valueOf(road.width))));
-        lines.add(
-            Component.literal(String.format(I18n.get("wayfarer.road.gui.detail.points"), road.points.size())));
-        lines.add(Component.literal(
-            String.format(I18n.get("wayfarer.road.gui.detail.intersections"), road.intersections.size())));
-        for (var inter : road.intersections) {
-            lines.add(Component.literal("  └ " + safe(inter.roadName)));
-        }
-        lines.add(Component.literal(String.format(I18n.get("wayfarer.road.gui.detail.id"), safe(road.id))));
-        return lines;
-    }
-
-    private void reloadEntries() {
-        roadDataStore.syncToCurrentContext();
-        roadDataStore.reloadFromDisk();
-        reloadFilteredEntries();
-    }
-
-    private void onSearchTextChanged(String text) {
-        this.searchText = text.trim().toLowerCase();
-        reloadFilteredEntries();
-    }
-
-    private void reloadFilteredEntries() {
-        List<RoadPath> roads = roadDataStore.getRoads();
-        if (!searchText.isEmpty()) {
-            roads = roads.stream().filter(road -> road.name != null && road.name.toLowerCase().contains(searchText))
-                .collect(Collectors.toList());
-        }
-
-        String selectedId = selectedRoad == null ? null : selectedRoad.id;
-        if (roadList != null) {
-            roadList.reload(roads);
-        }
-
-        selectedRoad = selectedId == null ? (roads.isEmpty() ? null : roads.get(0)) : roads.stream()
-            .filter(road -> selectedId.equals(road.id)).findFirst().orElse(roads.isEmpty() ? null : roads.get(0));
-        if (roadList != null) {
-            roadList.setSelected(selectedRoad == null ? null : roadList.findEntry(selectedRoad));
-        }
-        setStatus(roads.isEmpty() ? I18n.get("wayfarer.road.gui.empty_status")
-            : String.format(I18n.get("wayfarer.road.gui.road_count"), roads.size()));
+        return super.mouseClicked(mx, my, button);
     }
 
     @Override
-    public void tick() {
-        super.tick();
-        if (searchBox != null) {
-            searchBox.tick();
+    public boolean mouseScrolled(double mx, double my, double amount) {
+        int ix = (int)mx, da = (int)amount * 3;
+        if (ix >= colLeftX && ix <= colLeftX + colLeftW) {
+            scrollLeft = clamp0(scrollLeft - da);
+            return true;
         }
-    }
-
-    @Override
-    public boolean charTyped(char codePoint, int modifiers) {
-        if (renameBox != null && renameBox.isFocused()) {
-            return renameBox.charTyped(codePoint, modifiers);
+        if (ix >= colMidX && ix <= colMidX + colMidW) {
+            scrollMid = clamp0(scrollMid - da);
+            return true;
         }
-        if (searchBox != null && searchBox.isFocused()) {
-            return searchBox.charTyped(codePoint, modifiers);
+        if (ix >= colRightX && ix <= colRightX + colRightW) {
+            scrollRight = clamp0(scrollRight - da);
+            return true;
         }
-        return super.charTyped(codePoint, modifiers);
+        return super.mouseScrolled(mx, my, amount);
     }
 
     @Override
     public boolean keyPressed(int keyCode, int scanCode, int modifiers) {
-        if (renameBox != null && renameBox.isFocused()) {
-            if (keyCode == org.lwjgl.glfw.GLFW.GLFW_KEY_ENTER || keyCode == org.lwjgl.glfw.GLFW.GLFW_KEY_KP_ENTER) {
-                commitRename();
+        if (keyCode == GLFW.GLFW_KEY_ESCAPE) {
+            if (dragMode) {
+                dragMode = false;
                 return true;
             }
-            if (keyCode == org.lwjgl.glfw.GLFW.GLFW_KEY_ESCAPE) {
-                cancelRename();
-                return true;
-            }
-            return renameBox.keyPressed(keyCode, scanCode, modifiers);
-        }
-        if (searchBox != null && searchBox.isFocused()) {
-            return searchBox.keyPressed(keyCode, scanCode, modifiers);
+            if (mode == Mode.SELECT && onCancel != null)
+                onCancel.run();
+            this.minecraft.setScreen(null);
+            return true;
         }
         return super.keyPressed(keyCode, scanCode, modifiers);
     }
 
-    private void beginRename(RoadEntry entry) {
-        if (renameBox != null) {
-            this.removeWidget(renameBox);
-        }
-        this.renamingRoadId = entry.road.id;
-        this.renameBox = new EditBox(this.font, 0, 0, 200, 20, Component.empty());
-        this.renameBox.setValue(entry.road.name != null ? entry.road.name : "");
-        this.renameBox.setMaxLength(64);
-        this.renameBox.setFocused(true);
-        this.addRenderableWidget(this.renameBox);
-    }
+    // ---- Click handlers ----
 
-    private void commitRename() {
-        if (renamingRoadId == null || renameBox == null)
+    private void clickLeft(int mx, int my) {
+        int off = allUnfiled.isEmpty() ? 0 : 1;
+        int relY = my - panelTop + scrollLeft * ITEM_H;
+        int idx = relY / ITEM_H;
+
+        if (!allUnfiled.isEmpty() && idx == 0) {
+            selectedRoad = null;
+            selectedSegment = allUnfiled.get(0);
+            selectedNode = null;
+            scrollMid = 0;
+            scrollRight = 0;
             return;
-        String newName = renameBox.getValue().trim();
-        if (newName.isEmpty())
-            newName = "未命名道路";
-        RoadPath ref = selectedRoad != null && selectedRoad.id.equals(renamingRoadId) ? selectedRoad : null;
-        roadDataStore.updateRoad(renamingRoadId, newName, ref != null ? ref.width : 7.0D,
-            ref != null ? ref.classification : "", ref != null ? ref.number : "");
-        setStatus("已重命名: " + newName);
-        cancelRename();
-        reloadEntries();
-    }
-
-    private void cancelRename() {
-        if (renameBox != null) {
-            this.removeWidget(renameBox);
-            renameBox = null;
         }
-        renamingRoadId = null;
-    }
-
-    private void openPreviewInBrowser() {
-        try {
-            if (Desktop.isDesktopSupported()) {
-                Desktop.getDesktop().browse(URI.create(previewServer.getUrl()));
-                setStatus("已在浏览器打开预览");
-            } else {
-                setStatus("当前系统不支持自动打开浏览器，请手动访问 " + previewServer.getUrl());
-            }
-        } catch (Exception exception) {
-            setStatus("打开浏览器失败：请手动访问 " + previewServer.getUrl());
-        }
-    }
-
-    private void setStatus(String message) {
-        this.statusText = Component.literal(message);
-    }
-
-    private String safe(String input) {
-        return input == null || input.isBlank() ? "未命名" : input;
-    }
-
-    private void openEditScreen(RoadPath road) {
-        RoadMetadataScreen editScreen =
-            new RoadMetadataScreen(RoadMetadataScreen.Mode.EDIT, (name, width, classification, number) -> {
-                roadDataStore.updateRoad(road.id, name, width, classification, number);
-                reloadEntries();
-                setStatus(String.format(I18n.get("wayfarer.road.gui.status.modified"), name));
-            }, () -> {
-            }, road.name, String.valueOf(road.width), road.classification, road.number);
-        this.minecraft.setScreen(editScreen);
-    }
-
-    private void deleteSelectedRoad(RoadPath road) {
-        String roadName = road.name;
-        roadDataStore.deleteRoad(road.id);
-        setStatus("已删除: " + roadName);
-        reloadEntries();
-    }
-
-    @Override
-    public boolean mouseClicked(double mouseX, double mouseY, int button) {
-        if (button != 0 || selectedRoad == null || selectedRoad.points.isEmpty()) {
-            return super.mouseClicked(mouseX, mouseY, button);
-        }
-        if (mouseX >= detailButtonStartX && mouseX <= detailButtonStartX + detailButtonStartW
-            && mouseY >= detailButtonStartY && mouseY <= detailButtonStartY + this.font.lineHeight) {
-            var first = selectedRoad.points.get(0);
-            var last = selectedRoad.points.get(selectedRoad.points.size() - 1);
-            clickEndpoint(selectedRoad.name, directionTo((float)(first.x - last.x), (float)(first.z - last.z)),
-                (int)Math.floor(first.x), (int)Math.floor(first.z));
-            return true;
-        }
-        if (mouseX >= detailButtonEndX && mouseX <= detailButtonEndX + detailButtonEndW && mouseY >= detailButtonEndY
-            && mouseY <= detailButtonEndY + this.font.lineHeight) {
-            var last = selectedRoad.points.get(selectedRoad.points.size() - 1);
-            var first = selectedRoad.points.get(0);
-            clickEndpoint(selectedRoad.name, directionTo((float)(last.x - first.x), (float)(last.z - first.z)),
-                (int)Math.floor(last.x), (int)Math.floor(last.z));
-            return true;
-        }
-        return super.mouseClicked(mouseX, mouseY, button);
-    }
-
-    private static String directionTo(float dx, float dz) {
-        double angle = Math.toDegrees(Math.atan2(dz, dx));
-        if (angle < 0)
-            angle += 360;
-        if (angle <= 15 || angle >= 345)
-            return I18n.get("wayfarer.road.gui.direction.east");
-        if (angle >= 75 && angle <= 105)
-            return I18n.get("wayfarer.road.gui.direction.south");
-        if (angle >= 165 && angle <= 195)
-            return I18n.get("wayfarer.road.gui.direction.west");
-        if (angle >= 255 && angle <= 285)
-            return I18n.get("wayfarer.road.gui.direction.north");
-        if (angle > 15 && angle < 75)
-            return I18n.get("wayfarer.road.gui.direction.southeast");
-        if (angle > 105 && angle < 165)
-            return I18n.get("wayfarer.road.gui.direction.southwest");
-        if (angle > 195 && angle < 255)
-            return I18n.get("wayfarer.road.gui.direction.northwest");
-        if (angle > 285 && angle < 345)
-            return I18n.get("wayfarer.road.gui.direction.northeast");
-        return I18n.get("wayfarer.road.gui.direction.endpoint");
-    }
-
-    private void clickEndpoint(String roadName, String direction, int x, int z) {
-        if (minecraft.player == null)
-            return;
-        String coordStr = "[" + x + ", ~, " + z + "]";
-        Component coord = Component.literal(coordStr)
-            .withStyle(Style.EMPTY.withColor(ChatFormatting.GREEN)
-                .withClickEvent(new ClickEvent(ClickEvent.Action.SUGGEST_COMMAND, "/tp " + x + " ~ " + z))
-                .withHoverEvent(new HoverEvent(HoverEvent.Action.SHOW_TEXT,
-                    Component.literal(I18n.get("wayfarer.road.gui.endpoint_hover")))));
-        Component msg = Component
-            .literal(String.format(I18n.get("wayfarer.road.gui.endpoint_location"), safe(roadName), direction))
-            .append(coord);
-        minecraft.player.displayClientMessage(msg, false);
-        this.minecraft.setScreen(null);
-    }
-
-    // --- 内部列表组件类优化 ---
-    private final class RoadEntryList extends ObjectSelectionList<RoadEntry> {
-        RoadEntryList(Minecraft minecraft, int width, int height, int top, int bottom, int itemHeight) {
-            super(minecraft, width, height, top, bottom, itemHeight);
-        }
-
-        @Override
-        public int getRowWidth() {
-            return this.width - 6;
-        }
-
-        @Override
-        protected int getScrollbarPosition() {
-            return this.x0 + this.width - 6;
-        }
-
-        @Override
-        protected void renderSelection(GuiGraphics graphics, int top, int width, int height, int outerColor,
-            int innerColor) {
-            // no-op: handled in RoadEntry.render()
-        }
-
-        void reload(List<RoadPath> roads) {
-            super.clearEntries();
-            for (RoadPath road : roads) {
-                super.addEntry(new RoadEntry(road));
-            }
-        }
-
-        RoadEntry findEntry(RoadPath road) {
-            for (RoadEntry entry : this.children()) {
-                if (entry.road.id != null && entry.road.id.equals(road.id)) {
-                    return entry;
-                }
-            }
-            return null;
-        }
-
-        RoadEntry findEntryById(String roadId) {
-            for (RoadEntry entry : this.children()) {
-                if (entry.road.id != null && entry.road.id.equals(roadId)) {
-                    return entry;
-                }
-            }
-            return null;
-        }
-
-        int getEntryTop(RoadEntry entry) {
-            return this.getRowTop(this.children().indexOf(entry));
-        }
-    }
-
-    private final class RoadEntry extends ObjectSelectionList.Entry<RoadEntry> {
-        private final RoadPath road;
-        private static final int ICON_GAP = 18;
-        private static final int ICON_RIGHT_MARGIN = 8;
-
-        private RoadEntry(RoadPath road) {
-            this.road = road;
-        }
-
-        @Override
-        public Component getNarration() {
-            return Component.literal(safe(road.name));
-        }
-
-        @Override
-        public void render(GuiGraphics graphics, int index, int top, int left, int width, int height, int mouseX,
-            int mouseY, boolean hovered, float partialTick) {
-            boolean isRenaming = road.id != null && road.id.equals(renamingRoadId);
-            boolean selected = selectedRoad != null && selectedRoad.id != null && selectedRoad.id.equals(road.id);
-            int background;
-            if (selected) {
-                background = 0xFF3A4560;
-            } else if (hovered) {
-                background = 0xFF2A3345;
-            } else {
-                background = index % 2 == 0 ? 0xFF1E2633 : 0xFF161C26;
-            }
-
-            graphics.fill(left, top, left + width, top + height - 1, background);
-
-            if (isRenaming)
+        int ri = idx - off;
+        if (ri >= 0 && ri < filteredRoads.size()) {
+            Road road = filteredRoads.get(ri);
+            if (mode == Mode.SELECT) {
+                if (onRoadSelected != null)
+                    onRoadSelected.accept(road);
+                this.minecraft.setScreen(null);
                 return;
-
-            int iconRight = left + width - ICON_RIGHT_MARGIN;
-            int editIconX = iconRight - ICON_GAP * 3 + 2;
-            int continueIconX = iconRight - ICON_GAP * 2 + 2;
-            int deleteIconX = iconRight - ICON_GAP + 2;
-            int iconY = top + (height - RoadListScreen.this.font.lineHeight) / 2;
-
-            int textColor = selected ? 0xFFF7F9FC : hovered ? 0xFFF4F7FF : 0xFFC8CDD6;
-            int maxNameWidth = editIconX - left - 10;
-            String displayName = RoadListScreen.this.font.plainSubstrByWidth(safe(road.name), maxNameWidth);
-            graphics.drawString(RoadListScreen.this.font, displayName, left + 6, iconY, textColor, false);
-
-            boolean hoverEdit =
-                mouseX >= editIconX - 1 && mouseX <= editIconX + 13 && mouseY >= iconY - 1 && mouseY <= iconY + 11;
-            boolean hoverContinue = mouseX >= continueIconX - 1 && mouseX <= continueIconX + 13 && mouseY >= iconY - 1
-                && mouseY <= iconY + 11;
-            boolean hoverDelete =
-                mouseX >= deleteIconX - 1 && mouseX <= deleteIconX + 13 && mouseY >= iconY - 1 && mouseY <= iconY + 11;
-
-            graphics.drawString(RoadListScreen.this.font, "\u270E", editIconX, iconY,
-                hoverEdit ? 0xFF66BBFF : 0xFF888888, false);
-            graphics.drawString(RoadListScreen.this.font, "\u25B6", continueIconX, iconY,
-                hoverContinue ? 0xFF66FF66 : 0xFF888888, false);
-            graphics.drawString(RoadListScreen.this.font, "\u2715", deleteIconX, iconY,
-                hoverDelete ? 0xFFFF6666 : 0xFF888888, false);
-        }
-
-        @Override
-        public boolean mouseClicked(double mouseX, double mouseY, int button) {
-            int iconRight = roadList.getRowLeft() + roadList.getRowWidth() - ICON_RIGHT_MARGIN;
-            int editIconX = iconRight - ICON_GAP * 3 + 2;
-            int continueIconX = iconRight - ICON_GAP * 2 + 2;
-            int deleteIconX = iconRight - ICON_GAP + 2;
-
-            boolean clickEdit = mouseX >= editIconX - 1 && mouseX <= editIconX + 13;
-            boolean clickContinue = mouseX >= continueIconX - 1 && mouseX <= continueIconX + 13;
-            boolean clickDelete = mouseX >= deleteIconX - 1 && mouseX <= deleteIconX + 13;
-
-            if (button == 0 && clickEdit) {
-                openEditScreen(road);
-                return true;
             }
-            if (button == 0 && clickContinue) {
-                if (onContinueRecording != null) {
-                    onContinueRecording.accept(road);
-                }
-                onClose();
-                return true;
-            }
-            if (button == 0 && clickDelete) {
-                deleteSelectedRoad(road);
-                return true;
-            }
-            if (button == 1) {
-                beginRename(this);
-                return true;
-            }
-
             selectedRoad = road;
-            if (RoadListScreen.this.roadList != null) {
-                RoadListScreen.this.roadList.setSelected(this);
-            }
-            return true;
+            selectedSegment = null;
+            selectedNode = null;
+            scrollMid = 0;
+            scrollRight = 0;
         }
+    }
+
+    private void clickMid(int mx, int my) {
+        List<Segment> segs = currentSegments();
+        int headerH =
+            (selectedRoad != null || (!allUnfiled.isEmpty() && selectedRoad == null && selectedSegment != null))
+                ? HEADER_H : 0;
+        int relY = my - panelTop - headerH + scrollMid * ITEM_H;
+        int idx = relY / ITEM_H;
+        if (idx >= 0 && idx < segs.size()) {
+            selectedSegment = segs.get(idx);
+            selectedNode = null;
+            scrollRight = 0;
+            dragMode = true;
+        }
+    }
+
+    private void clickRight(int mx, int my) {
+        List<Node> nodes = currentNodes();
+        int headerH = selectedSegment != null ? HEADER_H : 0;
+        int relY = my - panelTop - headerH + scrollRight * ITEM_H;
+        int idx = relY / ITEM_H;
+        if (idx >= 0 && idx < nodes.size()) {
+            selectedNode = nodes.get(idx);
+            CornerType[] vals = CornerType.values();
+            CornerType next = vals[(selectedNode.getCornerType().ordinal() + 1) % vals.length];
+            selectedNode.setCornerType(next);
+            db.updateNode(selectedNode.getId(), selectedNode);
+            db.asyncSave();
+        }
+    }
+
+    private void rightClickMid(int mx, int my) {
+        List<Segment> segs = currentSegments();
+        int headerH =
+            (selectedRoad != null || (!allUnfiled.isEmpty() && selectedRoad == null && selectedSegment != null))
+                ? HEADER_H : 0;
+        int relY = my - panelTop - headerH + scrollMid * ITEM_H;
+        int idx = relY / ITEM_H;
+        if (idx >= 0 && idx < segs.size()) {
+            Segment seg = segs.get(idx);
+            Status next = seg.getStatus() == Status.CONFIRMED ? Status.DRAFT : Status.CONFIRMED;
+            seg.setStatus(next);
+            db.updateSegment(seg.getId(), seg);
+            db.asyncSave();
+        }
+    }
+
+    // ---- Button actions ----
+
+    private void createNewRoad() {
+        Road r = new Road(UUID.randomUUID(), "New Road", "#FFFFFF", new ArrayList<>(), 1);
+        db.addRoad(r);
+        db.asyncSave();
+        scrollLeft = 0;
+        selectedRoad = r;
+        selectedSegment = null;
+        selectedNode = null;
+    }
+
+    private void deleteSelectedRoad() {
+        if (selectedRoad == null)
+            return;
+        for (Segment s : db.getSegmentsForRoad(selectedRoad.getId())) {
+            s.setRoadId(null);
+            db.updateSegment(s.getId(), s);
+        }
+        db.removeRoad(selectedRoad.getId());
+        selectedRoad = null;
+        selectedSegment = null;
+        selectedNode = null;
+        db.asyncSave();
+    }
+
+    private void deleteSelectedSegment() {
+        if (selectedSegment == null)
+            return;
+        if (selectedSegment.getRoadId() != null) {
+            Road r = db.getRoad(selectedSegment.getRoadId());
+            if (r != null && r.getSegmentIds() != null) {
+                r.getSegmentIds().remove(selectedSegment.getId());
+                db.updateRoad(r.getId(), r);
+            }
+        }
+        db.removeSegment(selectedSegment.getId());
+        selectedSegment = null;
+        selectedNode = null;
+        db.asyncSave();
+    }
+
+    private void deleteSelectedNode() {
+        if (selectedNode == null || selectedSegment == null)
+            return;
+        selectedSegment.getNodeIds().remove(selectedNode.getId());
+        db.updateSegment(selectedSegment.getId(), selectedSegment);
+        db.removeNode(selectedNode.getId());
+        selectedNode = null;
+        db.asyncSave();
+    }
+
+    // ---- Drag ----
+
+    private Road roadAtPos(int mx, int my) {
+        int off = allUnfiled.isEmpty() ? 0 : 1;
+        int relY = my - panelTop + scrollLeft * ITEM_H;
+        int idx = relY / ITEM_H;
+        int ri = idx - off;
+        if (ri >= 0 && ri < filteredRoads.size())
+            return filteredRoads.get(ri);
+        return null;
+    }
+
+    private void moveSegmentToRoad(Segment seg, Road target) {
+        if (seg.getRoadId() != null) {
+            Road old = db.getRoad(seg.getRoadId());
+            if (old != null && old.getSegmentIds() != null) {
+                old.getSegmentIds().remove(seg.getId());
+                db.updateRoad(old.getId(), old);
+            }
+        }
+        db.addSegmentToRoad(target.getId(), seg.getId());
+        db.asyncSave();
+    }
+
+    // ---- Cache ----
+
+    private void refreshCache() {
+        filteredRoads.clear();
+        allUnfiled.clear();
+        String f = searchFilter;
+        for (Road r : db.getRoads()) {
+            if (f.isEmpty() || (r.getName() != null && r.getName().toLowerCase().contains(f))) {
+                filteredRoads.add(r);
+            }
+            for (Segment s : db.getSegmentsForRoad(r.getId())) {
+                if (s.getRoadId() == null)
+                    allUnfiled.add(s);
+            }
+        }
+    }
+
+    private List<Segment> currentSegments() {
+        if (selectedRoad != null)
+            return db.getSegmentsForRoad(selectedRoad.getId());
+        if (!allUnfiled.isEmpty() && selectedRoad == null
+            && (selectedSegment == null || selectedSegment.getRoadId() == null)) {
+            return allUnfiled;
+        }
+        return new ArrayList<>();
+    }
+
+    private List<Node> currentNodes() {
+        if (selectedSegment != null)
+            return db.getNodesForSegment(selectedSegment.getId());
+        return new ArrayList<>();
+    }
+
+    private void updateButtonStates() {
+        if (mode != Mode.LIST)
+            return;
+        if (delRoadBtn != null)
+            delRoadBtn.active = selectedRoad != null;
+        if (editSegBtn != null)
+            editSegBtn.active = selectedSegment != null;
+        if (delSegBtn != null)
+            delSegBtn.active = selectedSegment != null;
+        if (delNodeBtn != null)
+            delNodeBtn.active = selectedNode != null;
+    }
+
+    // ---- Drawing helpers ----
+
+    private String roadLabel(Road r) {
+        StringBuilder sb = new StringBuilder();
+        if (r.getNumber() != null && !r.getNumber().isEmpty())
+            sb.append("[").append(r.getNumber()).append("] ");
+        if (r.getClassification() != null && !r.getClassification().isEmpty())
+            sb.append(r.getClassification()).append(" ");
+        sb.append(r.getName());
+        return sb.toString();
+    }
+
+    private String segShortLabel(Segment seg) {
+        int n = seg.getNodeIds() != null ? seg.getNodeIds().size() : 0;
+        return "Seg (" + n + " nodes)";
+    }
+
+    private void drawItem(GuiGraphics g, int x, int y, int w, int h, String label, String badge, int color, boolean sel,
+        boolean hov) {
+        if (sel)
+            g.fill(x, y, x + w, y + h, 0x663366AA);
+        else if (hov)
+            g.fill(x, y, x + w, y + h, 0x33333333);
+        g.drawString(this.font, label, x + 5, y + 1, color, false);
+        if (badge != null) {
+            int bw = this.font.width(badge) + 6;
+            g.fill(x + w - bw - 4, y + 1, x + w - 4, y + h - 2, 0x66444444);
+            g.drawString(this.font, badge, x + w - bw + 1, y + 2, 0xFFAAAAAA, false);
+        }
+    }
+
+    // ---- Utility ----
+
+    private int classificationColor(String cls) {
+        if (cls == null || cls.isEmpty())
+            return 0xFFFFFFFF;
+        switch (cls.charAt(0)) {
+            case 'G':
+                return 0xFFFF8800;
+            case 'S':
+                return 0xFFFFFF00;
+            case 'X':
+                return 0xFF00FF00;
+            case 'Y':
+                return 0xFF4488FF;
+            case 'C':
+                return 0xFF888888;
+            default:
+                return 0xFFFFFFFF;
+        }
+    }
+
+    private void clampScrollLeft(int total, int maxVis) {
+        if (scrollLeft > total - maxVis)
+            scrollLeft = Math.max(0, total - maxVis);
+        if (scrollLeft < 0)
+            scrollLeft = 0;
+    }
+
+    private static boolean hit(int mx, int my, int x, int y, int w, int h) {
+        return mx >= x && mx <= x + w && my >= y && my <= y + h;
+    }
+
+    private static String fmt(double v) {
+        return String.format("%.0f", v);
+    }
+
+    private static int clamp0(int v) {
+        return Math.max(0, v);
     }
 }

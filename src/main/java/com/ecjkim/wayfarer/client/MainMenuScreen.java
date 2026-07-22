@@ -16,18 +16,13 @@
  */
 package com.ecjkim.wayfarer.client;
 
-import java.util.function.Consumer;
-
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.components.Button;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.network.chat.Component;
 
 import com.ecjkim.wayfarer.client.gui.WayfarerConfigScreen;
-import com.ecjkim.wayfarer.client.road.RoadDataStore;
 import com.ecjkim.wayfarer.client.road.RoadListScreen;
-import com.ecjkim.wayfarer.client.road.RoadPreviewServer;
-import com.ecjkim.wayfarer.client.road.model.RoadPath;
 
 public class MainMenuScreen extends Screen {
     private static final int PANEL_WIDTH = 200;
@@ -36,16 +31,8 @@ public class MainMenuScreen extends Screen {
     private static final int BUTTON_HEIGHT = 20;
     private static final int BUTTON_GAP = 4;
 
-    private final RoadDataStore roadDataStore;
-    private final RoadPreviewServer previewServer;
-    private final Consumer<RoadPath> onContinueRecording;
-
-    public MainMenuScreen(RoadDataStore roadDataStore, RoadPreviewServer previewServer,
-        Consumer<RoadPath> onContinueRecording) {
+    public MainMenuScreen() {
         super(Component.literal("Wayfarer"));
-        this.roadDataStore = roadDataStore;
-        this.previewServer = previewServer;
-        this.onContinueRecording = onContinueRecording;
     }
 
     @Override
@@ -57,7 +44,7 @@ public class MainMenuScreen extends Screen {
         int y = panelTop + 36;
 
         addRenderableWidget(Button.builder(Component.literal("道路管理"), btn -> {
-            this.minecraft.setScreen(new RoadListScreen(roadDataStore, previewServer, onContinueRecording));
+            this.minecraft.setScreen(new RoadListScreen());
         }).bounds(btnX, y, BUTTON_WIDTH, BUTTON_HEIGHT).build());
         y += BUTTON_HEIGHT + BUTTON_GAP;
 

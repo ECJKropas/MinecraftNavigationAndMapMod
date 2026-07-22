@@ -24,12 +24,11 @@ import net.fabricmc.api.ClientModInitializer;
 import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientLifecycleEvents;
 import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientTickEvents;
 
-import com.ecjkim.wayfarer.client.road.RoadDataStore;
 import com.ecjkim.wayfarer.client.road.RoadMetadataScreen;
-import com.ecjkim.wayfarer.client.road.RoadPreviewServer;
 import com.ecjkim.wayfarer.client.road.RoadRecordingManager;
 import com.ecjkim.wayfarer.client.road.XaeroMapOverlay;
-import com.ecjkim.wayfarer.client.road.model.RoadPath;
+import com.ecjkim.wayfarer.client.road.data.RoadNetworkDatabase;
+import com.ecjkim.wayfarer.client.road.model.Segment;
 
 import org.lwjgl.glfw.GLFW;
 
@@ -38,9 +37,7 @@ import it.unimi.dsi.fastutil.ints.IntOpenHashSet;
 import it.unimi.dsi.fastutil.ints.IntSet;
 
 public class WayfarerClient implements ClientModInitializer {
-    private static final RoadDataStore ROAD_DATA_STORE = new RoadDataStore();
-    private static final RoadPreviewServer PREVIEW_SERVER = new RoadPreviewServer(ROAD_DATA_STORE);
-    private static final RoadRecordingManager ROAD_MANAGER = new RoadRecordingManager(ROAD_DATA_STORE);
+    private static final RoadRecordingManager ROAD_MANAGER = new RoadRecordingManager();
 
     private final IntSet keysDownLastTick = new IntOpenHashSet();
 
@@ -48,24 +45,18 @@ public class WayfarerClient implements ClientModInitializer {
     public void onInitializeClient() {
         InitializationHandler.getInstance().registerInitializationHandler(new WayfarerInitHandler());
 
-        PREVIEW_SERVER.start();
+        RoadNetworkDatabase.getInstance().loadFromDisk();
 
         XaeroMapOverlay.register();
         ClientLifecycleEvents.CLIENT_STOPPING.register(client -> {
-            PREVIEW_SERVER.stop();
+            RoadNetworkDatabase.getInstance().saveToDisk();
         });
         ClientTickEvents.END_CLIENT_TICK.register(this::handleClientTick);
-    }
-
-    public static RoadDataStore getRoadDataStore() {
-        return ROAD_DATA_STORE;
     }
 
     public static void reloadHotkeys() {}
 
     private void handleClientTick(Minecraft client) {
-        ROAD_DATA_STORE.syncToCurrentContext();
-
         if (client.screen != null) {
             keysDownLastTick.clear();
             ROAD_MANAGER.tick(client);
@@ -84,7 +75,7 @@ public class WayfarerClient implements ClientModInitializer {
 
         for (WayfarerConfig.HotkeyBind bind : config.getHotkeysForAction("open_menu")) {
             if (consumeHotkey(window, bind)) {
-                client.setScreen(new MainMenuScreen(ROAD_DATA_STORE, PREVIEW_SERVER, this::startAppendRecording));
+                client.setScreen(new MainMenuScreen());
                 break;
             }
         }
@@ -122,29 +113,18 @@ public class WayfarerClient implements ClientModInitializer {
             if (ROAD_MANAGER.getRecordedPointCount() < 2) {
                 ROAD_MANAGER.discardRecording();
                 player.displayClientMessage(Component.literal("记录点太少，已取消这次道路记录。"), false);
-            } else if (ROAD_MANAGER.isAppending()) {
-                client.setScreen(new RoadMetadataScreen(RoadMetadataScreen.Mode.EDIT, ROAD_MANAGER::finishAppend,
-                    ROAD_MANAGER::discardRecording, ROAD_MANAGER.getAppendRoadName(),
-                    String.valueOf(ROAD_MANAGER.getAppendRoadWidth()), ROAD_MANAGER.getAppendRoadClassification(),
-                    ROAD_MANAGER.getAppendRoadNumber()));
-                player.displayClientMessage(Component.literal("继续录制已停止，确认后保存。"), false);
             } else {
-                client.setScreen(new RoadMetadataScreen(RoadMetadataScreen.Mode.CREATE, ROAD_MANAGER::saveRecording,
-                    ROAD_MANAGER::discardRecording, null, null, null, null));
-                player.displayClientMessage(Component.literal("道路记录已停止，填写名称后保存。"), false);
+                Segment segment = ROAD_MANAGER.saveRecording();
+                if (segment != null) {
+                    client.setScreen(new RoadMetadataScreen(segment, savedRoad -> {
+                        player.displayClientMessage(Component.literal("道路已保存: " + savedRoad.getName()), false);
+                    }, ROAD_MANAGER::discardRecording));
+                    player.displayClientMessage(Component.literal("道路记录已停止，选择或创建道路后保存。"), false);
+                }
             }
         } else {
             ROAD_MANAGER.startRecording();
             player.displayClientMessage(Component.literal("道路记录已开始。"), false);
         }
-    }
-
-    private void startAppendRecording(RoadPath road) {
-        Minecraft client = Minecraft.getInstance();
-        if (client.player == null)
-            return;
-
-        ROAD_MANAGER.startAppend(road, client.player.getX(), client.player.getY(), client.player.getZ());
-        client.player.displayClientMessage(Component.literal("继续录制道路: " + road.name + "（按 R 结束并保存）"), false);
     }
 }

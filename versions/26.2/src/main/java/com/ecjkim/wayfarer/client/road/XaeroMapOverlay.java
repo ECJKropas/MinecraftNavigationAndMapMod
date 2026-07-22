@@ -17,6 +17,7 @@
 package com.ecjkim.wayfarer.client.road;
 
 import java.lang.reflect.Field;
+import java.util.Collection;
 import java.util.List;
 
 import net.minecraft.client.Minecraft;
@@ -27,16 +28,17 @@ import com.mojang.blaze3d.platform.Window;
 
 import net.fabricmc.fabric.api.client.screen.v1.ScreenEvents;
 
-import com.ecjkim.wayfarer.client.WayfarerClient;
-import com.ecjkim.wayfarer.client.road.model.RoadPath;
-import com.ecjkim.wayfarer.client.road.model.RoadPoint;
+import com.ecjkim.wayfarer.client.road.data.RoadNetworkDatabase;
+import com.ecjkim.wayfarer.client.road.model.Node;
+import com.ecjkim.wayfarer.client.road.model.Road;
+import com.ecjkim.wayfarer.client.road.model.Segment;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
- * 26.x version: renders road network overlay on Xaero World Map GuiMap. Uses {@code GuiGraphicsExtractor.fill()} for
- * rendering to avoid the 26.x RenderSystem API breakage (enableBlend/lineWidth removed).
+ * 26.x version: renders road network overlay on Xaero World Map GuiMap. Uses RoadNetworkDatabase for data and
+ * GuiGraphicsExtractor.fill() for rendering.
  */
 public final class XaeroMapOverlay {
     private static final Logger LOGGER = LoggerFactory.getLogger("Wayfarer|Overlay");
@@ -46,7 +48,6 @@ public final class XaeroMapOverlay {
     private static Field cameraXField;
     private static Field cameraZField;
     private static int reflectionFailCount;
-    /** Xaero scale is in physical pixels/block; divide by guiScale for GUI-scaled coords */
     private static double guiScale = 2.0;
 
     private XaeroMapOverlay() {}
@@ -54,7 +55,6 @@ public final class XaeroMapOverlay {
     public static void register() {
         ScreenEvents.AFTER_INIT.register((client, screen, scaledWidth, scaledHeight) -> {
             if (isGuiMap(screen)) {
-                // Compute guiScale once when GuiMap opens (Xaero scale is in physical px/block)
                 Window win = Minecraft.getInstance().getWindow();
                 guiScale = (double)win.getScreenWidth() / win.getGuiScaledWidth();
                 ScreenEvents.afterExtract(screen).register(XaeroMapOverlay::onAfterScreenRender);
@@ -65,11 +65,8 @@ public final class XaeroMapOverlay {
 
     private static void onAfterScreenRender(Screen screen, GuiGraphicsExtractor graphics, int mouseX, int mouseY,
         float tickDelta) {
-        RoadDataStore store = WayfarerClient.getRoadDataStore();
-        if (store == null)
-            return;
-
-        List<RoadPath> roads = store.getRoads();
+        RoadNetworkDatabase db = RoadNetworkDatabase.getInstance();
+        Collection<Road> roads = db.getRoads();
         if (roads.isEmpty())
             return;
 
@@ -85,7 +82,7 @@ public final class XaeroMapOverlay {
             int screenW = screen.width;
             int screenH = screen.height;
 
-            renderRoadNetwork(graphics, roads, scale, cameraX, cameraZ, screenW, screenH);
+            renderRoadNetwork(graphics, db, roads, scale, cameraX, cameraZ, screenW, screenH);
         } catch (Exception e) {
             if (reflectionFailCount < 3) {
                 LOGGER.warn("Failed to render road overlay: {}", e.getMessage());
@@ -94,19 +91,11 @@ public final class XaeroMapOverlay {
         }
     }
 
-    // ------------------------------------------------------------------
-    // GuiMap detection
-    // ------------------------------------------------------------------
-
     private static boolean isGuiMap(Screen screen) {
         if (screen == null)
             return false;
         return GUIMAP_CLASS.equals(screen.getClass().getName());
     }
-
-    // ------------------------------------------------------------------
-    // Reflection helpers
-    // ------------------------------------------------------------------
 
     private static double[] getMapParams(Screen screen) {
         try {
@@ -133,17 +122,9 @@ public final class XaeroMapOverlay {
         }
     }
 
-    // ------------------------------------------------------------------
-    // Road network rendering
-    // ------------------------------------------------------------------
+    private static void renderRoadNetwork(GuiGraphicsExtractor graphics, RoadNetworkDatabase db, Collection<Road> roads,
+        double scale, double cameraX, double cameraZ, int screenW, int screenH) {
 
-    private static void renderRoadNetwork(GuiGraphicsExtractor graphics, List<RoadPath> roads, double scale,
-        double cameraX, double cameraZ, int screenW, int screenH) {
-
-        // Xaero scale is in physical px/block. GuiMap renders to an FBO with a
-        // 1/guiScale downscale, then blits 1:1 to screen (physical px). Since
-        // we draw directly to the GUI layer, we must divide by guiScale twice:
-        // once for FBO downscale, once for physical→GUI coordinate conversion.
         double effectiveScale = scale / (guiScale * guiScale);
         double centerX = screenW / 2.0;
         double centerY = screenH / 2.0;
@@ -156,52 +137,59 @@ public final class XaeroMapOverlay {
         double minWorldZ = cameraZ - halfWorldH - margin;
         double maxWorldZ = cameraZ + halfWorldH + margin;
 
-        for (RoadPath road : roads) {
-            if (!isRoadVisible(road, minWorldX, maxWorldX, minWorldZ, maxWorldZ))
-                continue;
+        for (Road road : roads) {
+            String classification = road.getClassification();
+            int color = classificationColor(classification);
 
-            int lineWidth = "G".equals(road.classification) ? 3 : ("S".equals(road.classification) ? 2 : 1);
-            int color = classificationColor(road.classification);
-            renderRoad(graphics, road, effectiveScale, cameraX, cameraZ, centerX, centerY, color, lineWidth);
+            List<Segment> segments = db.getSegmentsForRoad(road.getId());
+            for (Segment seg : segments) {
+                List<Node> nodes = db.getNodesForSegment(seg.getId());
+                if (nodes.size() < 2)
+                    continue;
+
+                if (!isSegmentVisible(nodes, minWorldX, maxWorldX, minWorldZ, maxWorldZ))
+                    continue;
+
+                int lineWidth = 1;
+                if ("G".equals(classification))
+                    lineWidth = 3;
+                else if ("S".equals(classification))
+                    lineWidth = 2;
+
+                renderSegment(graphics, nodes, effectiveScale, cameraX, cameraZ, centerX, centerY, color, lineWidth);
+            }
         }
     }
 
-    private static boolean isRoadVisible(RoadPath road, double minX, double maxX, double minZ, double maxZ) {
-        if (road.points == null || road.points.size() < 2)
-            return false;
+    private static boolean isSegmentVisible(List<Node> nodes, double minX, double maxX, double minZ, double maxZ) {
+        double segMinX = Double.MAX_VALUE, segMaxX = -Double.MAX_VALUE;
+        double segMinZ = Double.MAX_VALUE, segMaxZ = -Double.MAX_VALUE;
 
-        double roadMinX = Double.MAX_VALUE, roadMaxX = -Double.MAX_VALUE;
-        double roadMinZ = Double.MAX_VALUE, roadMaxZ = -Double.MAX_VALUE;
-
-        for (RoadPoint pt : road.points) {
-            if (pt.x < roadMinX)
-                roadMinX = pt.x;
-            if (pt.x > roadMaxX)
-                roadMaxX = pt.x;
-            if (pt.z < roadMinZ)
-                roadMinZ = pt.z;
-            if (pt.z > roadMaxZ)
-                roadMaxZ = pt.z;
+        for (Node n : nodes) {
+            if (n.getX() < segMinX)
+                segMinX = n.getX();
+            if (n.getX() > segMaxX)
+                segMaxX = n.getX();
+            if (n.getZ() < segMinZ)
+                segMinZ = n.getZ();
+            if (n.getZ() > segMaxZ)
+                segMaxZ = n.getZ();
         }
 
-        return !(roadMaxX < minX || roadMinX > maxX || roadMaxZ < minZ || roadMinZ > maxZ);
+        return !(segMaxX < minX || segMinX > maxX || segMaxZ < minZ || segMinZ > maxZ);
     }
 
-    private static void renderRoad(GuiGraphicsExtractor graphics, RoadPath road, double effectiveScale, double cameraX,
-        double cameraZ, double centerX, double centerY, int color, int thickness) {
+    private static void renderSegment(GuiGraphicsExtractor graphics, List<Node> nodes, double effectiveScale,
+        double cameraX, double cameraZ, double centerX, double centerY, int color, int thickness) {
 
-        List<RoadPoint> points = road.points;
-        if (points.size() < 2)
-            return;
+        for (int i = 0; i < nodes.size() - 1; i++) {
+            Node n1 = nodes.get(i);
+            Node n2 = nodes.get(i + 1);
 
-        for (int i = 0; i < points.size() - 1; i++) {
-            RoadPoint p1 = points.get(i);
-            RoadPoint p2 = points.get(i + 1);
-
-            int sx1 = (int)((p1.x - cameraX) * effectiveScale + centerX);
-            int sy1 = (int)((p1.z - cameraZ) * effectiveScale + centerY);
-            int sx2 = (int)((p2.x - cameraX) * effectiveScale + centerX);
-            int sy2 = (int)((p2.z - cameraZ) * effectiveScale + centerY);
+            int sx1 = (int)((n1.getX() - cameraX) * effectiveScale + centerX);
+            int sy1 = (int)((n1.getZ() - cameraZ) * effectiveScale + centerY);
+            int sx2 = (int)((n2.getX() - cameraX) * effectiveScale + centerX);
+            int sy2 = (int)((n2.getZ() - cameraZ) * effectiveScale + centerY);
 
             drawThickLine(graphics, sx1, sy1, sx2, sy2, color, thickness);
         }
@@ -234,10 +222,6 @@ public final class XaeroMapOverlay {
             }
         }
     }
-
-    // ------------------------------------------------------------------
-    // Color mapping
-    // ------------------------------------------------------------------
 
     private static int classificationColor(String classification) {
         if (classification == null)

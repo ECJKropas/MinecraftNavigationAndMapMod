@@ -42,9 +42,16 @@ key:
           browser_opened: 已在浏览器打开预览
           browser_unsupported: "当前系统不支持自动打开浏览器，请手动访问 %s"
           browser_failed: "打开浏览器失败：请手动访问 %s"
+        unfiled_segments: 未归档路段
+        new_road: 新建道路
+        select_mode_title: 选择道路
+        delete_node_warning: "该节点被 {0} 个路段引用，确认删除？"
+        status_bar: "总节点 {0} / 总路段 {1} / 总道路 {2}"
         metadata:
           title_edit: 修改道路
           title_create: 保存道路
+          select_road: 选择已有道路
+          create_new: 创建新的道路
           field_name: 道路名
           field_width: 道路宽度
           field_number: 编号

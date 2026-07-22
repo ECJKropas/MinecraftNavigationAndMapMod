@@ -42,9 +42,16 @@ key:
           browser_opened: Opened preview in browser
           browser_unsupported: "Cannot auto-open browser. Please manually visit %s"
           browser_failed: "Failed to open browser. Please manually visit %s"
+        unfiled_segments: Unfiled Segments
+        new_road: New Road
+        select_mode_title: Select a Road
+        delete_node_warning: "This node is referenced by {0} segments. Delete anyway?"
+        status_bar: "Nodes {0} / Segments {1} / Roads {2}"
         metadata:
           title_edit: Edit Road
           title_create: Save Road
+          select_road: Select Existing Road
+          create_new: Create New Road
           field_name: Road Name
           field_width: Road Width
           field_number: Number

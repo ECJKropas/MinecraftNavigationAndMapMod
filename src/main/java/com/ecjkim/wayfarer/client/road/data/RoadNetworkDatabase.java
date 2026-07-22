@@ -216,6 +216,70 @@ public class RoadNetworkDatabase {
         return false;
     }
 
+    // ---------- Helper queries ----------
+
+    /**
+     * Returns an unmodifiable collection of all Roads (snapshot).
+     */
+    public java.util.Collection<Road> getRoads() {
+        return new java.util.ArrayList<>(roads.values());
+    }
+
+    /**
+     * Returns all Nodes belonging to the given Segment, in {@code nodeIds} order.
+     */
+    public List<Node> getNodesForSegment(UUID segmentId) {
+        Segment segment = segments.get(segmentId);
+        if (segment == null || segment.getNodeIds() == null) {
+            return new ArrayList<>();
+        }
+        List<Node> result = new ArrayList<>();
+        for (UUID nodeId : segment.getNodeIds()) {
+            Node node = nodes.get(nodeId);
+            if (node != null) {
+                result.add(node);
+            }
+        }
+        return result;
+    }
+
+    /**
+     * Returns all Segments belonging to the given Road.
+     */
+    public List<Segment> getSegmentsForRoad(UUID roadId) {
+        Road road = roads.get(roadId);
+        if (road == null || road.getSegmentIds() == null) {
+            return new ArrayList<>();
+        }
+        List<Segment> result = new ArrayList<>();
+        for (UUID segId : road.getSegmentIds()) {
+            Segment seg = segments.get(segId);
+            if (seg != null) {
+                result.add(seg);
+            }
+        }
+        return result;
+    }
+
+    /**
+     * Appends a Segment to an existing Road and updates the Segment's roadId.
+     */
+    public synchronized void addSegmentToRoad(UUID roadId, UUID segmentId) {
+        Road road = roads.get(roadId);
+        if (road == null)
+            return;
+        Segment segment = segments.get(segmentId);
+        if (segment == null)
+            return;
+
+        if (road.getSegmentIds() == null) {
+            road.setSegmentIds(new ArrayList<>());
+        }
+        road.getSegmentIds().add(segmentId);
+        segment.setRoadId(roadId);
+        markDirty();
+    }
+
     // ---------- Persistence ----------
 
     private void markDirty() {

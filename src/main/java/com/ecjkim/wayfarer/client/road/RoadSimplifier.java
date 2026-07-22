@@ -21,20 +21,22 @@ import java.util.List;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
-import com.ecjkim.wayfarer.client.road.model.RoadPoint;
-
 /**
- * 道路轨迹简化工具。
+ * Road trajectory simplifier.
  *
  * <p>
- * 提供两步后处理流水线：
+ * Two-step post-processing pipeline:
  * <ol>
- * <li><b>回退路径剪枝</b>：检测并移除物理采集中的"Z字形回退"路径</li>
- * <li><b>Douglas-Peucker 简化</b>：用最少的关键点表示道路折线形状</li>
+ * <li><b>Backtrack removal</b>: detect and remove Z-shaped backtrack paths</li>
+ * <li><b>Douglas-Peucker simplification</b>: reduce points to key shape vertices</li>
  * </ol>
  *
  * <p>
- * 所有距离计算在 XZ 平面（Minecraft 水平面）上进行，Y 轴（高度）不参与简化判定， 但保留原始 RoadPoint 的 y 和 tick 字段不变。
+ * All distance calculations are on the XZ plane (Minecraft horizontal). Y (height) is preserved but does not
+ * participate in simplification decisions.
+ *
+ * <p>
+ * Points are represented as {@code double[]} arrays of length 3: {@code [x, y, z]}.
  */
 public final class RoadSimplifier {
 
@@ -43,20 +45,15 @@ public final class RoadSimplifier {
     private RoadSimplifier() {}
 
     // ──────────────────────────────────────────────
-    // 公式求值
+    // Formula evaluation
     // ──────────────────────────────────────────────
 
     /**
-     * 求值 epsilon 公式字符串。
+     * Evaluate an epsilon formula string.
      *
      * <p>
-     * 支持占位符 {@code [RW]}（Road Width，道路宽度）和 {@code [DW]}（Default Width，等级默认宽度）。 支持基本四则运算（+ - * /）与括号。 若公式解析失败，回退为
-     * {@code rw / 2.0}。
-     *
-     * @param formula 公式字符串，如 {@code "[RW]/2"}
-     * @param rw 当前道路的实际宽度
-     * @param dw 当前道路等级对应的默认宽度
-     * @return 求值结果（非负）
+     * Supports placeholders {@code [RW]} (Road Width) and {@code [DW]} (Default Width). Supports basic arithmetic (+ -
+     * * /) and parentheses. Falls back to {@code rw / 2.0} on parse failure.
      */
     public static double evaluateFormula(String formula, double rw, double dw) {
         if (formula == null || formula.trim().isEmpty()) {
@@ -73,7 +70,7 @@ public final class RoadSimplifier {
         }
     }
 
-    // ── 递归下降表达式解析器 ──
+    // ── Recursive descent parser ──
 
     private static String expr;
     private static int pos;
@@ -127,52 +124,58 @@ public final class RoadSimplifier {
             }
             return val;
         }
-        // parse number
         int start = pos;
         if (ch == '-')
             pos++;
         while (pos < expr.length() && (Character.isDigit(expr.charAt(pos)) || expr.charAt(pos) == '.')) {
             pos++;
         }
-        double val = Double.parseDouble(expr.substring(start, pos));
-        return val;
+        return Double.parseDouble(expr.substring(start, pos));
     }
 
     // ──────────────────────────────────────────────
-    // 公开 API
+    // Public API — uses double[]{x, y, z}
     // ──────────────────────────────────────────────
 
+    /** Accessor helpers to avoid magic indices. */
+    public static double x(double[] pt) {
+        return pt[0];
+    }
+
+    public static double y(double[] pt) {
+        return pt[1];
+    }
+
+    public static double z(double[] pt) {
+        return pt[2];
+    }
+
     /**
-     * 去除回退路径。
+     * Remove backtracking walks.
      *
      * <p>
-     * 按时间顺序扫描轨迹点。当新点落入历史旧点（除栈顶外）的邻域内时， 认定发生了物理回退：截断该旧点之后的所有点（舍弃第一次前进路径）， 并丢弃当前回退点，等待后续真正前进的点到来。
-     *
-     * <p>
-     * 示例：A(0,0) → B(1,1) → C(2,0) → D(0.1,0.1)（D 回访到 A 附近） → 输出 A(0,0)，B(1,1) 和 C(2,0) 被裁剪，D 也不保留。
-     *
-     * @param points 原始轨迹点（按 tick 时间排序）
-     * @param threshold 判定"回访到旧点"的距离阈值（XZ 平面，单位：格）
-     * @return 清洗后的轨迹点列表
+     * Scans trajectory points in temporal order. When a new point falls within the neighbourhood of a historical point
+     * (excluding the top of the stack), the walk is considered backtracked: truncates all points after the matched one
+     * and discards the current point.
      */
-    public static List<RoadPoint> removeBacktracking(List<RoadPoint> points, double threshold) {
+    public static List<double[]> removeBacktracking(List<double[]> points, double threshold) {
         if (points.size() <= 2) {
             return new ArrayList<>(points);
         }
 
-        List<RoadPoint> cleaned = new ArrayList<>();
+        List<double[]> cleaned = new ArrayList<>();
         cleaned.add(points.get(0));
 
         for (int i = 1; i < points.size(); i++) {
-            RoadPoint curr = points.get(i);
-            RoadPoint last = cleaned.get(cleaned.size() - 1);
+            double[] curr = points.get(i);
+            double[] last = cleaned.get(cleaned.size() - 1);
 
-            // 去重：与栈顶距离 < threshold*0.1 视为重复采样，直接跳过
+            // dedup: distance < threshold*0.1 is treated as duplicate sample
             if (distXZ(curr, last) < threshold * 0.1) {
                 continue;
             }
 
-            // 回溯检测：扫描 cleaned 中除栈顶外的所有历史点
+            // backtrack detection: scan all historical points except stack top
             int hitIndex = -1;
             for (int j = 0; j < cleaned.size() - 1; j++) {
                 if (distXZ(curr, cleaned.get(j)) < threshold) {
@@ -182,7 +185,6 @@ public final class RoadSimplifier {
             }
 
             if (hitIndex >= 0) {
-                // 命中旧点 → 截断 hitIndex 之后的所有点，不添加 curr
                 while (cleaned.size() > hitIndex + 1) {
                     cleaned.remove(cleaned.size() - 1);
                 }
@@ -195,16 +197,9 @@ public final class RoadSimplifier {
     }
 
     /**
-     * Douglas-Peucker 曲线简化（XZ 平面）。
-     *
-     * <p>
-     * 递归剔除对整体形状贡献小的点，输出最少的"拐点"集合。 epsilon 越大保留点越少。
-     *
-     * @param points 清洗后的轨迹点
-     * @param epsilon 最大允许偏差（XZ 平面，单位：格）
-     * @return 简化后的关键点列表（至少包含首尾两点）
+     * Douglas-Peucker curve simplification (XZ plane).
      */
-    public static List<RoadPoint> douglasPeucker(List<RoadPoint> points, double epsilon) {
+    public static List<double[]> douglasPeucker(List<double[]> points, double epsilon) {
         if (points.size() <= 2) {
             return new ArrayList<>(points);
         }
@@ -212,29 +207,29 @@ public final class RoadSimplifier {
     }
 
     /**
-     * 完整流水线：回退去除 → RDP 简化。
+     * Full pipeline: backtrack removal → RDP simplification.
      *
-     * @param points 原始轨迹点
-     * @param backtrackThreshold 回退检测阈值（格）
-     * @param epsilonFormula epsilon 公式字符串，如 {@code "[RW]/2"}
-     * @param rw 道路实际宽度（Road Width）
-     * @param dw 等级默认宽度（Default Width）
-     * @return 简化后的关键点列表
+     * @param points raw trajectory points
+     * @param backtrackThreshold backtrack detection threshold (blocks)
+     * @param epsilonFormula epsilon formula string, e.g. {@code "[RW]/2"}
+     * @param rw road width
+     * @param dw default width
+     * @return simplified key-point list
      */
-    public static List<RoadPoint> simplify(List<RoadPoint> points, double backtrackThreshold, String epsilonFormula,
+    public static List<double[]> simplify(List<double[]> points, double backtrackThreshold, String epsilonFormula,
         double rw, double dw) {
         double epsilon = evaluateFormula(epsilonFormula, rw, dw);
-        List<RoadPoint> cleaned = removeBacktracking(points, backtrackThreshold);
+        List<double[]> cleaned = removeBacktracking(points, backtrackThreshold);
         return douglasPeucker(cleaned, epsilon);
     }
 
     // ──────────────────────────────────────────────
-    // 内部实现
+    // Internal implementation
     // ──────────────────────────────────────────────
 
-    private static List<RoadPoint> dpRecursive(List<RoadPoint> points, int start, int end, double epsilon) {
+    private static List<double[]> dpRecursive(List<double[]> points, int start, int end, double epsilon) {
         if (end - start <= 1) {
-            List<RoadPoint> result = new ArrayList<>();
+            List<double[]> result = new ArrayList<>();
             result.add(points.get(start));
             if (end > start) {
                 result.add(points.get(end));
@@ -242,8 +237,8 @@ public final class RoadSimplifier {
             return result;
         }
 
-        RoadPoint startPt = points.get(start);
-        RoadPoint endPt = points.get(end);
+        double[] startPt = points.get(start);
+        double[] endPt = points.get(end);
 
         double dmax = 0.0;
         int idx = start;
@@ -257,44 +252,40 @@ public final class RoadSimplifier {
         }
 
         if (dmax > epsilon) {
-            List<RoadPoint> left = dpRecursive(points, start, idx, epsilon);
-            List<RoadPoint> right = dpRecursive(points, idx, end, epsilon);
-            // 合并：去掉左段尾点（与右段首点重复）
+            List<double[]> left = dpRecursive(points, start, idx, epsilon);
+            List<double[]> right = dpRecursive(points, idx, end, epsilon);
             left.remove(left.size() - 1);
             left.addAll(right);
             return left;
         } else {
-            List<RoadPoint> result = new ArrayList<>();
+            List<double[]> result = new ArrayList<>();
             result.add(startPt);
             result.add(endPt);
             return result;
         }
     }
 
-    /**
-     * 计算点到线段（XZ 平面投影）的垂直距离。
-     */
-    private static double perpendicularDistanceXZ(RoadPoint point, RoadPoint lineStart, RoadPoint lineEnd) {
-        double dx = lineEnd.x - lineStart.x;
-        double dz = lineEnd.z - lineStart.z;
+    private static double perpendicularDistanceXZ(double[] point, double[] lineStart, double[] lineEnd) {
+        double dx = lineEnd[0] - lineStart[0];
+        double dz = lineEnd[2] - lineStart[2];
         double lenSq = dx * dx + dz * dz;
         if (lenSq == 0.0) {
             return distXZ(point, lineStart);
         }
 
-        double t = ((point.x - lineStart.x) * dx + (point.z - lineStart.z) * dz) / lenSq;
+        double t = ((point[0] - lineStart[0]) * dx + (point[2] - lineStart[2]) * dz) / lenSq;
         t = Math.max(0.0, Math.min(1.0, t));
 
-        double projX = lineStart.x + t * dx;
-        double projZ = lineStart.z + t * dz;
-        double pdx = point.x - projX;
-        double pdz = point.z - projZ;
+        double projX = lineStart[0] + t * dx;
+        double projZ = lineStart[2] + t * dz;
+        double pdx = point[0] - projX;
+        double pdz = point[2] - projZ;
         return Math.sqrt(pdx * pdx + pdz * pdz);
     }
 
-    private static double distXZ(RoadPoint a, RoadPoint b) {
-        double dx = a.x - b.x;
-        double dz = a.z - b.z;
+    private static double distXZ(double[] a, double[] b) {
+        double dx = a[0] - b[0];
+        double dz = a[2] - b[2];
         return Math.sqrt(dx * dx + dz * dz);
     }
 }
