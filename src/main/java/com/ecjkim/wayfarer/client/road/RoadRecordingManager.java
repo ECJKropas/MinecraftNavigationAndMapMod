@@ -25,6 +25,7 @@ import java.util.logging.Logger;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.player.LocalPlayer;
 
+import com.ecjkim.wayfarer.client.WayfarerConfig;
 import com.ecjkim.wayfarer.client.road.model.RoadIntersection;
 import com.ecjkim.wayfarer.client.road.model.RoadPath;
 import com.ecjkim.wayfarer.client.road.model.RoadPoint;
@@ -35,6 +36,8 @@ public class RoadRecordingManager {
     private static final double MIN_ANGLE_DEGREES = 60.0;
     /** Threshold (blocks) for snapping a road endpoint to a nearby other road path. */
     private static final double SNAP_THRESHOLD = 2.0;
+    /** Threshold (blocks) for backtracking removal: 3× sample distance. */
+    private static final double BACKTRACK_THRESHOLD = 1.5;
 
     private final RoadDataStore roadDataStore;
 
@@ -157,6 +160,17 @@ public class RoadRecordingManager {
         updated.classification = classification;
         updated.number = number;
         updated.points = new ArrayList<>(sessionPoints);
+
+        // --- 轨迹简化（回退去除 + RDP） ---
+        int beforeCount = updated.points.size();
+        double epsilon = WayfarerConfig.getInstance().rdpEpsilon;
+        updated.points = RoadSimplifier.simplify(updated.points, BACKTRACK_THRESHOLD, epsilon);
+        int afterCount = updated.points.size();
+        if (beforeCount != afterCount) {
+            LOGGER.log(Level.INFO, "Simplified appended road \"{0}\": {1} → {2} points (ε={3})",
+                new Object[] {name, beforeCount, afterCount, epsilon});
+        }
+
         snapEndpoints(updated);
         updated.intersections = detectIntersections(updated);
 
@@ -229,6 +243,17 @@ public class RoadRecordingManager {
         road.classification = classification;
         road.number = number;
         road.points = new ArrayList<>(sessionPoints);
+
+        // --- 轨迹简化（回退去除 + RDP） ---
+        int beforeCount = road.points.size();
+        double epsilon = WayfarerConfig.getInstance().rdpEpsilon;
+        road.points = RoadSimplifier.simplify(road.points, BACKTRACK_THRESHOLD, epsilon);
+        int afterCount = road.points.size();
+        if (beforeCount != afterCount) {
+            LOGGER.log(Level.INFO, "Simplified road \"{0}\": {1} → {2} points (ε={3})",
+                new Object[] {roadName, beforeCount, afterCount, epsilon});
+        }
+
         snapEndpoints(road);
         road.intersections = detectIntersections(road);
 

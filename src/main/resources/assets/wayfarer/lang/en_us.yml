@@ -18,6 +18,7 @@ widthSGaojia: S-Elevated Road Width
 widthXXiangdao: X-Township Road Width
 widthYXiaodao: Y-County Road Width
 widthCCundao: C-Village Road Width
+rdpEpsilon: RDP Epsilon
 toggleRecording: Toggle Recording
 openMenu: Open Menu
 
@@ -32,5 +33,6 @@ openMenu: Open Menu
 "X乡道宽度": X-Township road width
 "Y县道宽度": Y-County road width
 "C村道宽度": C-Village road width
+"RDP简化容差（格），越大保留点越少": RDP simplification tolerance (blocks), larger value = fewer points
 "切换道路录制开关": Toggle road recording on/off
 "打开导航菜单": Open navigation menu

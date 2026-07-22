@@ -18,6 +18,7 @@ widthSGaojia: S高架宽度
 widthXXiangdao: X乡道宽度
 widthYXiaodao: Y县道宽度
 widthCCundao: C村道宽度
+rdpEpsilon: RDP简化容差
 toggleRecording: 切换道路录制
 openMenu: 打开导航菜单
 
@@ -32,5 +33,6 @@ openMenu: 打开导航菜单
 "X乡道宽度": X乡道宽度
 "Y县道宽度": Y县道宽度
 "C村道宽度": C村道宽度
+"RDP简化容差（格），越大保留点越少": RDP简化容差（格），越大保留点越少
 "切换道路录制开关": 切换道路录制开关
 "打开导航菜单": 打开导航菜单

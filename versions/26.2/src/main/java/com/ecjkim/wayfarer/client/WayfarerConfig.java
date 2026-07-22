@@ -26,8 +26,12 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
+import com.ecjkim.wayfarer.client.config.WayfarerHotkeys;
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
+
+import fi.dy.masa.malilib.config.options.ConfigHotkey;
+import fi.dy.masa.malilib.hotkeys.IKeybind;
 
 public class WayfarerConfig {
     private static final Gson GSON = new GsonBuilder().setPrettyPrinting().create();
@@ -41,6 +45,7 @@ public class WayfarerConfig {
     public double defaultWidth = 7.0;
     public String defaultClassification = "";
     public Map<String, List<HotkeyBind>> hotkeys = defaultHotkeys();
+    public double rdpEpsilon = 1.0;
 
     private WayfarerConfig() {}
 
@@ -93,8 +98,13 @@ public class WayfarerConfig {
     }
 
     public List<HotkeyBind> getHotkeysForAction(String action) {
-        List<HotkeyBind> binds = hotkeys.get(action);
-        return binds != null ? binds : Collections.emptyList();
+        if ("toggle_recording".equals(action)) {
+            return List.of(new HotkeyBind(WayfarerHotkeys.TOGGLE_RECORDING));
+        }
+        if ("open_menu".equals(action)) {
+            return List.of(new HotkeyBind(WayfarerHotkeys.OPEN_MENU));
+        }
+        return Collections.emptyList();
     }
 
     public double getWidthForClassification(String classification) {
@@ -143,6 +153,23 @@ public class WayfarerConfig {
             this.scanCode = scanCode;
             this.modifierKey = modifierKey;
             this.modifierScanCode = modifierScanCode;
+        }
+
+        public HotkeyBind(ConfigHotkey hotkey) {
+            IKeybind keybind = hotkey.getKeybind();
+            java.util.List<Integer> keys = keybind.getKeys();
+            int size = keys.size();
+            if (size == 0) {
+                this.key = -1;
+                this.modifierKey = -1;
+            } else if (size == 1) {
+                this.key = keys.get(0);
+                this.modifierKey = -1;
+            } else {
+                this.key = keys.get(size - 1);
+                this.modifierKey = keys.get(0);
+            }
+            this.scanCode = 0;
         }
 
         public String toDisplayString() {

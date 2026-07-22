@@ -33,12 +33,14 @@ public class WayfarerConfig {
     public final String defaultClassification;
     public final boolean useClassificationWidth;
     public final Map<String, Integer> classificationWidths;
+    public final double rdpEpsilon;
 
     private WayfarerConfig() {
         this.defaultWidth = WayfarerConfigs.Generic.DEFAULT_WIDTH.getDoubleValue();
         this.defaultClassification = WayfarerConfigs.Generic.DEFAULT_CLASSIFICATION.getStringValue();
         this.useClassificationWidth = WayfarerConfigs.Generic.USE_CLASSIFICATION_WIDTH.getBooleanValue();
         this.classificationWidths = WayfarerConfigs.Generic.getClassificationWidths();
+        this.rdpEpsilon = WayfarerConfigs.Generic.RDP_EPSILON.getDoubleValue();
     }
 
     public static WayfarerConfig getInstance() {
