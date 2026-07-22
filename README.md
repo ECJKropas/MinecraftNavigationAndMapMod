@@ -11,9 +11,9 @@ Wayfarer（越陌度阡）是一个客户端侧 Minecraft Fabric 模组，帮助
 
 | Minecraft | 模组版本 |
 | --------- | -------- |
-| 1.20.1    | 0.1.0    |
-| 26.1.1    | 0.1.0    |
-| 26.2      | 0.1.0    |
+| 1.20.1    | 0.2.1    |
+| 26.1.1    | 0.2.1    |
+| 26.2      | 0.2.1    |
 
 ## 使用方式
 
@@ -50,7 +50,8 @@ Wayfarer（越陌度阡）是一个客户端侧 Minecraft Fabric 模组，帮助
 
 ## 依赖
 
-- Fabric API（`fabric-lifecycle-events-v1`、`fabric-key-binding-api-v1`）
+- [malilib](https://github.com/sakura-ryoko/malilib)（**必需前置**，提供按键绑定与配置界面）
+- Fabric API（`fabric-lifecycle-events-v1`、`fabric-key-binding-api-v1`、`fabric-resource-loader-v0`）
 
 ## 构建
 
