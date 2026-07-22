@@ -226,6 +226,13 @@ public class RoadNetworkDatabase {
     }
 
     /**
+     * Returns an unmodifiable collection of all Segments (snapshot).
+     */
+    public java.util.Collection<Segment> getAllSegments() {
+        return new java.util.ArrayList<>(segments.values());
+    }
+
+    /**
      * Returns all Nodes belonging to the given Segment, in {@code nodeIds} order.
      */
     public List<Node> getNodesForSegment(UUID segmentId) {

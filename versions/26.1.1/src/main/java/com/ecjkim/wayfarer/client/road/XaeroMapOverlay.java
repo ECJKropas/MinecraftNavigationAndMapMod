@@ -146,10 +146,13 @@ public final class XaeroMapOverlay {
                     continue;
 
                 int lineWidth = 1;
-                if ("G".equals(classification))
-                    lineWidth = 3;
-                else if ("S".equals(classification))
-                    lineWidth = 2;
+                if (classification != null && !classification.isEmpty()) {
+                    char c = classification.charAt(0);
+                    if (c == 'G')
+                        lineWidth = 3;
+                    else if (c == 'S')
+                        lineWidth = 2;
+                }
 
                 renderSegment(graphics, nodes, effectiveScale, cameraX, cameraZ, centerX, centerY, color, lineWidth);
             }
@@ -219,14 +222,19 @@ public final class XaeroMapOverlay {
     }
 
     private static int classificationColor(String classification) {
-        if (classification == null)
+        if (classification == null || classification.isEmpty())
             return 0xFFa0b0c0;
-        return switch (classification) {
-            case "G" -> 0xFFD9432B;
-            case "S" -> 0xFFF0A030;
-            case "X" -> 0xFF5a6a7a;
-            case "Y" -> 0xFF8899aa;
-            default -> 0xFFa0b0c0;
-        };
+        switch (classification.charAt(0)) {
+            case 'G':
+                return 0xFFD9432B;
+            case 'S':
+                return 0xFFF0A030;
+            case 'X':
+                return 0xFF5a6a7a;
+            case 'Y':
+                return 0xFF8899aa;
+            default:
+                return 0xFFa0b0c0;
+        }
     }
 }

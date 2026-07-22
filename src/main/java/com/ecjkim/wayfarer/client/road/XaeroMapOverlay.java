@@ -217,20 +217,25 @@ public final class XaeroMapOverlay {
     }
 
     private static int classificationColor(String classification) {
-        if (classification == null)
+        if (classification == null || classification.isEmpty())
             return 0xFFa0b0c0;
-        return switch (classification) {
-            case "G" -> 0xFFD9432B;
-            case "S" -> 0xFFF0A030;
-            case "X" -> 0xFF5a6a7a;
-            case "Y" -> 0xFF8899aa;
-            default -> 0xFFa0b0c0;
-        };
+        switch (classification.charAt(0)) {
+            case 'G':
+                return 0xFFD9432B;
+            case 'S':
+                return 0xFFF0A030;
+            case 'X':
+                return 0xFF5a6a7a;
+            case 'Y':
+                return 0xFF8899aa;
+            default:
+                return 0xFFa0b0c0;
+        }
     }
 
     private static float classificationLineWidth(String classification) {
-        if (classification == null)
+        if (classification == null || classification.isEmpty())
             return 2.0f;
-        return "G".equals(classification) ? 4.0f : ("S".equals(classification) ? 3.0f : 2.0f);
+        return classification.charAt(0) == 'G' ? 4.0f : (classification.charAt(0) == 'S' ? 3.0f : 2.0f);
     }
 }

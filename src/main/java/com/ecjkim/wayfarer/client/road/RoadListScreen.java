@@ -589,10 +589,10 @@ public class RoadListScreen extends Screen {
             if (f.isEmpty() || (r.getName() != null && r.getName().toLowerCase().contains(f))) {
                 filteredRoads.add(r);
             }
-            for (Segment s : db.getSegmentsForRoad(r.getId())) {
-                if (s.getRoadId() == null)
-                    allUnfiled.add(s);
-            }
+        }
+        for (Segment s : db.getAllSegments()) {
+            if (s.getRoadId() == null)
+                allUnfiled.add(s);
         }
     }
 
