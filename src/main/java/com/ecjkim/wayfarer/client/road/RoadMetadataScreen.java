@@ -26,6 +26,8 @@ import net.minecraft.network.chat.Component;
 
 import com.ecjkim.wayfarer.client.WayfarerConfig;
 
+import me.fallenbreath.yamlang.api.I18n;
+
 import org.lwjgl.glfw.GLFW;
 
 public class RoadMetadataScreen extends Screen {
@@ -57,7 +59,7 @@ public class RoadMetadataScreen extends Screen {
 
     public RoadMetadataScreen(Mode mode, OnSaveCallback onSave, Runnable onCancel, String prefillName,
         String prefillWidth, String prefillClassification, String prefillNumber) {
-        super(Component.literal(mode == Mode.EDIT ? "修改道路" : "保存道路"));
+        super(Component.literal(mode == Mode.EDIT ? I18n.translate("wayfarer.road.gui.metadata.title_edit") : I18n.translate("wayfarer.road.gui.metadata.title_create")));
         this.mode = mode;
         this.onSave = onSave;
         this.onCancel = onCancel;
@@ -88,7 +90,7 @@ public class RoadMetadataScreen extends Screen {
         int hintY = classifLabelY + 46;
         int buttonY = top + panelHeight - 30;
 
-        this.nameBox = new EditBox(this.font, fieldLeft, nameBoxY, fieldWidth, 20, Component.literal("道路名"));
+        this.nameBox = new EditBox(this.font, fieldLeft, nameBoxY, fieldWidth, 20, Component.literal(I18n.translate("wayfarer.road.gui.metadata.field_name")));
         this.nameBox.setMaxLength(64);
         this.nameBox.setValue(prefillName != null ? prefillName : "");
         this.addRenderableWidget(this.nameBox);
@@ -96,7 +98,7 @@ public class RoadMetadataScreen extends Screen {
         if (!useClassify) {
             int widthLabelY = top + 82;
             int widthBoxY = widthLabelY + 12;
-            this.widthBox = new EditBox(this.font, fieldLeft, widthBoxY, fieldWidth, 20, Component.literal("道路宽度"));
+            this.widthBox = new EditBox(this.font, fieldLeft, widthBoxY, fieldWidth, 20, Component.literal(I18n.translate("wayfarer.road.gui.metadata.field_width")));
             this.widthBox.setValue(prefillWidth != null ? prefillWidth : "7");
             this.addRenderableWidget(this.widthBox);
         }
@@ -116,8 +118,8 @@ public class RoadMetadataScreen extends Screen {
         this.numberBox.setValue(prefillNumber != null ? prefillNumber : "");
         this.addRenderableWidget(this.numberBox);
 
-        String cancelLabel = mode == Mode.EDIT ? "放弃修改" : "放弃";
-        this.addRenderableWidget(Button.builder(Component.literal("保存"), button -> {
+        String cancelLabel = mode == Mode.EDIT ? I18n.translate("wayfarer.road.gui.metadata.button_cancel_edit") : I18n.translate("wayfarer.road.gui.metadata.button_cancel");
+        this.addRenderableWidget(Button.builder(Component.literal(I18n.translate("wayfarer.road.gui.metadata.button_save")), button -> {
             String roadName = this.nameBox.getValue().trim();
             String classification = CLASSIFICATIONS.get(classificationIndex);
             String number = this.numberBox.getValue().trim();
@@ -160,19 +162,19 @@ public class RoadMetadataScreen extends Screen {
         graphics.fill(left, top, left + PANEL_WIDTH, top + 1, 0xFF4E5768);
         graphics.fill(left, top + panelHeight - 1, left + PANEL_WIDTH, top + panelHeight, 0xFF1A1F27);
         graphics.drawCenteredString(this.font, this.title, centerX, top + 8, 16777215);
-        graphics.drawCenteredString(this.font, Component.literal("记录完成后补充名称和宽度"), centerX, top + 22, 11184810);
+        graphics.drawCenteredString(this.font, Component.literal(I18n.translate("wayfarer.road.gui.metadata.subtitle_width")), centerX, top + 22, 11184810);
 
         int fieldLeft = left + 20;
-        graphics.drawString(this.font, Component.literal("道路名"), fieldLeft, top + 40, 11184810, false);
+        graphics.drawString(this.font, Component.literal(I18n.translate("wayfarer.road.gui.metadata.field_name")), fieldLeft, top + 40, 11184810, false);
 
         if (!useClassify) {
-            graphics.drawString(this.font, Component.literal("道路宽度"), fieldLeft, top + 82, 11184810, false);
+            graphics.drawString(this.font, Component.literal(I18n.translate("wayfarer.road.gui.metadata.field_width")), fieldLeft, top + 82, 11184810, false);
         }
 
         int classifLabelY = useClassify ? top + 82 : top + 124;
         int hintY = classifLabelY + 46;
-        graphics.drawString(this.font, Component.literal("道路分级 / 编号"), fieldLeft, classifLabelY, 11184810, false);
-        graphics.drawString(this.font, Component.literal("分级与编号非必填；若名称留空则默认用「分级+编号」组合。"), fieldLeft, hintY, 8947848,
+        graphics.drawString(this.font, Component.literal(I18n.translate("wayfarer.road.gui.metadata.classification_number")), fieldLeft, classifLabelY, 11184810, false);
+        graphics.drawString(this.font, Component.literal(I18n.translate("wayfarer.road.gui.metadata.hint")), fieldLeft, hintY, 8947848,
             false);
         super.render(graphics, mouseX, mouseY, partialTick);
     }
@@ -189,7 +191,7 @@ public class RoadMetadataScreen extends Screen {
 
     private String classificationLabel() {
         String val = CLASSIFICATIONS.get(classificationIndex);
-        return val.isEmpty() ? "道路分级" : val;
+        return val.isEmpty() ? I18n.translate("wayfarer.road.gui.metadata.classification_default") : val;
     }
 
     private double parseWidth(String input) {

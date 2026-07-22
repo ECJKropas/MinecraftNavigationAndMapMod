@@ -110,7 +110,7 @@ dependencies {
     autoImplementation(":${gradleProperty("malilibDep")}")
 }
 
-val langDir = "assets/mcnav/lang"
+val langDir = "assets/wayfarer/lang"
 val javaCompatibility =
     when {
         mcVersion >= 26_00_00 -> JavaVersion.VERSION_25

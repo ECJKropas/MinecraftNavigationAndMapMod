@@ -2,6 +2,60 @@ key:
   wayfarer:
     toggle_road_recording: 切换道路记录
     open_road_list: 打开路线列表（N）
+    road:
+      gui:
+        title: 路线列表
+        search_placeholder: 搜索路线...
+        context_label: "当前实例: %s"
+        detail_header: 详情
+        road_count: "共 %d 条路线"
+        data_file: "数据文件: %s"
+        preview_url: "本地预览: %s"
+        no_selection: 暂无选中路线
+        empty_status: 没有已保存的路线
+        unnamed: 未命名
+        unnamed_road: 未命名道路
+        endpoint_location: "%s的%s在"
+        endpoint_hover: 点击填入传送指令
+        detail:
+          name: "名称: %s"
+          number: "号: %s"
+          number_none: 无
+          width: "宽度: %s 格"
+          points: "轨迹点: %d"
+          intersections: "交叉点: %d"
+          id: "ID: %s"
+        direction:
+          east: 东端
+          south: 南端
+          west: 西端
+          north: 北端
+          southeast: 东南端
+          southwest: 西南端
+          northwest: 西北端
+          northeast: 东北端
+          endpoint: 端点
+        status:
+          renamed: "已重命名: %s"
+          modified: "已修改: %s"
+          deleted: "已删除: %s"
+          browser_opened: 已在浏览器打开预览
+          browser_unsupported: "当前系统不支持自动打开浏览器，请手动访问 %s"
+          browser_failed: "打开浏览器失败：请手动访问 %s"
+        metadata:
+          title_edit: 修改道路
+          title_create: 保存道路
+          field_name: 道路名
+          field_width: 道路宽度
+          field_number: 编号
+          classification_default: 道路分级
+          classification_number: 道路分级 / 编号
+          hint: 分级与编号非必填；若名称留空则默认用「分级+编号」组合。
+          button_save: 保存
+          button_cancel_edit: 放弃修改
+          button_cancel: 放弃
+          subtitle_width: 记录完成后补充名称和宽度
+          subtitle_classify: 记录完成后补充名称和分级
 category:
   wayfarer: Wayfarer
 

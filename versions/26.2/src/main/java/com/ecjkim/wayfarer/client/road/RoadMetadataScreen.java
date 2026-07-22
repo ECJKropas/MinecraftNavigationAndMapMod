@@ -57,7 +57,7 @@ public class RoadMetadataScreen extends Screen {
 
     public RoadMetadataScreen(Mode mode, OnSaveCallback onSave, Runnable onCancel, String prefillName,
         String prefillWidth, String prefillClassification, String prefillNumber) {
-        super(Component.literal(mode == Mode.EDIT ? "修改道路" : "保存道路"));
+        super(Component.literal(mode == Mode.EDIT ? I18n.translate("wayfarer.road.gui.metadata.title_edit") : I18n.translate("wayfarer.road.gui.metadata.title_create")));
         this.mode = mode;
         this.onSave = onSave;
         this.onCancel = onCancel;
@@ -155,19 +155,19 @@ public class RoadMetadataScreen extends Screen {
         graphics.fill(left, top, left + PANEL_WIDTH, top + 1, 0xFF4E5768);
         graphics.fill(left, top + panelHeight - 1, left + PANEL_WIDTH, top + panelHeight, 0xFF1A1F27);
 
-        String subtitle = useClassify ? "记录完成后补充名称和分级" : "记录完成后补充名称和宽度";
+        String subtitle = useClassify ? I18n.translate("wayfarer.road.gui.metadata.subtitle_classify") : I18n.translate("wayfarer.road.gui.metadata.subtitle_width");
         graphics.centeredText(this.font, this.title, centerX, top + 8, 0xFFFFFFFF);
         graphics.centeredText(this.font, Component.literal(subtitle), centerX, top + 22, 0xFFAAAAAA);
 
-        graphics.text(this.font, Component.literal("道路名"), fieldLeft, top + 40, 0xFFAAAAAA, true);
+        graphics.text(this.font, Component.literal(I18n.translate("wayfarer.road.gui.metadata.field_name")), fieldLeft, top + 40, 0xFFAAAAAA, true);
         if (!useClassify) {
-            graphics.text(this.font, Component.literal("道路宽度"), fieldLeft, top + 82, 0xFFAAAAAA, true);
-            graphics.text(this.font, Component.literal("道路分级 / 编号"), fieldLeft, top + 124, 0xFFAAAAAA, true);
-            graphics.text(this.font, Component.literal("分级与编号非必填；若名称留空则默认用「分级+编号」组合。"), fieldLeft, top + 170,
+            graphics.text(this.font, Component.literal(I18n.translate("wayfarer.road.gui.metadata.field_width")), fieldLeft, top + 82, 0xFFAAAAAA, true);
+            graphics.text(this.font, Component.literal(I18n.translate("wayfarer.road.gui.metadata.classification_number")), fieldLeft, top + 124, 0xFFAAAAAA, true);
+            graphics.text(this.font, Component.literal(I18n.translate("wayfarer.road.gui.metadata.hint")), fieldLeft, top + 170,
                 0xFF888888, true);
         } else {
-            graphics.text(this.font, Component.literal("道路分级 / 编号"), fieldLeft, top + 82, 0xFFAAAAAA, true);
-            graphics.text(this.font, Component.literal("分级与编号非必填；若名称留空则默认用「分级+编号」组合。"), fieldLeft, top + 128,
+            graphics.text(this.font, Component.literal(I18n.translate("wayfarer.road.gui.metadata.classification_number")), fieldLeft, top + 82, 0xFFAAAAAA, true);
+            graphics.text(this.font, Component.literal(I18n.translate("wayfarer.road.gui.metadata.hint")), fieldLeft, top + 128,
                 0xFF888888, true);
         }
 

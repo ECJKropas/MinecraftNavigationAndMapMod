@@ -61,7 +61,7 @@ public class RoadListScreen extends Screen {
 
     public RoadListScreen(RoadDataStore roadDataStore, RoadPreviewServer previewServer,
         Consumer<RoadPath> onContinueRecording) {
-        super(Component.literal("路线列表"));
+        super(Component.literal(I18n.translate("wayfarer.road.gui.title")));
         this.roadDataStore = roadDataStore;
         this.previewServer = previewServer;
         this.onContinueRecording = onContinueRecording;
@@ -106,20 +106,20 @@ public class RoadListScreen extends Screen {
 
         // 4. 绘制所有文本（位于最上层）
         graphics.text(this.font, this.title, MARGIN, HEADER_TOP, 0xFFFFFFFF, true);
-        graphics.text(this.font, Component.literal("当前实例: " + roadDataStore.getContextLabel()), MARGIN, HEADER_TOP + 12,
+        graphics.text(this.font, Component.literal(String.format(I18n.translate("wayfarer.road.gui.context_label"), roadDataStore.getContextLabel())), MARGIN, HEADER_TOP + 12,
             0xFFAAAAAA, true);
         graphics.text(this.font, statusText, MARGIN, HEADER_TOP + 24, 0xFF888888, true);
 
-        graphics.text(this.font, Component.literal("路线列表"), leftPanelX + 12, PANEL_TOP + 6, 0xFFFFFFFF, true);
-        graphics.text(this.font, Component.literal("详情"), rightPanelX + 12, PANEL_TOP + 6, 0xFFFFFFFF, true);
+        graphics.text(this.font, Component.literal(I18n.translate("wayfarer.road.gui.title")), leftPanelX + 12, PANEL_TOP + 6, 0xFFFFFFFF, true);
+        graphics.text(this.font, Component.literal(I18n.translate("wayfarer.road.gui.detail_header")), rightPanelX + 12, PANEL_TOP + 6, 0xFFFFFFFF, true);
 
         List<RoadPath> roads = roadDataStore.getRoads();
-        graphics.text(this.font, Component.literal("共 " + roads.size() + " 条路线"), leftPanelX + 120, PANEL_TOP + 6,
+        graphics.text(this.font, Component.literal(String.format(I18n.translate("wayfarer.road.gui.road_count"), roads.size())), leftPanelX + 120, PANEL_TOP + 6,
             0xFFAAAAAA, true);
 
-        graphics.text(this.font, Component.literal("数据文件: " + roadDataStore.getDataFile()), MARGIN, panelBottomY + 4,
+        graphics.text(this.font, Component.literal(String.format(I18n.translate("wayfarer.road.gui.data_file"), roadDataStore.getDataFile())), MARGIN, panelBottomY + 4,
             0xFF888888, true);
-        graphics.text(this.font, Component.literal("本地预览: " + previewServer.getUrl()), MARGIN, panelBottomY + 16,
+        graphics.text(this.font, Component.literal(String.format(I18n.translate("wayfarer.road.gui.preview_url"), previewServer.getUrl())), MARGIN, panelBottomY + 16,
             0xFF888888, true);
 
         // 重命名模式下更新 EditBox 位置
@@ -137,7 +137,7 @@ public class RoadListScreen extends Screen {
         }
 
         if (selectedRoad == null) {
-            graphics.text(this.font, Component.literal("暂无选中路线"), rightPanelX + 12, PANEL_TOP + 24, 0xFFAAAAAA, true);
+            graphics.text(this.font, Component.literal(I18n.translate("wayfarer.road.gui.no_selection")), rightPanelX + 12, PANEL_TOP + 24, 0xFFAAAAAA, true);
             return;
         }
 
@@ -195,18 +195,18 @@ public class RoadListScreen extends Screen {
 
     private List<Component> buildDetailLines(RoadPath road) {
         List<Component> lines = new ArrayList<>();
-        lines.add(Component.literal("名称: " + safe(road.name)));
+        lines.add(Component.literal(String.format(I18n.translate("wayfarer.road.gui.detail.name"), safe(road.name))));
         String cls =
             road.classification != null && !road.classification.isEmpty() ? road.classification.substring(0, 1) : "";
         String cn = cls + (road.number != null ? road.number : "");
-        lines.add(Component.literal("号: " + (cn.isEmpty() ? "无" : cn)));
-        lines.add(Component.literal("宽度: " + road.width + " 格"));
-        lines.add(Component.literal("轨迹点: " + road.points.size()));
-        lines.add(Component.literal("交叉点: " + road.intersections.size()));
+        lines.add(Component.literal(String.format(I18n.translate("wayfarer.road.gui.detail.number"), cn.isEmpty() ? I18n.translate("wayfarer.road.gui.detail.number_none") : cn)));
+        lines.add(Component.literal(String.format(I18n.translate("wayfarer.road.gui.detail.width"), String.valueOf(road.width))));
+        lines.add(Component.literal(String.format(I18n.translate("wayfarer.road.gui.detail.points"), road.points.size())));
+        lines.add(Component.literal(String.format(I18n.translate("wayfarer.road.gui.detail.intersections"), road.intersections.size())));
         for (var inter : road.intersections) {
             lines.add(Component.literal("  └ " + safe(inter.roadName)));
         }
-        lines.add(Component.literal("ID: " + safe(road.id)));
+        lines.add(Component.literal(String.format(I18n.translate("wayfarer.road.gui.detail.id"), safe(road.id))));
         return lines;
     }
 
@@ -238,7 +238,7 @@ public class RoadListScreen extends Screen {
         if (roadList != null) {
             roadList.setSelected(selectedRoad == null ? null : roadList.findEntry(selectedRoad));
         }
-        setStatus(roads.isEmpty() ? "没有已保存的路线" : "共 " + roads.size() + " 条路线");
+        setStatus(roads.isEmpty() ? I18n.translate("wayfarer.road.gui.empty_status") : String.format(I18n.translate("wayfarer.road.gui.road_count"), roads.size()));
     }
 
     @Override
@@ -337,7 +337,7 @@ public class RoadListScreen extends Screen {
             new RoadMetadataScreen(RoadMetadataScreen.Mode.EDIT, (name, width, classification, number) -> {
                 roadDataStore.updateRoad(road.id, name, width, classification, number);
                 reloadEntries();
-                setStatus("已修改: " + name);
+                setStatus(String.format(I18n.translate("wayfarer.road.gui.status.modified"), name));
             }, () -> {
             }, road.name, String.valueOf(road.width), road.classification, road.number);
         this.minecraft.setScreenAndShow(editScreen);
@@ -379,22 +379,22 @@ public class RoadListScreen extends Screen {
         if (angle < 0)
             angle += 360;
         if (angle <= 15 || angle >= 345)
-            return "东端";
+            return I18n.translate("wayfarer.road.gui.direction.east");
         if (angle >= 75 && angle <= 105)
-            return "南端";
+            return I18n.translate("wayfarer.road.gui.direction.south");
         if (angle >= 165 && angle <= 195)
-            return "西端";
+            return I18n.translate("wayfarer.road.gui.direction.west");
         if (angle >= 255 && angle <= 285)
-            return "北端";
+            return I18n.translate("wayfarer.road.gui.direction.north");
         if (angle > 15 && angle < 75)
-            return "东南端";
+            return I18n.translate("wayfarer.road.gui.direction.southeast");
         if (angle > 105 && angle < 165)
-            return "西南端";
+            return I18n.translate("wayfarer.road.gui.direction.southwest");
         if (angle > 195 && angle < 255)
-            return "西北端";
+            return I18n.translate("wayfarer.road.gui.direction.northwest");
         if (angle > 285 && angle < 345)
-            return "东北端";
-        return "端点";
+            return I18n.translate("wayfarer.road.gui.direction.northeast");
+        return I18n.translate("wayfarer.road.gui.direction.endpoint");
     }
 
     private void clickEndpoint(String roadName, String direction, int x, int z) {
@@ -404,8 +404,8 @@ public class RoadListScreen extends Screen {
         Component coord = Component.literal(coordStr)
             .withStyle(Style.EMPTY.withColor(ChatFormatting.GREEN)
                 .withClickEvent(new ClickEvent.SuggestCommand("/tp " + x + " ~ " + z))
-                .withHoverEvent(new HoverEvent.ShowText(Component.literal("点击填入传送指令"))));
-        Component msg = Component.literal(safe(roadName) + "的" + direction + "在").append(coord);
+                .withHoverEvent(new HoverEvent.ShowText(Component.literal(I18n.translate("wayfarer.road.gui.endpoint_hover")))));
+        Component msg = Component.literal(String.format(I18n.translate("wayfarer.road.gui.endpoint_location"), safe(roadName), direction)).append(coord);
         minecraft.player.sendSystemMessage(msg);
         this.minecraft.setScreenAndShow(null);
     }
