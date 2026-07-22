@@ -27,9 +27,6 @@ import com.ecjkim.wayfarer.client.road.RoadMetadataScreen;
 import com.ecjkim.wayfarer.client.road.RoadPreviewServer;
 import com.ecjkim.wayfarer.client.road.RoadRecordingManager;
 import com.ecjkim.wayfarer.client.road.XaeroMapOverlay;
-import com.ecjkim.wayfarer.client.road.map.ProviderManager;
-import com.ecjkim.wayfarer.client.road.map.SelfBuiltProvider;
-import com.ecjkim.wayfarer.client.road.map.XaeroProvider;
 import com.ecjkim.wayfarer.client.road.model.RoadPath;
 
 import org.lwjgl.glfw.GLFW;
@@ -48,23 +45,10 @@ public class WayfarerClient implements ClientModInitializer {
     public void onInitializeClient() {
         PREVIEW_SERVER.start();
 
-        // init tile providers
-        ProviderManager pm =
-            new ProviderManager(ProviderManager.Mode.valueOf(WayfarerConfig.getInstance().tileProviderMode));
-        pm.add(new XaeroProvider());
-        SelfBuiltProvider selfBuilt = new SelfBuiltProvider();
-        pm.add(selfBuilt);
-        PREVIEW_SERVER.setProviderManager(pm);
-
-        // Enable background tile pre-rendering: listen to chunk loads so that newly explored
-        // chunks automatically trigger tile rendering in worker threads.
-        selfBuilt.registerListeners();
-
         XaeroMapOverlay.register();
         var lifecycles = net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientLifecycleEvents.CLIENT_STOPPING;
         lifecycles.register(client -> {
             PREVIEW_SERVER.stop();
-            pm.shutdown();
         });
         var ticks = net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientTickEvents.END_CLIENT_TICK;
         ticks.register(this::handleClientTick);

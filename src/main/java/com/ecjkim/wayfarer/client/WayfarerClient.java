@@ -29,9 +29,6 @@ import com.ecjkim.wayfarer.client.road.RoadMetadataScreen;
 import com.ecjkim.wayfarer.client.road.RoadPreviewServer;
 import com.ecjkim.wayfarer.client.road.RoadRecordingManager;
 import com.ecjkim.wayfarer.client.road.XaeroMapOverlay;
-import com.ecjkim.wayfarer.client.road.map.ProviderManager;
-import com.ecjkim.wayfarer.client.road.map.SelfBuiltProvider;
-import com.ecjkim.wayfarer.client.road.map.XaeroProvider;
 import com.ecjkim.wayfarer.client.road.model.RoadPath;
 
 import org.lwjgl.glfw.GLFW;
@@ -44,7 +41,6 @@ public class WayfarerClient implements ClientModInitializer {
     private static final RoadDataStore ROAD_DATA_STORE = new RoadDataStore();
     private static final RoadPreviewServer PREVIEW_SERVER = new RoadPreviewServer(ROAD_DATA_STORE);
     private static final RoadRecordingManager ROAD_MANAGER = new RoadRecordingManager(ROAD_DATA_STORE);
-    private static ProviderManager PROVIDER_MANAGER;
 
     private final IntSet keysDownLastTick = new IntOpenHashSet();
 
@@ -54,24 +50,9 @@ public class WayfarerClient implements ClientModInitializer {
 
         PREVIEW_SERVER.start();
 
-        // init tile providers
-        ProviderManager pm =
-            new ProviderManager(ProviderManager.Mode.valueOf(WayfarerConfig.getInstance().tileProviderMode));
-        PROVIDER_MANAGER = pm;
-        SelfBuiltProvider selfBuilt = new SelfBuiltProvider();
-        pm.add(selfBuilt);
-        pm.add(new XaeroProvider());
-        PREVIEW_SERVER.setProviderManager(pm);
-
-        // Enable background tile pre-rendering: listen to chunk loads so that newly explored
-        // chunks automatically trigger tile rendering in worker threads.
-        selfBuilt.registerListeners();
-
         XaeroMapOverlay.register();
         ClientLifecycleEvents.CLIENT_STOPPING.register(client -> {
             PREVIEW_SERVER.stop();
-            if (pm != null)
-                pm.shutdown();
         });
         ClientTickEvents.END_CLIENT_TICK.register(this::handleClientTick);
     }
@@ -81,20 +62,6 @@ public class WayfarerClient implements ClientModInitializer {
     }
 
     public static void reloadHotkeys() {}
-
-    public static void setTileProviderMode(String mode) {
-        ProviderManager.Mode providerMode;
-        try {
-            providerMode = ProviderManager.Mode.valueOf(mode);
-        } catch (IllegalArgumentException e) {
-            providerMode = ProviderManager.Mode.AUTO;
-        }
-        WayfarerConfig.getInstance().tileProviderMode = providerMode.name();
-        if (PROVIDER_MANAGER != null) {
-            PROVIDER_MANAGER.setMode(providerMode);
-            PREVIEW_SERVER.clearTileCache();
-        }
-    }
 
     private void handleClientTick(Minecraft client) {
         ROAD_DATA_STORE.syncToCurrentContext();

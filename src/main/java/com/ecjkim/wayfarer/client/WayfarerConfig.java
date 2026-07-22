@@ -33,15 +33,12 @@ public class WayfarerConfig {
     public final String defaultClassification;
     public final boolean useClassificationWidth;
     public final Map<String, Integer> classificationWidths;
-    public String tileProviderMode;
 
     private WayfarerConfig() {
         this.defaultWidth = WayfarerConfigs.Generic.DEFAULT_WIDTH.getDoubleValue();
         this.defaultClassification = WayfarerConfigs.Generic.DEFAULT_CLASSIFICATION.getStringValue();
         this.useClassificationWidth = WayfarerConfigs.Generic.USE_CLASSIFICATION_WIDTH.getBooleanValue();
         this.classificationWidths = WayfarerConfigs.Generic.getClassificationWidths();
-        this.tileProviderMode =
-            ((WayfarerConfigs.TileProviderMode)WayfarerConfigs.Generic.TILE_PROVIDER_MODE.getOptionListValue()).name();
     }
 
     public static WayfarerConfig getInstance() {

@@ -16,14 +16,10 @@
  */
 package com.ecjkim.wayfarer.client.road;
 
-import java.awt.image.BufferedImage;
-import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.OutputStream;
 import java.net.InetSocketAddress;
 import java.nio.charset.StandardCharsets;
-import java.nio.file.Files;
-import java.nio.file.Path;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -31,13 +27,8 @@ import java.util.concurrent.Executors;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
-import javax.imageio.ImageIO;
-
-import net.minecraft.client.Minecraft;
-
 import com.ecjkim.wayfarer.client.road.layer.LayerManager;
 import com.ecjkim.wayfarer.client.road.layer.MapLayer;
-import com.ecjkim.wayfarer.client.road.map.ProviderManager;
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
 import com.sun.net.httpserver.HttpExchange;
@@ -51,33 +42,11 @@ public class RoadPreviewServer {
 
     private final RoadDataStore roadDataStore;
     private final LayerManager layerManager;
-    private ProviderManager providerManager;
     private HttpServer server;
-    private volatile long tileCacheVersion = System.currentTimeMillis();
 
     public RoadPreviewServer(RoadDataStore roadDataStore) {
         this.roadDataStore = roadDataStore;
         this.layerManager = new LayerManager();
-    }
-
-    public void setProviderManager(ProviderManager providerManager) {
-        this.providerManager = providerManager;
-    }
-
-    public void clearTileCache() {
-        tileCacheVersion++;
-        Path cacheRoot = Minecraft.getInstance().gameDirectory.toPath().resolve("wayfarer/tilecache");
-        if (!Files.exists(cacheRoot))
-            return;
-        try (var paths = Files.walk(cacheRoot)) {
-            paths.sorted((left, right) -> right.compareTo(left)).forEach(path -> {
-                try {
-                    Files.deleteIfExists(path);
-                } catch (IOException ignored) {
-                }
-            });
-        } catch (IOException ignored) {
-        }
     }
 
     public synchronized void start() {
@@ -92,11 +61,6 @@ public class RoadPreviewServer {
             server.createContext("/api/roads/v2/geojson", this::handleRoadsGeoJson);
             server.createContext("/api/roads/", this::handleRoadById);
             server.createContext("/api/layers", this::handleLayers);
-            server.createContext("/api/xaero/tiles/", this::handleXaeroTile);
-            server.createContext("/api/tiles/", this::handleTile);
-            server.createContext("/api/player-dimension", this::handlePlayerDimension);
-            server.createContext("/api/player-position", this::handlePlayerPosition);
-            server.createContext("/api/provider-status", this::handleProviderStatus);
             server.setExecutor(Executors.newSingleThreadExecutor(runnable -> {
                 Thread thread = new Thread(runnable, "Wayfarer Preview");
                 thread.setDaemon(true);
@@ -133,62 +97,6 @@ public class RoadPreviewServer {
     // ------------------------------------------------------------------
     // Handlers
     // ------------------------------------------------------------------
-
-    /** GET /api/player-dimension — returns current player dimension */
-    private void handlePlayerDimension(HttpExchange exchange) throws IOException {
-        if (!"GET".equalsIgnoreCase(exchange.getRequestMethod())) {
-            sendText(exchange, 405, "Method Not Allowed");
-            return;
-        }
-        try {
-            int dim = 0;
-            if (Minecraft.getInstance().level != null) {
-                var dimension = Minecraft.getInstance().level.dimension();
-                if (dimension == net.minecraft.world.level.Level.NETHER) {
-                    dim = -1;
-                } else if (dimension == net.minecraft.world.level.Level.END) {
-                    dim = 1;
-                }
-            }
-            sendText(exchange, 200, "{\"dimension\":" + dim + "}", "application/json; charset=utf-8");
-        } catch (Exception exception) {
-            LOGGER.log(Level.SEVERE, "Player dimension error", exception);
-            sendText(exchange, 500, jsonError("INTERNAL_ERROR", exception.getMessage()));
-        }
-    }
-
-    /** GET /api/player-position — returns player block coordinates */
-    private void handlePlayerPosition(HttpExchange exchange) throws IOException {
-        if (!"GET".equalsIgnoreCase(exchange.getRequestMethod())) {
-            sendText(exchange, 405, "Method Not Allowed");
-            return;
-        }
-        try {
-            double x = 0, z = 0;
-            var player = Minecraft.getInstance().player;
-            if (player != null) {
-                x = player.getX();
-                z = player.getZ();
-            }
-            sendText(exchange, 200, "{\"x\":" + x + ",\"z\":" + z + "}", "application/json; charset=utf-8");
-        } catch (Exception exception) {
-            LOGGER.log(Level.SEVERE, "Player position error", exception);
-            sendText(exchange, 500, jsonError("INTERNAL_ERROR", exception.getMessage()));
-        }
-    }
-
-    private void handleProviderStatus(HttpExchange exchange) throws IOException {
-        if (!"GET".equalsIgnoreCase(exchange.getRequestMethod())) {
-            sendText(exchange, 405, "Method Not Allowed");
-            return;
-        }
-        ProviderManager manager = providerManager;
-        String mode = manager == null ? "UNINITIALIZED" : manager.getMode().name();
-        String active = manager == null ? "None" : manager.getActiveProviderName();
-        sendText(exchange, 200,
-            "{\"mode\":\"" + mode + "\",\"active\":\"" + active + "\",\"version\":" + tileCacheVersion + "}",
-            "application/json; charset=utf-8");
-    }
 
     /** GET / — Leaflet SPA */
     private void handleRoot(HttpExchange exchange) throws IOException {
@@ -302,129 +210,9 @@ public class RoadPreviewServer {
         }
     }
 
-    /**
-     * GET /api/xaero/tiles/{z}/{x}/{y} — legacy alias, redirects to /api/tiles/
-     */
-    private void handleXaeroTile(HttpExchange exchange) throws IOException {
-        if (!"GET".equalsIgnoreCase(exchange.getRequestMethod())) {
-            sendText(exchange, 405, "Method Not Allowed");
-            return;
-        }
-        String path = exchange.getRequestURI().getPath();
-        // /api/xaero/tiles/{z}/{x}/{y} -> /api/tiles/0/{z}/{x}/{y}.png
-        String sub = path.substring("/api/xaero/tiles/".length());
-        String newPath = "/api/tiles/0/" + sub + ".png";
-        exchange.getResponseHeaders().set("Location", newPath);
-        exchange.sendResponseHeaders(302, -1);
-    }
-
-    /**
-     * GET /api/tiles/{dim}/{zoom}/{tileX}/{tileY}.png Delegates to ProviderManager for pixel data, encodes as PNG on
-     * output.
-     */
-    private void handleTile(HttpExchange exchange) throws IOException {
-        if (!"GET".equalsIgnoreCase(exchange.getRequestMethod())) {
-            sendText(exchange, 405, "Method Not Allowed");
-            return;
-        }
-        if (providerManager == null) {
-            sendTransparentPng(exchange);
-            return;
-        }
-
-        String path = exchange.getRequestURI().getPath();
-        // /api/tiles/{dim}/{zoom}/{tileX}/{tileY}.png
-        String sub = path.substring("/api/tiles/".length());
-        if (sub.endsWith(".png"))
-            sub = sub.substring(0, sub.length() - 4);
-        String[] parts = sub.split("/");
-        if (parts.length != 4) {
-            sendText(exchange, 400, "Bad tile path: expected /api/tiles/{dim}/{zoom}/{x}/{y}.png");
-            return;
-        }
-        try {
-            int dim = Integer.parseInt(parts[0]);
-            int zoom = Integer.parseInt(parts[1]);
-            int tileX = Integer.parseInt(parts[2]);
-            int tileY = Integer.parseInt(parts[3]);
-
-            // Try disk cache first
-            Path cachePath = tileCachePath(providerManager.getMode(), tileCacheVersion, dim, zoom, tileX, tileY);
-            if (Files.exists(cachePath)) {
-                byte[] cachedBytes = Files.readAllBytes(cachePath);
-                exchange.getResponseHeaders().set("Content-Type", "image/png");
-                exchange.getResponseHeaders().set("Cache-Control", "public, max-age=60");
-                exchange.sendResponseHeaders(200, cachedBytes.length);
-                try (OutputStream os = exchange.getResponseBody()) {
-                    os.write(cachedBytes);
-                }
-                return;
-            }
-
-            BufferedImage img = providerManager.getTile(dim, zoom, tileX, tileY);
-            if (img == null) {
-                providerManager.requestTileRender(dim, zoom, tileX, tileY);
-                sendNoCacheTransparentPng(exchange);
-                return;
-            }
-
-            ByteArrayOutputStream baos = new ByteArrayOutputStream();
-            ImageIO.write(img, "PNG", baos);
-            byte[] pngBytes = baos.toByteArray();
-
-            // Write to disk cache
-            try {
-                Files.createDirectories(cachePath.getParent());
-                Files.write(cachePath, pngBytes);
-            } catch (IOException ignored) {
-            }
-
-            exchange.getResponseHeaders().set("Content-Type", "image/png");
-            exchange.getResponseHeaders().set("Cache-Control", "public, max-age=10");
-            exchange.sendResponseHeaders(200, pngBytes.length);
-            try (OutputStream os = exchange.getResponseBody()) {
-                os.write(pngBytes);
-            }
-        } catch (NumberFormatException e) {
-            sendText(exchange, 400, "Invalid tile coordinates");
-        } catch (Exception e) {
-            LOGGER.log(Level.WARNING, "Tile render error", e);
-            sendTransparentPng(exchange);
-        }
-    }
-
-    private void sendTransparentPng(HttpExchange exchange) throws IOException {
-        byte[] transparentPng = {(byte)0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A, 0x00, 0x00, 0x00, 0x0D, 0x49,
-            0x48, 0x44, 0x52, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x01, 0x08, 0x06, 0x00, 0x00, 0x00, 0x1F, 0x15,
-            (byte)0xC4, (byte)0x89, 0x00, 0x00, 0x00, 0x0A, 0x49, 0x44, 0x41, 0x54, 0x78, (byte)0x9C, 0x62, 0x00, 0x00,
-            0x00, 0x02, 0x00, 0x01, (byte)0xE5, 0x27, (byte)0xDE, (byte)0xFC, 0x00, 0x00, 0x00, 0x00, 0x49, 0x45, 0x4E,
-            0x44, (byte)0xAE, 0x42, 0x60, (byte)0x82};
-
-        exchange.getResponseHeaders().set("Content-Type", "image/png");
-        exchange.getResponseHeaders().set("Cache-Control", "public, max-age=10");
-        exchange.sendResponseHeaders(200, transparentPng.length);
-        try (OutputStream os = exchange.getResponseBody()) {
-            os.write(transparentPng);
-        }
-    }
-
-    /** Send a retryable response when a tile is not ready yet. */
-    private void sendNoCacheTransparentPng(HttpExchange exchange) throws IOException {
-        exchange.getResponseHeaders().set("Cache-Control", "no-cache, no-store, must-revalidate");
-        exchange.sendResponseHeaders(404, -1);
-        exchange.close();
-    }
-
     // ------------------------------------------------------------------
     // Helpers
     // ------------------------------------------------------------------
-
-    private static Path tileCachePath(ProviderManager.Mode mode, long version, int dim, int zoom, int tileX,
-        int tileY) {
-        return Minecraft.getInstance().gameDirectory.toPath().resolve("wayfarer/tilecache").resolve(String.valueOf(dim))
-            .resolve(mode.name()).resolve(String.valueOf(version)).resolve(String.valueOf(zoom))
-            .resolve(tileX + "_" + tileY + ".png");
-    }
 
     private void sendText(HttpExchange exchange, int statusCode, String content) throws IOException {
         sendText(exchange, statusCode, content, "text/plain; charset=utf-8");
@@ -752,7 +540,6 @@ public class RoadPreviewServer {
                 var map = L.map('map',{crs:crs,zoomControl:true,attributionControl:false});
 
                 // Defer initial view to loadData's fitBounds to avoid race condition
-                var initialViewPending = true;
 
                 var recenterBtn = L.control({position:'topleft'});
                 recenterBtn.onAdd = function(){
@@ -831,143 +618,9 @@ public class RoadPreviewServer {
 
                 var intersectionLayer = L.layerGroup().addTo(map);
 
-                // Light grid tile layer
-                L.gridLayer({maxZoom:18,tileSize:256,
-                  createTile:function(c){
-                    var t=L.DomUtil.create('canvas','');
-                    t.width=256;t.height=256;
-                    var ctx=t.getContext('2d');
-                    ctx.clearRect(0,0,256,256);
-                    ctx.strokeStyle='rgba(0,0,0,0.08)';ctx.lineWidth=0.5;
-                    var gs=256;
-                    if(c.z>=14) gs=16; else if(c.z>=12) gs=32; else if(c.z>=10) gs=64; else if(c.z>=8) gs=128;
-                    for(var x=gs;x<256;x+=gs){ctx.beginPath();ctx.moveTo(x,0);ctx.lineTo(x,256);ctx.stroke();}
-                    for(var y=gs;y<256;y+=gs){ctx.beginPath();ctx.moveTo(0,y);ctx.lineTo(256,y);ctx.stroke();}
-                    if(c.z>=12){
-                      ctx.fillStyle='rgba(0,0,0,0.25)';ctx.font='8px monospace';
-                      var nwX=c.x*256,nwY=c.y*256,seX=(c.x+1)*256,seY=(c.y+1)*256;
-                      ctx.fillText(nwX.toFixed(0)+','+nwY.toFixed(0),4,14);
-                      ctx.fillText(seX.toFixed(0)+','+seY.toFixed(0),4,246);
-                    }
-                    return t;
-                  }
-                }).addTo(map);
-
-                // Chunk grid canvas overlay — covers entire viewport on any pan/zoom
-                var ChunkGridCanvas = L.Layer.extend({
-                  onAdd: function(map) {
-                    this._map = map;
-                    var canvas = this._canvas = L.DomUtil.create('canvas', '');
-                    canvas.style.position = 'absolute';
-                    canvas.style.pointerEvents = 'none';
-                    canvas.style.zIndex = '50';
-                    map.getPane('overlayPane').appendChild(canvas);
-                    this._resize();
-                    this._draw();
-                    map.on('moveend zoomend', this._draw, this);
-                    map.on('resize', this._onResize, this);
-                  },
-                  onRemove: function(map) {
-                    L.DomUtil.remove(this._canvas);
-                    map.off('moveend zoomend', this._draw, this);
-                    map.off('resize', this._onResize, this);
-                    this._map = null;
-                  },
-                  _onResize: function() {
-                    this._resize();
-                    this._draw();
-                  },
-                  _resize: function() {
-                    var s = this._map.getSize();
-                    this._canvas.width = s.x;
-                    this._canvas.height = s.y;
-                    this._canvas.style.width = s.x + 'px';
-                    this._canvas.style.height = s.y + 'px';
-                  },
-                  _draw: function() {
-                    if (!this._map) return;
-                    var ctx = this._canvas.getContext('2d');
-                    ctx.clearRect(0, 0, this._canvas.width, this._canvas.height);
-                    var b = this._map.getBounds();
-                    var z = this._map.getZoom();
-                    // chunk (16 blocks) above z=-3, region (256 blocks) below
-                    var STEP = z >= -3 ? 16 : z >= -7 ? 256 : 4096;
-                    var sw = b.getSouthWest(), ne = b.getNorthEast();
-                    var minX = sw.lng, maxX = ne.lng, minY = sw.lat, maxY = ne.lat;
-                    var cx0 = Math.floor(minX / STEP) * STEP;
-                    var cy0 = Math.floor(minY / STEP) * STEP;
-                    ctx.strokeStyle = 'rgba(0,0,0,0.08)';
-                    ctx.lineWidth = 1;
-                    ctx.setLineDash([2, 4]);
-                    // vertical lines
-                    for (var x = cx0; x <= maxX; x += STEP) {
-                      var a = this._map.latLngToContainerPoint([minY, x]);
-                      var d = this._map.latLngToContainerPoint([maxY, x]);
-                      ctx.beginPath(); ctx.moveTo(a.x, a.y); ctx.lineTo(d.x, d.y); ctx.stroke();
-                    }
-                    // horizontal lines
-                    for (var y = cy0; y <= maxY; y += STEP) {
-                      var a = this._map.latLngToContainerPoint([y, minX]);
-                      var d = this._map.latLngToContainerPoint([y, maxX]);
-                      ctx.beginPath(); ctx.moveTo(a.x, a.y); ctx.lineTo(d.x, d.y); ctx.stroke();
-                    }
-                  }
-                });
-                var chunkGridLayer = new ChunkGridCanvas();
-                chunkGridLayer._layerId = 'administrative';
-
-                // Single dynamic tile layer auto-following player dimension
-                var currentDim = 0;
-                var providerVersion = 0;
-                var satTiles = L.tileLayer('/api/tiles/' + currentDim + '/{z}/{x}/{y}.png?v=' + providerVersion, {
-                  minZoom: -6, maxZoom: 18, maxNativeZoom: 0, tileSize: 256,
-                  opacity: 0.85, zIndex: 0,
-                  attribution: 'Wayfarer Tiles'
-                }).addTo(map);
-                var tileRetryTimer = null;
-                satTiles.on('tileerror', function(){
-                  if(tileRetryTimer !== null) return;
-                  tileRetryTimer = setTimeout(function(){
-                    tileRetryTimer = null;
-                    satTiles.redraw();
-                  }, 1200);
-                });
-
-                function pollDimension(){
-                  fetch('/api/player-dimension',{cache:'no-store'})
-                    .then(function(r){return r.ok ? r.json() : null;})
-                    .then(function(data){
-                      if(data && data.dimension !== undefined && data.dimension !== currentDim){
-                        currentDim = data.dimension;
-                        satTiles.setUrl('/api/tiles/' + currentDim + '/{z}/{x}/{y}.png?v=' + providerVersion);
-                      }
-                    })
-                    .catch(function(){});
-                }
-                setInterval(pollDimension, 2000);
-                pollDimension();
-
-                function pollProvider(){
-                  fetch('/api/provider-status',{cache:'no-store'})
-                    .then(function(r){return r.ok ? r.json() : null;})
-                    .then(function(data){
-                      if(!data) return;
-                      if(data.version !== providerVersion){
-                        providerVersion = data.version;
-                        satTiles.setUrl('/api/tiles/' + currentDim + '/{z}/{x}/{y}.png?v=' + providerVersion);
-                        satTiles.redraw();
-                      }
-                    })
-                    .catch(function(){});
-                }
-                setInterval(pollProvider, 1000);
-                pollProvider();
-
                 L.control.layers({},{
-                  '\u536B\u661F\u5730\u56FE': satTiles,
                   '\u9053\u8DEF\u8DEF\u7F51':geoJsonLayer,
-                  '\u4EA4\u53C9\u53E3':intersectionLayer,
-                  '\u533A\u5757\u7F51\u683C':chunkGridLayer
+                  '\u4EA4\u53C9\u53E3':intersectionLayer
                 },{position:'topright',collapsed:false}).addTo(map);
 
                 // data
@@ -1070,7 +723,6 @@ public class RoadPreviewServer {
                           map.fitBounds(b.pad(0.15),{maxZoom:0});
                         }
                       }
-                      // ChunkGridCanvas auto-redraws via moveend/zoomend events
                     })
                     .catch(function(err){
                       console.error('Wayfarer load error',err);

@@ -22,62 +22,13 @@ import java.util.List;
 import com.google.common.collect.ImmutableList;
 
 import fi.dy.masa.malilib.config.IConfigBase;
-import fi.dy.masa.malilib.config.IConfigOptionListEntry;
 import fi.dy.masa.malilib.config.options.ConfigBoolean;
 import fi.dy.masa.malilib.config.options.ConfigDouble;
 import fi.dy.masa.malilib.config.options.ConfigInteger;
-import fi.dy.masa.malilib.config.options.ConfigOptionList;
 import fi.dy.masa.malilib.config.options.ConfigString;
 
 public class WayfarerConfigs {
     public static final int CURRENT_VERSION = 1;
-
-    public enum TileProviderMode implements IConfigOptionListEntry {
-        AUTO("auto", "自动（优先Xaero）"), XAERO_ONLY("xaero_only", "仅Xaero"), SELF_BUILT("self_built", "自建瓦片");
-
-        public static final ImmutableList<TileProviderMode> VALUES = ImmutableList.copyOf(values());
-
-        private final String configString;
-        private final String displayName;
-
-        TileProviderMode(String configString, String displayName) {
-            this.configString = configString;
-            this.displayName = displayName;
-        }
-
-        @Override
-        public String getStringValue() {
-            return this.configString;
-        }
-
-        @Override
-        public String getDisplayName() {
-            return this.displayName;
-        }
-
-        @Override
-        public IConfigOptionListEntry cycle(boolean forward) {
-            int idx = this.ordinal();
-            int next = forward ? idx + 1 : idx - 1;
-            if (next >= VALUES.size()) {
-                next = 0;
-            }
-            if (next < 0) {
-                next = VALUES.size() - 1;
-            }
-            return VALUES.get(next);
-        }
-
-        @Override
-        public IConfigOptionListEntry fromString(String value) {
-            for (TileProviderMode mode : VALUES) {
-                if (mode.configString.equals(value)) {
-                    return mode;
-                }
-            }
-            return AUTO;
-        }
-    }
 
     public static class Generic {
         public static final ConfigBoolean USE_CLASSIFICATION_WIDTH =
@@ -88,9 +39,6 @@ public class WayfarerConfigs {
         public static final ConfigString DEFAULT_CLASSIFICATION =
             new ConfigString("defaultClassification", "", "新建道路时默认使用的分级代码，如 G国道、S省道");
 
-        public static final ConfigOptionList TILE_PROVIDER_MODE =
-            new ConfigOptionList("tileProviderMode", TileProviderMode.AUTO, "地图瓦片提供者模式");
-
         public static final ConfigInteger WIDTH_G_GUODAO = new ConfigInteger("widthGGuodao", 21, 1, 100, "G国道宽度");
         public static final ConfigInteger WIDTH_G_GAOSU = new ConfigInteger("widthGGaosu", 21, 1, 100, "G高速宽度");
         public static final ConfigInteger WIDTH_S_SHENGDAO = new ConfigInteger("widthSShengdao", 17, 1, 100, "S省道宽度");
@@ -99,9 +47,9 @@ public class WayfarerConfigs {
         public static final ConfigInteger WIDTH_Y_XIANDAO = new ConfigInteger("widthYXiaodao", 7, 1, 100, "Y县道宽度");
         public static final ConfigInteger WIDTH_C_CUNDAO = new ConfigInteger("widthCCundao", 3, 1, 100, "C村道宽度");
 
-        public static final ImmutableList<IConfigBase> OPTIONS = ImmutableList.of(USE_CLASSIFICATION_WIDTH,
-            DEFAULT_WIDTH, DEFAULT_CLASSIFICATION, TILE_PROVIDER_MODE, WIDTH_G_GUODAO, WIDTH_G_GAOSU, WIDTH_S_SHENGDAO,
-            WIDTH_S_GAOJIA, WIDTH_X_XIANGDAO, WIDTH_Y_XIANDAO, WIDTH_C_CUNDAO);
+        public static final ImmutableList<IConfigBase> OPTIONS =
+            ImmutableList.of(USE_CLASSIFICATION_WIDTH, DEFAULT_WIDTH, DEFAULT_CLASSIFICATION, WIDTH_G_GUODAO,
+                WIDTH_G_GAOSU, WIDTH_S_SHENGDAO, WIDTH_S_GAOJIA, WIDTH_X_XIANGDAO, WIDTH_Y_XIANDAO, WIDTH_C_CUNDAO);
 
         public static LinkedHashMap<String, Integer> getClassificationWidths() {
             LinkedHashMap<String, Integer> map = new LinkedHashMap<>();
