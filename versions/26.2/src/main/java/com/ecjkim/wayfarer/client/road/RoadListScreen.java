@@ -133,19 +133,22 @@ public class RoadListScreen extends Screen {
             newRoadBtn = Button.builder(Component.literal(I18n.get("wayfarer.road.gui.new_road")), b -> createNewRoad())
                 .bounds(colLeftX + 4, this.height - STATUS_H - BTN_H - 2, halfW, BTN_H).build();
             addRenderableWidget(newRoadBtn);
-            delRoadBtn = Button.builder(Component.literal("Delete Road"), b -> deleteSelectedRoad())
-                .bounds(colLeftX + 8 + halfW, this.height - STATUS_H - BTN_H - 2, halfW, BTN_H).build();
+            delRoadBtn =
+                Button.builder(Component.literal(I18n.get("wayfarer.road.gui.delete_road")), b -> deleteSelectedRoad())
+                    .bounds(colLeftX + 8 + halfW, this.height - STATUS_H - BTN_H - 2, halfW, BTN_H).build();
             addRenderableWidget(delRoadBtn);
 
-            editSegBtn = Button.builder(Component.literal("Edit"), b -> {
+            editSegBtn = Button.builder(Component.literal(I18n.get("wayfarer.road.gui.edit")), b -> {
             }).bounds(colMidX + 4, this.height - STATUS_H - BTN_H - 2, 45, BTN_H).build();
             addRenderableWidget(editSegBtn);
-            delSegBtn = Button.builder(Component.literal("Delete"), b -> deleteSelectedSegment())
-                .bounds(colMidX + 53, this.height - STATUS_H - BTN_H - 2, 45, BTN_H).build();
+            delSegBtn =
+                Button.builder(Component.literal(I18n.get("wayfarer.road.gui.delete")), b -> deleteSelectedSegment())
+                    .bounds(colMidX + 53, this.height - STATUS_H - BTN_H - 2, 45, BTN_H).build();
             addRenderableWidget(delSegBtn);
 
-            delNodeBtn = Button.builder(Component.literal("Delete"), b -> deleteSelectedNode())
-                .bounds(colRightX + 4, this.height - STATUS_H - BTN_H - 2, 45, BTN_H).build();
+            delNodeBtn =
+                Button.builder(Component.literal(I18n.get("wayfarer.road.gui.delete")), b -> deleteSelectedNode())
+                    .bounds(colRightX + 4, this.height - STATUS_H - BTN_H - 2, 45, BTN_H).build();
             addRenderableWidget(delNodeBtn);
         }
 
@@ -343,7 +346,7 @@ public class RoadListScreen extends Screen {
                     tn += s.getNodeIds().size();
             }
         }
-        String text = "Nodes " + tn + " / Segments " + ts + " / Roads " + tr;
+        String text = I18n.get("wayfarer.road.gui.status_bar", tn, ts, tr);
         g.centeredText(this.font, text, this.width / 2, sy + 1, 0xFF888888);
     }
 

@@ -44,6 +44,9 @@ key:
           browser_failed: "Failed to open browser. Please manually visit %s"
         unfiled_segments: Unfiled Segments
         new_road: New Road
+        delete_road: Delete Road
+        edit: Edit
+        delete: Delete
         select_mode_title: Select a Road
         delete_node_warning: "This node is referenced by {0} segments. Delete anyway?"
         status_bar: "Nodes {0} / Segments {1} / Roads {2}"

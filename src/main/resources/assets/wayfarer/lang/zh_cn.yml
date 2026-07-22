@@ -44,6 +44,9 @@ key:
           browser_failed: "打开浏览器失败：请手动访问 %s"
         unfiled_segments: 未归档路段
         new_road: 新建道路
+        delete_road: 删除道路
+        edit: 编辑
+        delete: 删除
         select_mode_title: 选择道路
         delete_node_warning: "该节点被 {0} 个路段引用，确认删除？"
         status_bar: "总节点 {0} / 总路段 {1} / 总道路 {2}"
