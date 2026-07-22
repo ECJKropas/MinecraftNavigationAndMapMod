@@ -1,71 +1,70 @@
-key:
-  wayfarer:
-    toggle_road_recording: Toggle road recording
-    open_road_list: Open road list (N)
-    road:
-      gui:
-        title: Road List
-        search_placeholder: Search roads...
-        context_label: "Current Instance: %s"
-        detail_header: Details
-        road_count: "%d road(s) total"
-        data_file: "Data file: %s"
-        preview_url: "Local preview: %s"
-        no_selection: No road selected
-        empty_status: No saved roads
-        unnamed: Unnamed
-        unnamed_road: Unnamed Road
-        endpoint_location: "%s's %s at "
-        endpoint_hover: Click to fill teleport command
-        detail:
-          name: "Name: %s"
-          number: "Number: %s"
-          number_none: "None"
-          width: "Width: %s blocks"
-          points: "Track points: %d"
-          intersections: "Intersections: %d"
-          id: "ID: %s"
-        direction:
-          east: East End
-          south: South End
-          west: West End
-          north: North End
-          southeast: Southeast End
-          southwest: Southwest End
-          northwest: Northwest End
-          northeast: Northeast End
-          endpoint: Endpoint
-        status:
-          renamed: "Renamed: %s"
-          modified: "Modified: %s"
-          deleted: "Deleted: %s"
-          browser_opened: Opened preview in browser
-          browser_unsupported: "Cannot auto-open browser. Please manually visit %s"
-          browser_failed: "Failed to open browser. Please manually visit %s"
-        unfiled_segments: Unfiled Segments
-        new_road: New Road
-        delete_road: Delete Road
-        edit: Edit
-        delete: Delete
-        select_mode_title: Select a Road
-        delete_node_warning: "This node is referenced by {0} segments. Delete anyway?"
-        status_bar: "Nodes {0} / Segments {1} / Roads {2}"
-        metadata:
-          title_edit: Edit Road
-          title_create: Save Road
-          select_road: Select Existing Road
-          create_new: Create New Road
-          field_name: Road Name
-          field_width: Road Width
-          field_number: Number
-          classification_default: Classification
-          classification_number: Classification / Number
-          hint: Classification & number are optional. If name is blank, it defaults to 「classification+number」.
-          button_save: Save
-          button_cancel_edit: Discard Changes
-          button_cancel: Cancel
-          subtitle_width: Fill in name and width after recording
-          subtitle_classify: Fill in name and classification after recording
+wayfarer:
+  toggle_road_recording: Toggle road recording
+  open_road_list: Open road list (N)
+  road:
+    gui:
+      title: Road List
+      search_placeholder: Search roads...
+      context_label: "Current Instance: %s"
+      detail_header: Details
+      road_count: "%d road(s) total"
+      data_file: "Data file: %s"
+      preview_url: "Local preview: %s"
+      no_selection: No road selected
+      empty_status: No saved roads
+      unnamed: Unnamed
+      unnamed_road: Unnamed Road
+      endpoint_location: "%s's %s at "
+      endpoint_hover: Click to fill teleport command
+      detail:
+        name: "Name: %s"
+        number: "Number: %s"
+        number_none: "None"
+        width: "Width: %s blocks"
+        points: "Track points: %d"
+        intersections: "Intersections: %d"
+        id: "ID: %s"
+      direction:
+        east: East End
+        south: South End
+        west: West End
+        north: North End
+        southeast: Southeast End
+        southwest: Southwest End
+        northwest: Northwest End
+        northeast: Northeast End
+        endpoint: Endpoint
+      status:
+        renamed: "Renamed: %s"
+        modified: "Modified: %s"
+        deleted: "Deleted: %s"
+        browser_opened: Opened preview in browser
+        browser_unsupported: "Cannot auto-open browser. Please manually visit %s"
+        browser_failed: "Failed to open browser. Please manually visit %s"
+      unfiled_segments: Unfiled Segments
+      new_road: New Road
+      delete_road: Delete Road
+      edit: Edit
+      delete: Delete
+      select_mode_title: Select a Road
+      delete_node_warning: "This node is referenced by {0} segments. Delete anyway?"
+      status_bar: "Nodes %d / Segments %d / Roads %d"
+      metadata:
+        title_edit: Edit Road
+        title_create: Save Road
+        select_road: Select Existing Road
+        create_new: Create New Road
+        field_name: Road Name
+        field_width: Road Width
+        field_number: Number
+        classification_default: Classification
+        classification_number: Classification / Number
+        hint: Classification & number are optional. If name is blank, it defaults to 「classification+number」.
+        button_save: Save
+        button_cancel_edit: Discard Changes
+        button_cancel: Cancel
+        subtitle_width: Fill in name and width after recording
+        subtitle_classify: Fill in name and classification after recording
 category:
   wayfarer: Wayfarer
 
