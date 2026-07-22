@@ -163,12 +163,14 @@ public class RoadRecordingManager {
 
         // --- 轨迹简化（回退去除 + RDP） ---
         int beforeCount = updated.points.size();
-        double epsilon = WayfarerConfig.getInstance().rdpEpsilon;
-        updated.points = RoadSimplifier.simplify(updated.points, BACKTRACK_THRESHOLD, epsilon);
+        WayfarerConfig config = WayfarerConfig.getInstance();
+        String epsilonFormula = config.rdpEpsilonFormula;
+        double dw = config.getWidthForClassification(classification);
+        updated.points = RoadSimplifier.simplify(updated.points, BACKTRACK_THRESHOLD, epsilonFormula, width, dw);
         int afterCount = updated.points.size();
         if (beforeCount != afterCount) {
-            LOGGER.log(Level.INFO, "Simplified appended road \"{0}\": {1} → {2} points (ε={3})",
-                new Object[] {name, beforeCount, afterCount, epsilon});
+            LOGGER.log(Level.INFO, "Simplified appended road \"{0}\": {1} → {2} points (formula={3})",
+                new Object[] {name, beforeCount, afterCount, epsilonFormula});
         }
 
         snapEndpoints(updated);
@@ -246,12 +248,14 @@ public class RoadRecordingManager {
 
         // --- 轨迹简化（回退去除 + RDP） ---
         int beforeCount = road.points.size();
-        double epsilon = WayfarerConfig.getInstance().rdpEpsilon;
-        road.points = RoadSimplifier.simplify(road.points, BACKTRACK_THRESHOLD, epsilon);
+        WayfarerConfig config = WayfarerConfig.getInstance();
+        String epsilonFormula = config.rdpEpsilonFormula;
+        double dw = config.getWidthForClassification(classification);
+        road.points = RoadSimplifier.simplify(road.points, BACKTRACK_THRESHOLD, epsilonFormula, width, dw);
         int afterCount = road.points.size();
         if (beforeCount != afterCount) {
-            LOGGER.log(Level.INFO, "Simplified road \"{0}\": {1} → {2} points (ε={3})",
-                new Object[] {roadName, beforeCount, afterCount, epsilon});
+            LOGGER.log(Level.INFO, "Simplified road \"{0}\": {1} → {2} points (formula={3})",
+                new Object[] {roadName, beforeCount, afterCount, epsilonFormula});
         }
 
         snapEndpoints(road);

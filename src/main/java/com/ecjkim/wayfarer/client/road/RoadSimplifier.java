@@ -18,6 +18,8 @@ package com.ecjkim.wayfarer.client.road;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 
 import com.ecjkim.wayfarer.client.road.model.RoadPoint;
 
@@ -36,7 +38,105 @@ import com.ecjkim.wayfarer.client.road.model.RoadPoint;
  */
 public final class RoadSimplifier {
 
+    private static final Logger LOGGER = Logger.getLogger("Wayfarer");
+
     private RoadSimplifier() {}
+
+    // ──────────────────────────────────────────────
+    // 公式求值
+    // ──────────────────────────────────────────────
+
+    /**
+     * 求值 epsilon 公式字符串。
+     *
+     * <p>
+     * 支持占位符 {@code [RW]}（Road Width，道路宽度）和 {@code [DW]}（Default Width，等级默认宽度）。 支持基本四则运算（+ - * /）与括号。 若公式解析失败，回退为
+     * {@code rw / 2.0}。
+     *
+     * @param formula 公式字符串，如 {@code "[RW]/2"}
+     * @param rw 当前道路的实际宽度
+     * @param dw 当前道路等级对应的默认宽度
+     * @return 求值结果（非负）
+     */
+    public static double evaluateFormula(String formula, double rw, double dw) {
+        if (formula == null || formula.trim().isEmpty()) {
+            return rw / 2.0;
+        }
+        try {
+            String expr = formula.replace("[RW]", Double.toString(rw)).replace("[DW]", Double.toString(dw));
+            double result = parseExpression(expr);
+            return Math.max(0.0, result);
+        } catch (Exception e) {
+            LOGGER.log(Level.WARNING,
+                "[Wayfarer] Failed to evaluate RDP formula '" + formula + "', falling back to RW/2", e);
+            return rw / 2.0;
+        }
+    }
+
+    // ── 递归下降表达式解析器 ──
+
+    private static String expr;
+    private static int pos;
+
+    private static double parseExpression(String s) {
+        expr = s.replaceAll("\\s+", "");
+        pos = 0;
+        return parseExpressionInternal();
+    }
+
+    private static double parseExpressionInternal() {
+        double val = parseTerm();
+        while (pos < expr.length()) {
+            char op = expr.charAt(pos);
+            if (op == '+' || op == '-') {
+                pos++;
+                double rhs = parseTerm();
+                val = (op == '+') ? val + rhs : val - rhs;
+            } else {
+                break;
+            }
+        }
+        return val;
+    }
+
+    private static double parseTerm() {
+        double val = parseFactor();
+        while (pos < expr.length()) {
+            char op = expr.charAt(pos);
+            if (op == '*' || op == '/') {
+                pos++;
+                double rhs = parseFactor();
+                val = (op == '*') ? val * rhs : val / rhs;
+            } else {
+                break;
+            }
+        }
+        return val;
+    }
+
+    private static double parseFactor() {
+        if (pos >= expr.length()) {
+            throw new IllegalArgumentException("Unexpected end of expression");
+        }
+        char ch = expr.charAt(pos);
+        if (ch == '(') {
+            pos++;
+            double val = parseExpressionInternal();
+            if (pos < expr.length() && expr.charAt(pos) == ')') {
+                pos++;
+            }
+            return val;
+        }
+        // parse number
+        int start = pos;
+        if (ch == '-')
+            pos++;
+        while (pos < expr.length() && (Character.isDigit(expr.charAt(pos)) || expr.charAt(pos) == '.')) {
+            pos++;
+        }
+        double val = Double.parseDouble(expr.substring(start, pos));
+        return val;
+    }
 
     // ──────────────────────────────────────────────
     // 公开 API
@@ -116,12 +216,16 @@ public final class RoadSimplifier {
      *
      * @param points 原始轨迹点
      * @param backtrackThreshold 回退检测阈值（格）
-     * @param rdpEpsilon RDP 简化容差（格）
+     * @param epsilonFormula epsilon 公式字符串，如 {@code "[RW]/2"}
+     * @param rw 道路实际宽度（Road Width）
+     * @param dw 等级默认宽度（Default Width）
      * @return 简化后的关键点列表
      */
-    public static List<RoadPoint> simplify(List<RoadPoint> points, double backtrackThreshold, double rdpEpsilon) {
+    public static List<RoadPoint> simplify(List<RoadPoint> points, double backtrackThreshold, String epsilonFormula,
+        double rw, double dw) {
+        double epsilon = evaluateFormula(epsilonFormula, rw, dw);
         List<RoadPoint> cleaned = removeBacktracking(points, backtrackThreshold);
-        return douglasPeucker(cleaned, rdpEpsilon);
+        return douglasPeucker(cleaned, epsilon);
     }
 
     // ──────────────────────────────────────────────

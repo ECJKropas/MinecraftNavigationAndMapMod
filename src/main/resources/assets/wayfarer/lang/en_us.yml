@@ -33,6 +33,6 @@ openMenu: Open Menu
 "X乡道宽度": X-Township road width
 "Y县道宽度": Y-County road width
 "C村道宽度": C-Village road width
-"RDP简化容差（格），越大保留点越少": RDP simplification tolerance (blocks), larger value = fewer points
+"RDP简化容差公式，[RW]=道路宽度 [DW]=等级默认宽度，支持 + - * / 运算，如 [RW]/2 或 [RW]*2": RDP epsilon formula. [RW]=road width [DW]=classification default width. Supports + - * /. E.g. [RW]/2 or [RW]*2
 "切换道路录制开关": Toggle road recording on/off
 "打开导航菜单": Open navigation menu

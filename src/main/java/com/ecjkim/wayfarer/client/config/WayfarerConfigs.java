@@ -35,7 +35,6 @@ public class WayfarerConfigs {
             new ConfigBoolean("useClassificationWidth", false, "是否启用分级道路宽度");
 
         public static final ConfigDouble DEFAULT_WIDTH = new ConfigDouble("defaultWidth", 7.0, 0.5, 100.0, "道路默认宽度");
-
         public static final ConfigString DEFAULT_CLASSIFICATION =
             new ConfigString("defaultClassification", "", "新建道路时默认使用的分级代码，如 G国道、S省道");
 
@@ -47,11 +46,11 @@ public class WayfarerConfigs {
         public static final ConfigInteger WIDTH_Y_XIANDAO = new ConfigInteger("widthYXiaodao", 7, 1, 100, "Y县道宽度");
         public static final ConfigInteger WIDTH_C_CUNDAO = new ConfigInteger("widthCCundao", 3, 1, 100, "C村道宽度");
 
-        public static final ConfigDouble RDP_EPSILON =
-            new ConfigDouble("rdpEpsilon", 1.0, 0.1, 10.0, "RDP简化容差（格），越大保留点越少");
+        public static final ConfigString RDP_EPSILON_FORMULA = new ConfigString("rdpEpsilonFormula", "[RW]/2",
+            "RDP简化容差公式，[RW]=道路宽度 [DW]=等级默认宽度，支持 + - * / 运算，如 [RW]/2 或 [RW]*2");
 
         public static final ImmutableList<IConfigBase> OPTIONS = ImmutableList.of(USE_CLASSIFICATION_WIDTH,
-            DEFAULT_WIDTH, DEFAULT_CLASSIFICATION, RDP_EPSILON, WIDTH_G_GUODAO, WIDTH_G_GAOSU, WIDTH_S_SHENGDAO,
+            DEFAULT_WIDTH, DEFAULT_CLASSIFICATION, RDP_EPSILON_FORMULA, WIDTH_G_GUODAO, WIDTH_G_GAOSU, WIDTH_S_SHENGDAO,
             WIDTH_S_GAOJIA, WIDTH_X_XIANGDAO, WIDTH_Y_XIANDAO, WIDTH_C_CUNDAO);
 
         public static LinkedHashMap<String, Integer> getClassificationWidths() {

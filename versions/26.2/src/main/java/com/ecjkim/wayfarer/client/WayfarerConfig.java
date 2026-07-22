@@ -45,7 +45,7 @@ public class WayfarerConfig {
     public double defaultWidth = 7.0;
     public String defaultClassification = "";
     public Map<String, List<HotkeyBind>> hotkeys = defaultHotkeys();
-    public double rdpEpsilon = 1.0;
+    public String rdpEpsilonFormula = "[RW]/2";
 
     private WayfarerConfig() {}
 
