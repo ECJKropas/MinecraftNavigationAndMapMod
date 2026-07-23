@@ -27,6 +27,7 @@ import com.ecjkim.wayfarer.client.road.RoadRecordingManager;
 import com.ecjkim.wayfarer.client.road.XaeroMapOverlay;
 import com.ecjkim.wayfarer.client.road.data.RoadNetworkDatabase;
 import com.ecjkim.wayfarer.client.road.model.Segment;
+import com.ecjkim.wayfarer.client.road.server.WayfarerHttpServer;
 
 import org.lwjgl.glfw.GLFW;
 
@@ -35,20 +36,41 @@ import it.unimi.dsi.fastutil.ints.IntSet;
 
 public class WayfarerClient implements ClientModInitializer {
     private static final RoadRecordingManager ROAD_MANAGER = new RoadRecordingManager();
+    private static volatile WayfarerHttpServer httpServer;
+    private static volatile Thread httpThread;
 
     private final IntSet keysDownLastTick = new IntOpenHashSet();
 
     @Override
     public void onInitializeClient() {
         RoadNetworkDatabase.getInstance().loadFromDisk();
+        startHttpServer();
 
         XaeroMapOverlay.register();
         var lifecycles = net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientLifecycleEvents.CLIENT_STOPPING;
         lifecycles.register(client -> {
+            stopHttpServer();
             RoadNetworkDatabase.getInstance().saveToDisk();
         });
         var ticks = net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientTickEvents.END_CLIENT_TICK;
         ticks.register(this::handleClientTick);
+    }
+
+    private static void startHttpServer() {
+        if (httpServer != null)
+            return;
+        httpServer = new WayfarerHttpServer();
+        httpThread = new Thread(httpServer, "Wayfarer-HTTP-Main");
+        httpThread.setDaemon(true);
+        httpThread.start();
+    }
+
+    private static void stopHttpServer() {
+        if (httpServer != null) {
+            httpServer.stop();
+            httpServer = null;
+        }
+        httpThread = null;
     }
 
     public static void reloadHotkeys() {}
