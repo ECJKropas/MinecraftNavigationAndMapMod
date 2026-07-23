@@ -23,9 +23,14 @@ import java.util.List;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.screens.Screen;
+import net.minecraft.client.renderer.GameRenderer;
 
 import com.mojang.blaze3d.platform.Window;
 import com.mojang.blaze3d.systems.RenderSystem;
+import com.mojang.blaze3d.vertex.BufferBuilder;
+import com.mojang.blaze3d.vertex.BufferUploader;
+import com.mojang.blaze3d.vertex.DefaultVertexFormat;
+import com.mojang.blaze3d.vertex.VertexFormat;
 
 import net.fabricmc.fabric.api.client.screen.v1.ScreenEvents;
 
@@ -34,6 +39,7 @@ import com.ecjkim.wayfarer.client.road.model.Node;
 import com.ecjkim.wayfarer.client.road.model.Road;
 import com.ecjkim.wayfarer.client.road.model.Segment;
 
+import org.joml.Matrix4f;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -186,46 +192,46 @@ public final class XaeroMapOverlay {
     private static void renderSegment(GuiGraphics graphics, List<Node> nodes, double effectiveScale, double cameraX,
         double cameraZ, double centerX, double centerY, int color, float lineWidth) {
 
-        int thickness = (int)lineWidth;
+        Matrix4f matrix = graphics.pose().last().pose();
+        float half = lineWidth / 2.0f;
+
+        RenderSystem.setShader(GameRenderer::getPositionColorShader);
+
+        float r = ((color >> 16) & 0xFF) / 255.0f;
+        float g = ((color >> 8) & 0xFF) / 255.0f;
+        float b = (color & 0xFF) / 255.0f;
+        float a = 0.85f;
+
+        BufferBuilder builder = new BufferBuilder(2048);
+        builder.begin(VertexFormat.Mode.TRIANGLES, DefaultVertexFormat.POSITION_COLOR);
 
         for (int i = 0; i < nodes.size() - 1; i++) {
             Node n1 = nodes.get(i);
             Node n2 = nodes.get(i + 1);
 
-            int sx1 = (int)((n1.getX() - cameraX) * effectiveScale + centerX);
-            int sy1 = (int)((n1.getZ() - cameraZ) * effectiveScale + centerY);
-            int sx2 = (int)((n2.getX() - cameraX) * effectiveScale + centerX);
-            int sy2 = (int)((n2.getZ() - cameraZ) * effectiveScale + centerY);
+            float sx1 = (float)((n1.getX() - cameraX) * effectiveScale + centerX);
+            float sy1 = (float)((n1.getZ() - cameraZ) * effectiveScale + centerY);
+            float sx2 = (float)((n2.getX() - cameraX) * effectiveScale + centerX);
+            float sy2 = (float)((n2.getZ() - cameraZ) * effectiveScale + centerY);
 
-            drawThickLine(graphics, sx1, sy1, sx2, sy2, color, thickness);
+            float dx = sx2 - sx1;
+            float dy = sy2 - sy1;
+            float len = (float)Math.sqrt(dx * dx + dy * dy);
+            if (len < 0.001f)
+                continue;
+            float px = -dy / len * half;
+            float py = dx / len * half;
+
+            // Two triangles forming a thick quad
+            builder.vertex(matrix, sx1 - px, sy1 - py, 0.0f).color(r, g, b, a).endVertex();
+            builder.vertex(matrix, sx1 + px, sy1 + py, 0.0f).color(r, g, b, a).endVertex();
+            builder.vertex(matrix, sx2 + px, sy2 + py, 0.0f).color(r, g, b, a).endVertex();
+            builder.vertex(matrix, sx1 - px, sy1 - py, 0.0f).color(r, g, b, a).endVertex();
+            builder.vertex(matrix, sx2 + px, sy2 + py, 0.0f).color(r, g, b, a).endVertex();
+            builder.vertex(matrix, sx2 - px, sy2 - py, 0.0f).color(r, g, b, a).endVertex();
         }
-    }
 
-    private static void drawThickLine(GuiGraphics graphics, int x1, int y1, int x2, int y2, int color, int thickness) {
-        int dx = Math.abs(x2 - x1);
-        int dy = Math.abs(y2 - y1);
-        int sx = x1 < x2 ? 1 : -1;
-        int sy = y1 < y2 ? 1 : -1;
-        int err = dx - dy;
-        int half = thickness / 2;
-
-        int cx = x1, cy = y1;
-        while (true) {
-            graphics.fill(cx - half, cy - half, cx + thickness - half, cy + thickness - half, color);
-
-            if (cx == x2 && cy == y2)
-                break;
-
-            int e2 = 2 * err;
-            if (e2 > -dy) {
-                err -= dy;
-                cx += sx;
-            }
-            if (e2 < dx) {
-                err += dx;
-                cy += sy;
-            }
-        }
+        BufferUploader.drawWithShader(builder.end());
     }
 
     private static int classificationColor(String classification) {
