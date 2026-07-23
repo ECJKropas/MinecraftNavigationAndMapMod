@@ -135,7 +135,7 @@ function initMap() {
   map = L.map('map', {
     crs: L.CRS.Simple,
     minZoom: -4,
-    maxZoom: 8,
+    maxZoom: 10,
     zoomControl: true
   }).setView([0, 0], 5);
   map.on('click', onMapClick);
