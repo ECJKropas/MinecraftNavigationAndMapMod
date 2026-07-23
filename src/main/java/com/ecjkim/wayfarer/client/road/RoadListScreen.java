@@ -613,18 +613,20 @@ public class RoadListScreen extends Screen {
         if (seg.getRoadId() != null) {
             Road old = db.getRoad(seg.getRoadId());
             if (old != null && old.getSegmentIds() != null) {
-                old.getSegmentIds().remove(seg.getId());
+                List<UUID> oldSegIds = new ArrayList<>(old.getSegmentIds());
+                oldSegIds.remove(seg.getId());
+                old.setSegmentIds(oldSegIds);
                 db.updateRoad(old.getId(), old);
             }
         }
         seg.setRoadId(target.getId());
         db.updateSegment(seg.getId(), seg);
-        if (target.getSegmentIds() == null) {
-            target.setSegmentIds(new ArrayList<>());
+        List<UUID> targetSegIds =
+            target.getSegmentIds() != null ? new ArrayList<>(target.getSegmentIds()) : new ArrayList<>();
+        if (!targetSegIds.contains(seg.getId())) {
+            targetSegIds.add(seg.getId());
         }
-        if (!target.getSegmentIds().contains(seg.getId())) {
-            target.getSegmentIds().add(seg.getId());
-        }
+        target.setSegmentIds(targetSegIds);
         db.updateRoad(target.getId(), target);
         db.asyncSave();
     }

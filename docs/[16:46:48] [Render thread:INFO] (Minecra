@@ -1,0 +1,330 @@
+[16:46:48] [Render thread/INFO] (Minecraft) [System] [CHAT] 道路已保存: RGjw
+[16:46:52] [Server thread/INFO] (Minecraft) Saving and pausing game...
+[16:46:52] [Server thread/INFO] (Minecraft) Saving chunks for level 'ServerLevel[New World]'/minecraft:overworld
+[16:46:52] [Server thread/INFO] (Minecraft) Saving chunks for level 'ServerLevel[New World]'/minecraft:the_end
+[16:46:52] [Server thread/INFO] (Minecraft) Saving chunks for level 'ServerLevel[New World]'/minecraft:the_nether
+[16:47:18] [Render thread/ERROR] (Minecraft) Reported exception thrown!
+
+net.minecraft.ReportedException: Rendering screen
+        at knot//net.minecraft.client.Minecraft.runTick(Minecraft.java:1274)
+        at knot//net.minecraft.client.Minecraft.run(Minecraft.java:959)
+        at knot//net.minecraft.client.main.Main.main(Main.java:292)
+        at net.fabricmc.loader.impl.game.minecraft.MinecraftGameProvider.launch(MinecraftGameProvider.java:514)
+        at net.fabricmc.loader.impl.launch.knot.Knot.launch(Knot.java:72)
+        at net.fabricmc.loader.impl.launch.knot.KnotClient.main(KnotClient.java:23)
+        at net.fabricmc.devlaunchinjector.Main.main(Main.java:86)
+Caused by: java.lang.UnsupportedOperationException
+        at java.base/java.util.ImmutableCollections.uoe(ImmutableCollections.java:159)
+        at java.base/java.util.ImmutableCollections$AbstractImmutableCollection.remove(ImmutableCollections.java:167)
+        at knot//com.ecjkim.wayfarer.client.road.RoadListScreen.dropSegment(RoadListScreen.java:482)
+        at knot//com.ecjkim.wayfarer.client.road.RoadListScreen.extractRenderState(RoadListScreen.java:207)
+        at knot//net.minecraft.client.gui.screens.Screen.extractRenderStateWithTooltipAndSubtitles(Screen.java:119)
+        at knot//net.minecraft.client.gui.Gui.mixinextras$bridge$extractRenderStateWithTooltipAndSubtitles$47(Gui.java)
+        at knot//net.minecraft.client.gui.Gui.wrapOperation$cig000$fabric-screen-api-v1$onExtractGui(Gui.java:2609)
+        at knot//net.minecraft.client.gui.Gui.extractRenderState(Gui.java:183)
+        at knot//net.minecraft.client.renderer.GameRenderer.extract(GameRenderer.java:401)
+        at knot//net.minecraft.client.Minecraft.renderFrame(Minecraft.java:1366)
+        at knot//net.minecraft.client.Minecraft.runTick(Minecraft.java:1269)
+        ... 6 more
+---- Minecraft Crash Report ----
+// You should try our sister game, Minceraft!
+
+Time: 2026-07-23 16:47:20
+Description: Rendering screen
+
+java.lang.UnsupportedOperationException
+        at java.base/java.util.ImmutableCollections.uoe(ImmutableCollections.java:159)
+        at java.base/java.util.ImmutableCollections$AbstractImmutableCollection.remove(ImmutableCollections.java:167)
+        at knot//com.ecjkim.wayfarer.client.road.RoadListScreen.dropSegment(RoadListScreen.java:482)
+        at knot//com.ecjkim.wayfarer.client.road.RoadListScreen.extractRenderState(RoadListScreen.java:207)
+        at knot//net.minecraft.client.gui.screens.Screen.extractRenderStateWithTooltipAndSubtitles(Screen.java:119)
+        at knot//net.minecraft.client.gui.Gui.mixinextras$bridge$extractRenderStateWithTooltipAndSubtitles$47(Gui.java)
+        at knot//net.minecraft.client.gui.Gui.wrapOperation$cig000$fabric-screen-api-v1$onExtractGui(Gui.java:2609)
+        at knot//net.minecraft.client.gui.Gui.extractRenderState(Gui.java:183)
+        at knot//net.minecraft.client.renderer.GameRenderer.extract(GameRenderer.java:401)
+        at knot//net.minecraft.client.Minecraft.renderFrame(Minecraft.java:1366)
+        at knot//net.minecraft.client.Minecraft.runTick(Minecraft.java:1269)
+        at knot//net.minecraft.client.Minecraft.run(Minecraft.java:959)
+        at knot//net.minecraft.client.main.Main.main(Main.java:292)
+        at net.fabricmc.loader.impl.game.minecraft.MinecraftGameProvider.launch(MinecraftGameProvider.java:514)
+        at net.fabricmc.loader.impl.launch.knot.Knot.launch(Knot.java:72)
+        at net.fabricmc.loader.impl.launch.knot.KnotClient.main(KnotClient.java:23)
+        at net.fabricmc.devlaunchinjector.Main.main(Main.java:86)
+
+
+A detailed walkthrough of the error, its code path and all known details is as follows:
+---------------------------------------------------------------------------------------
+
+-- Head --
+Thread: Render thread
+Stacktrace:
+        at java.base/java.util.ImmutableCollections.uoe(ImmutableCollections.java:159)
+        at java.base/java.util.ImmutableCollections$AbstractImmutableCollection.remove(ImmutableCollections.java:167)
+        at knot//com.ecjkim.wayfarer.client.road.RoadListScreen.dropSegment(RoadListScreen.java:482)
+        at knot//com.ecjkim.wayfarer.client.road.RoadListScreen.extractRenderState(RoadListScreen.java:207)
+        at knot//net.minecraft.client.gui.screens.Screen.extractRenderStateWithTooltipAndSubtitles(Screen.java:119)
+        at knot//net.minecraft.client.gui.Gui.mixinextras$bridge$extractRenderStateWithTooltipAndSubtitles$47(Gui.java)
+        at knot//net.minecraft.client.gui.Gui.wrapOperation$cig000$fabric-screen-api-v1$onExtractGui(Gui.java:2609)
+        at knot//net.minecraft.client.gui.Gui.extractRenderState(Gui.java:183)
+        at knot//net.minecraft.client.renderer.GameRenderer.extract(GameRenderer.java:401)
+
+-- Screen render details --
+Details:
+        Screen name: com.ecjkim.wayfarer.client.road.RoadListScreen
+        Mouse location: Scaled: (76.140625, 38.316406). Absolute: (152.281250, 76.632813)
+        Screen size: Scaled: (427, 240). Absolute: (1708, 960). Scale factor of 4
+Stacktrace:
+        at knot//net.minecraft.client.gui.Gui.extractRenderState(Gui.java:183)
+        at knot//net.minecraft.client.renderer.GameRenderer.extract(GameRenderer.java:401)
+        at knot//net.minecraft.client.Minecraft.renderFrame(Minecraft.java:1366)
+        at knot//net.minecraft.client.Minecraft.runTick(Minecraft.java:1269)
+        at knot//net.minecraft.client.Minecraft.run(Minecraft.java:959)
+        at knot//net.minecraft.client.main.Main.main(Main.java:292)
+        at net.fabricmc.loader.impl.game.minecraft.MinecraftGameProvider.launch(MinecraftGameProvider.java:514)
+        at net.fabricmc.loader.impl.launch.knot.Knot.launch(Knot.java:72)
+        at net.fabricmc.loader.impl.launch.knot.KnotClient.main(KnotClient.java:23)
+        at net.fabricmc.devlaunchinjector.Main.main(Main.java:86)
+
+-- Render Frame Details --
+Details:
+        Modules:
+Stacktrace:
+        at knot//net.minecraft.client.Minecraft.runTick(Minecraft.java:1269)
+        at knot//net.minecraft.client.Minecraft.run(Minecraft.java:959)
+        at knot//net.minecraft.client.main.Main.main(Main.java:292)
+        at net.fabricmc.loader.impl.game.minecraft.MinecraftGameProvider.launch(MinecraftGameProvider.java:514)
+        at net.fabricmc.loader.impl.launch.knot.Knot.launch(Knot.java:72)
+        at net.fabricmc.loader.impl.launch.knot.KnotClient.main(KnotClient.java:23)
+        at net.fabricmc.devlaunchinjector.Main.main(Main.java:86)
+
+-- Uptime --
+Details:
+        JVM uptime: 211.451s
+        Wall uptime: 193.655s
+        High-res time: 186.026s
+        Client ticks: 3322 ticks / 166.100s
+Stacktrace:
+        at knot//net.minecraft.client.Minecraft.fillReport(Minecraft.java:2496)
+        at knot//net.minecraft.client.Minecraft.emergencySaveAndCrash(Minecraft.java:1008)
+        at knot//net.minecraft.client.Minecraft.run(Minecraft.java:980)
+        at knot//net.minecraft.client.main.Main.main(Main.java:292)
+        at net.fabricmc.loader.impl.game.minecraft.MinecraftGameProvider.launch(MinecraftGameProvider.java:514)
+        at net.fabricmc.loader.impl.launch.knot.Knot.launch(Knot.java:72)
+        at net.fabricmc.loader.impl.launch.knot.KnotClient.main(KnotClient.java:23)
+        at net.fabricmc.devlaunchinjector.Main.main(Main.java:86)
+
+-- Affected level --
+Details:
+        All players: 1 total; LocalPlayer{name=Player550, id=88, pos=(-1359.4240956394412, 70.9375, -1535.4382209703915), mode=CREATIVE, permission=owner}
+        Chunk stats: 961, 637
+        Level dimension: minecraft:overworld
+        Level time: 36271 game time, 36271 day time
+        Level spawn location: World: (16,69,-16), Section: (at 0,5,0 in 1,4,-1; chunk contains blocks 16,-64,-16 to 31,319,-1), Region: (0,-1; contains chunks 0,-32 to 31,-1, blocks 0,-64,-512 to 511,319,-1)
+        Server brand: fabric
+        Server type: Integrated singleplayer server
+        Tracked entity count: 206
+        Client weather: Raining: false, thundering: false
+
+-- Last reload --
+Details:
+        Reload number: 1
+        Reload reason: initial
+        Finished: Yes
+        Packs: vanilla, com_viaversion_viaaprilfools-common, com_viaversion_viabackwards-common, com_viaversion_viaversion-common, conditional-mixin, fabric-api, fabric-api-base, fabric-api-lookup-api-v1, fabric-biome-api-v1, fabric-block-api-v1, fabric-block-getter-api-v2, fabric-command-api-v2, fabric-content-registries-v0, fabric-convention-tags-v2, fabric-crash-report-info-v1, fabric-creative-tab-api-v1, fabric-data-attachment-api-v1, fabric-data-generation-api-v1, fabric-debug-api-v1, fabric-dimensions-v1, fabric-entity-events-v1, fabric-events-interaction-v0, fabric-game-rule-api-v1, fabric-item-api-v1, fabric-key-mapping-api-v1, fabric-lifecycle-events-v1, fabric-loot-api-v3, fabric-menu-api-v1, fabric-message-api-v1, fabric-model-loading-api-v1, fabric-networking-api-v1, fabric-object-builder-api-v1, fabric-particles-v1, fabric-permission-api-v1, fabric-recipe-api-v1, fabric-registry-sync-v0, fabric-renderer-api-v1, fabric-renderer-indigo, fabric-rendering-fluids-v1, fabric-rendering-v1, fabric-resource-conditions-api-v1, fabric-resource-loader-v0, fabric-resource-loader-v1, fabric-screen-api-v1, fabric-serialization-api-v1, fabric-sound-api-v1, fabric-tag-api-v1, fabric-transfer-api-v1, fabric-transitive-access-wideners-v1, fabricloader, malilib, net_raphimc_viabedrock, net_raphimc_vialegacy, viafabricplus, viafabricplus-visuals, wayfarer, xaerolib, xaerominimap, xaeroworldmap
+
+-- System Details --
+Details:
+        Minecraft Version: 26.2
+        Minecraft Version ID: 26.2
+        Operating System: Mac OS X (x86_64) version 26.5.1
+        Java Version: 25.0.3, Azul Systems, Inc.
+        Java VM Version: OpenJDK 64-Bit Server VM (mixed mode, sharing), Azul Systems, Inc.
+        Memory: 546919808 bytes (521 MiB) / 1566572544 bytes (1494 MiB) up to 4294967296 bytes (4096 MiB)
+        Memory (heap): init: 256MiB, used: 971MiB, committed: 1494MiB, max: 4096MiB
+        Memory (non-head): init: 007MiB, used: 269MiB, committed: 288MiB, max: 000MiB
+        CPUs: 8
+        Processor Vendor: Apple Inc.
+        Processor Name: Apple M2
+        Identifier: Apple Inc. Family 0xda33d83d Model 0 Stepping 0
+        Microarchitecture: ARM64 SoC: Avalanche + Blizzard
+        Frequency (GHz): 3.50
+        Number of physical packages: 1
+        Number of physical CPUs: 8
+        Number of logical CPUs: 8
+        Graphics card #0 name: Apple M2
+        Graphics card #0 vendor: Apple (0x106b)
+        Graphics card #0 VRAM (MiB): 0.00
+        Graphics card #0 deviceId: unknown
+        Graphics card #0 versionInfo: unknown
+        Memory slot #0 capacity (MiB): 0.00
+        Memory slot #0 clockSpeed (GHz): 0.00
+        Memory slot #0 type: unknown
+        Virtual memory max (MiB): 18432.00
+        Virtual memory used (MiB): 14091.31
+        Swap memory total (MiB): 2048.00
+        Swap memory used (MiB): 904.63
+        Space in storage for jna.tmpdir (MiB): <path not set>
+        Space in storage for org.lwjgl.system.SharedLibraryExtractPath (MiB): <path not set>
+        Space in storage for io.netty.native.workdir (MiB): <path not set>
+        Space in storage for java.io.tmpdir (MiB): available: 206191.81, total: 471482.09
+        Space in storage for workdir (MiB): available: 206191.81, total: 471482.09
+        Operating System Version: Apple macOS 26.5.1 (Tahoe) build 25F80
+        Process Elevated: false
+        Process Loads: Uptime: 210s, user: 325s (154.67%), kernel: 45s (21.32%), total: 370s (175.99%)
+        Process Virtual Size (MiB): 42173.73
+        Process Resident Size (MiB): 1185.72
+        JVM Flags: 0 total;
+        Debug Flags: 0 total;
+        Fabric Mods:
+                conditional-mixin: conditional mixin 0.6.4
+                fabric-api: Fabric API 0.155.2+26.2
+                        fabric-api-lookup-api-v1: Fabric API Lookup API (v1) 2.0.17+11e1c9a39e
+                        fabric-biome-api-v1: Fabric Biome API (v1) 18.0.6+c7bd5b8e9e
+                        fabric-block-api-v1: Fabric Block API (v1) 3.0.3+ec56b6019e
+                        fabric-block-getter-api-v2: Fabric BlockGetter API (v2) 2.0.7+ec56b6019e
+                        fabric-command-api-v2: Fabric Command API (v2) 3.1.0+00cb03469e
+                        fabric-content-registries-v0: Fabric Content Registries (v0) 11.3.0+d0a699d09e
+                        fabric-convention-tags-v2: Fabric Convention Tags (v2) 4.7.0+1f023a9e9e
+                        fabric-crash-report-info-v1: Fabric Crash Report Info (v1) 1.0.5+086d547a9e
+                        fabric-creative-tab-api-v1: Fabric Creative Tab API (v1) 5.0.14+d871b99e9e
+                        fabric-data-attachment-api-v1: Fabric Data Attachment API (v1) 2.2.17+aa0fd6fe9e
+                        fabric-data-generation-api-v1: Fabric Data Generation API (v1) 25.4.5+b190d6f59e
+                        fabric-debug-api-v1: Fabric Debug API (v1) 1.0.2+c792624d9e
+                        fabric-dimensions-v1: Fabric Dimensions API (v1) 5.1.10+5ed499069e
+                        fabric-entity-events-v1: Fabric Entity Events (v1) 5.0.5+06488ac19e
+                        fabric-events-interaction-v0: Fabric Events Interaction (v0) 5.2.6+8f57f7ee9e
+                        fabric-game-rule-api-v1: Fabric Game Rule API (v1) 4.0.8+46a6d00c9e
+                        fabric-item-api-v1: Fabric Item API (v1) 14.3.0+583e0a5f9e
+                        fabric-loot-api-v3: Fabric Loot API (v3) 3.0.17+06488ac19e
+                        fabric-menu-api-v1: Fabric Menu API (v1) 2.0.16+086d547a9e
+                        fabric-message-api-v1: Fabric Message API (v1) 7.0.7+086d547a9e
+                        fabric-model-loading-api-v1: Fabric Model Loading API (v1) 8.0.15+c80601bb9e
+                        fabric-networking-api-v1: Fabric Networking API (v1) 6.3.3+72073ef09e
+                        fabric-object-builder-api-v1: Fabric Object Builder API (v1) 24.1.0+6fcd5f039e
+                        fabric-particles-v1: Fabric Particles (v1) 5.0.18+d1756aa99e
+                        fabric-permission-api-v1: Fabric Permission API (v1) 1.0.3+b7020ca29e
+                        fabric-recipe-api-v1: Fabric Recipe API (v1) 9.0.20+11e1c9a39e
+                        fabric-registry-sync-v0: Fabric Registry Sync (v0) 7.1.0+c7bd5b8e9e
+                        fabric-renderer-api-v1: Fabric Renderer API (v1) 14.1.2+2b0d8a229e
+                        fabric-renderer-indigo: Fabric Renderer - Indigo 9.1.2+2b0d8a229e
+                        fabric-rendering-fluids-v1: Fabric Rendering Fluids (v1) 6.0.4+06488ac19e
+                        fabric-rendering-v1: Fabric Rendering (v1) 25.3.1+6988455e9e
+                        fabric-resource-conditions-api-v1: Fabric Resource Conditions API (v1) 6.1.0+10e9a28b9e
+                        fabric-serialization-api-v1: Fabric Serialization API (v1) 2.0.4+11a26f319e
+                        fabric-sound-api-v1: Fabric Sound API (v1) 2.0.5+11a26f319e
+                        fabric-tag-api-v1: Fabric Tag API (v1) 2.1.3+794df31d9e
+                        fabric-transfer-api-v1: Fabric Transfer API (v1) 8.0.11+39b5a3929e
+                        fabric-transitive-access-wideners-v1: Fabric Transitive Access Wideners (v1) 8.1.4+67c847259e
+                fabric-api-base: Fabric API Base 2.0.4+ece063239e
+                fabric-key-mapping-api-v1: Fabric Key Mapping API (v1) 2.0.5+e2bdee789e
+                fabric-lifecycle-events-v1: Fabric Lifecycle Events (v1) 4.1.3+4575b05f9e
+                fabric-resource-loader-v0: Fabric Resource Loader (v0) 3.3.20+4fc5413f9e
+                fabric-resource-loader-v1: Fabric Resource Loader (v1) 2.0.13+9edec1269e
+                fabric-screen-api-v1: Fabric Screen API (v1) 5.1.0+48e3c0b09e
+                fabricloader: Fabric Loader 0.19.3
+                java: OpenJDK 64-Bit Server VM 25
+                malilib: MaLiLib 0.29.3
+                minecraft: Minecraft 26.2
+                mixin-auditor: Mixin Auditor 0.2.0
+                mixinextras: MixinExtras 0.5.4
+                viafabricplus: ViaFabricPlus 4.6.1
+                        com_github_oryxel1_cubeconverter: CubeConverter abecffaaea
+                        com_google_code_gson_gson: gson 2.13.2
+                        com_google_errorprone_error_prone_annotations: error_prone_annotations 2.41.0
+                        com_seedfinding_mc_biome: mc_biome 1.171.1
+                        com_seedfinding_mc_core: mc_core 1.210.0
+                        com_seedfinding_mc_math: mc_math 1.171.0
+                        com_seedfinding_mc_noise: mc_noise 1.171.1
+                        com_seedfinding_mc_seed: mc_seed 1.171.2
+                        com_vdurmont_semver4j: semver4j 3.1.0
+                        com_viaversion_mcstructs_dialog: dialog 5-3.2.2-20251210.004302-1
+                        com_viaversion_mcstructs_registry: registry 5-3.2.2-SNAPSHOT
+                        com_viaversion_viaaprilfools-common: viaaprilfools-common 4.2.1
+                        com_viaversion_viabackwards-common: viabackwards-common 5.10.1-20260620.160713-2
+                        com_viaversion_viaversion-common: viaversion-common 5.10.1-20260627.115115-6
+                        de_florianreuth_classic4j: classic4j 2.3.0
+                        dev_kastle_netty_netty-transport-nethernet: netty-transport-nethernet 1.7.0
+                        dev_kastle_netty_netty-transport-raknet: netty-transport-raknet 1.7.0
+                        dev_kastle_webrtc_webrtc-java: webrtc-java 1.0.3
+                        dev_kastle_webrtc_webrtc-java_linux-aarch64: webrtc-java 1.0.3
+                        dev_kastle_webrtc_webrtc-java_linux-x86_64: webrtc-java 1.0.3
+                        dev_kastle_webrtc_webrtc-java_macos-aarch64: webrtc-java 1.0.3
+                        dev_kastle_webrtc_webrtc-java_windows-aarch64: webrtc-java 1.0.3
+                        dev_kastle_webrtc_webrtc-java_windows-x86_64: webrtc-java 1.0.3
+                        io_jsonwebtoken_jjwt-api: jjwt-api 0.13.0
+                        io_jsonwebtoken_jjwt-gson: jjwt-gson 0.13.0
+                        io_jsonwebtoken_jjwt-impl: jjwt-impl 0.13.0
+                        net_jodah_expiringmap: expiringmap 0.5.10
+                        net_lenni0451_commons_gson: gson 1.9.2
+                        net_lenni0451_commons_httpclient: httpclient 1.9.2
+                        net_lenni0451_commons_unchecked: unchecked 1.9.2
+                        net_lenni0451_mcstructs-bedrock_forms: forms 2.0.1
+                        net_lenni0451_mcstructs-bedrock_text: text 2.0.1
+                        net_lenni0451_reflect: Reflect 1.6.3
+                        net_raphimc_minecraftauth: MinecraftAuth 5.0.1
+                        net_raphimc_viabedrock: ViaBedrock 0.0.29-20260626.094539-2
+                        net_raphimc_vialegacy: ViaLegacy 3.0.16
+                        team_unnamed_mocha: mocha 3.0.1
+                        viafabricplus-api: ViaFabricPlus API 4.6.1
+                        viafabricplus-visuals: ViaFabricPlus Visuals 4.6.1
+                wayfarer: Wayfarer 0.3.0-SNAPSHOT
+                xaerominimap: Xaero's Minimap 26.4.2
+                xaeroworldmap: Xaero's World Map 1.44.2
+                        xaerolib: XaeroLib 1.7.1
+        Launched Version: Fabric
+        Backend library: LWJGL version 3.4.1-snapshot
+        Window size: 1708x960
+        Surface Info: acquired, FIFO, 1708 x 960
+        GFLW Platform: cocoa
+        Graphics Device: Apple M2
+        Graphics Backend: OpenGL
+        Graphics Vendor: Apple
+        Graphics Drivers: 4.1 Metal - 90.5
+        Graphics Device Extensions: GL_ARB_draw_indirect, GL_EXT_texture_filter_anisotropic
+        Graphics Device Type: OTHER
+        Graphics Device Features: DeviceFeatures[shaderDrawParameters=false, multiDrawDirectInterleaved=false, multiDrawDirectSeparate=true, multiDrawIndirect=false, drawIndirect=true, nonZeroFirstInstance=false, persistentMapping=false]
+        GL debug messages: <debugging unavailable>
+        Is Modded: Definitely; Client brand changed to 'fabric'
+        Universe: 400921fb54442d18
+        Type: Client
+        GPU Warnings: version: Metal
+        Transparency: regular
+        Render Distance: 12/12 chunks
+        Narrator config: OFF
+        Narrator status: true
+        Resource Packs: vanilla, com_viaversion_viaaprilfools-common, com_viaversion_viabackwards-common, com_viaversion_viaversion-common, conditional-mixin, fabric-api, fabric-api-base, fabric-api-lookup-api-v1, fabric-biome-api-v1, fabric-block-api-v1, fabric-block-getter-api-v2, fabric-command-api-v2, fabric-content-registries-v0, fabric-convention-tags-v2, fabric-crash-report-info-v1, fabric-creative-tab-api-v1, fabric-data-attachment-api-v1, fabric-data-generation-api-v1, fabric-debug-api-v1, fabric-dimensions-v1, fabric-entity-events-v1, fabric-events-interaction-v0, fabric-game-rule-api-v1, fabric-item-api-v1, fabric-key-mapping-api-v1, fabric-lifecycle-events-v1, fabric-loot-api-v3, fabric-menu-api-v1, fabric-message-api-v1, fabric-model-loading-api-v1, fabric-networking-api-v1, fabric-object-builder-api-v1, fabric-particles-v1, fabric-permission-api-v1, fabric-recipe-api-v1, fabric-registry-sync-v0, fabric-renderer-api-v1, fabric-renderer-indigo, fabric-rendering-fluids-v1, fabric-rendering-v1, fabric-resource-conditions-api-v1, fabric-resource-loader-v0, fabric-resource-loader-v1, fabric-screen-api-v1, fabric-serialization-api-v1, fabric-sound-api-v1, fabric-tag-api-v1, fabric-transfer-api-v1, fabric-transitive-access-wideners-v1, fabricloader, malilib, net_raphimc_viabedrock, net_raphimc_vialegacy, viafabricplus, viafabricplus-visuals, wayfarer, xaerolib (incompatible), xaerominimap (incompatible), xaeroworldmap (incompatible)
+        Sound Cache: 1982262 bytes in 5 buffers
+        Current Language: en_us
+        Locale: zh_CN_#Hans
+        System encoding: UTF-8
+        File encoding: UTF-8
+        CPU: 8x Apple M2
+        Server Running: true
+        Player Count: 1 / 8; [ServerPlayer['Player550'/88, l='ServerLevel[New World]', x=-1359.42, y=70.94, z=-1535.44]]
+        Active Data Packs: vanilla, fabric-convention-tags-v2
+        Available Data Packs: fabric-convention-tags-v2, minecart_improvements, redstone_experiments, trade_rebalance, vanilla
+        Enabled Feature Flags: minecraft:vanilla
+        World Generation: Stable
+        World Seed: -464546184579753962
+        Suppressed Exceptions: ~~NONE~~
+        Type: Integrated Server
+        Is Modded: Definitely; Client brand changed to 'fabric'; Server brand changed to 'fabric'
+        Launched Version: Fabric
+#@!@# Game crashed! Crash report saved to: #@!@# /Users/cjkim/Documents/MinecraftNavigationAndMapMod/run/crash-reports/crash-2026-07-23_16.47.20-client.txt
+
+> Task :26.2:runClient FAILED
+
+FAILURE: Build failed with an exception.
+
+* What went wrong:
+Execution failed for task ':26.2:runClient' (registered by plugin 'fabric-loom').
+> Process 'command '/Library/Java/JavaVirtualMachines/zulu-25.jdk/Contents/Home/bin/java'' finished with non-zero exit value 255
+
+* Try:
+> Run with --stacktrace option to get the stack trace.
+> Run with --info or --debug option to get more log output.
+> Run with --scan to get full insights from a Build Scan (powered by Develocity).
+> Get more help at https://help.gradle.org.
+
+BUILD FAILED in 3m 38s
+11 actionable tasks: 3 executed, 8 up-to-date

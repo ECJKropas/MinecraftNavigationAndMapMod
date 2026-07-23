@@ -16,6 +16,7 @@
  */
 package com.ecjkim.wayfarer.client.road;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
 import java.util.function.Consumer;
@@ -141,8 +142,8 @@ public class RoadMetadataScreen extends Screen {
                 roadName = "未命名道路";
             }
 
-            Road road =
-                new Road(UUID.randomUUID(), roadName, "#FFFFFF", classification, number, List.of(segment.getId()), 1);
+            Road road = new Road(UUID.randomUUID(), roadName, "#FFFFFF", classification, number,
+                new ArrayList<>(List.of(segment.getId())), 1);
             segment.setRoadId(road.getId());
             db.addRoad(road);
             db.updateSegment(segment.getId(), segment);
