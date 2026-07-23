@@ -22,6 +22,7 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -35,6 +36,8 @@ import net.fabricmc.loader.api.FabricLoader;
 import com.ecjkim.wayfarer.client.road.model.Node;
 import com.ecjkim.wayfarer.client.road.model.Road;
 import com.ecjkim.wayfarer.client.road.model.Segment;
+import com.ecjkim.wayfarer.client.road.model.Source;
+import com.ecjkim.wayfarer.client.road.model.Status;
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
 import com.google.gson.JsonArray;
@@ -102,6 +105,22 @@ public class RoadNetworkDatabase {
             existing.setModifiedAt(System.currentTimeMillis());
             markDirty();
         }
+    }
+
+    /**
+     * Updates node position (x/z) and increments version. Returns the new version, or -1 if not found.
+     */
+    public synchronized int updateNodePosition(UUID id, double x, double z) {
+        Node existing = nodes.get(id);
+        if (existing == null)
+            return -1;
+        existing.setX(x);
+        existing.setZ(z);
+        existing.setModifiedAt(System.currentTimeMillis());
+        int nextVersion = existing.getVersion() + 1;
+        existing.setVersion(nextVersion);
+        markDirty();
+        return nextVersion;
     }
 
     public synchronized void removeNode(UUID id) {
@@ -237,6 +256,13 @@ public class RoadNetworkDatabase {
     // ---------- Helper queries ----------
 
     /**
+     * Returns an unmodifiable collection of all Nodes (snapshot).
+     */
+    public java.util.Collection<Node> getAllNodes() {
+        return new java.util.ArrayList<>(nodes.values());
+    }
+
+    /**
      * Returns an unmodifiable collection of all Roads (snapshot).
      */
     public java.util.Collection<Road> getRoads() {
@@ -303,6 +329,111 @@ public class RoadNetworkDatabase {
         road.getSegmentIds().add(segmentId);
         segment.setRoadId(roadId);
         markDirty();
+    }
+
+    // ---------- Merge / Split ----------
+
+    /**
+     * Merges multiple segments into one. The segments must be connected end-to-end; duplicate endpoints are
+     * de-duplicated. Old segments are removed. Returns the merged Segment, or null if precondition fails.
+     */
+    public synchronized Segment mergeSegments(List<UUID> segmentIds) {
+        if (segmentIds == null || segmentIds.size() < 2)
+            return null;
+
+        List<UUID> mergedNodeIds = new ArrayList<>();
+        for (UUID segId : segmentIds) {
+            Segment seg = segments.get(segId);
+            if (seg == null || seg.getNodeIds() == null || seg.getNodeIds().size() < 2)
+                return null;
+            if (mergedNodeIds.isEmpty()) {
+                mergedNodeIds.addAll(seg.getNodeIds());
+            } else {
+                // Skip the first node (duplicate with previous segment's tail)
+                List<UUID> ids = seg.getNodeIds();
+                for (int i = 1; i < ids.size(); i++) {
+                    mergedNodeIds.add(ids.get(i));
+                }
+            }
+        }
+
+        Segment merged = new Segment(UUID.randomUUID(), mergedNodeIds, null, Source.USER, Status.CONFIRMED, 1);
+        segments.put(merged.getId(), merged);
+
+        for (UUID segId : segmentIds) {
+            segments.remove(segId);
+        }
+
+        markDirty();
+        return merged;
+    }
+
+    /**
+     * Splits a segment at the given node index. The node at nodeIndex belongs to both resulting segments. Returns the
+     * two new Segments, or null on failure.
+     */
+    public synchronized List<Segment> splitSegment(UUID segId, int nodeIndex) {
+        Segment seg = segments.get(segId);
+        if (seg == null || seg.getNodeIds() == null)
+            return null;
+        List<UUID> ids = seg.getNodeIds();
+        if (nodeIndex <= 0 || nodeIndex >= ids.size() - 1)
+            return null;
+
+        List<UUID> leftIds = new ArrayList<>(ids.subList(0, nodeIndex + 1));
+        List<UUID> rightIds = new ArrayList<>(ids.subList(nodeIndex, ids.size()));
+
+        Segment left = new Segment(UUID.randomUUID(), leftIds, seg.getRoadId(), Source.USER, Status.CONFIRMED, 1);
+        Segment right = new Segment(UUID.randomUUID(), rightIds, seg.getRoadId(), Source.USER, Status.CONFIRMED, 1);
+
+        segments.put(left.getId(), left);
+        segments.put(right.getId(), right);
+
+        // Update Road association
+        if (seg.getRoadId() != null) {
+            Road road = roads.get(seg.getRoadId());
+            if (road != null && road.getSegmentIds() != null) {
+                road.getSegmentIds().remove(segId);
+                road.getSegmentIds().add(left.getId());
+                road.getSegmentIds().add(right.getId());
+            }
+        }
+
+        segments.remove(segId);
+        markDirty();
+        return Arrays.asList(left, right);
+    }
+
+    /**
+     * Returns all entities modified since the given timestamp. The returned JsonObject contains "nodes",
+     * "segments", and "roads" arrays.
+     */
+    public JsonObject getDeltaSince(long since) {
+        JsonObject delta = new JsonObject();
+
+        JsonArray deltaNodes = new JsonArray();
+        for (Node node : nodes.values()) {
+            if (node.getModifiedAt() > since) {
+                deltaNodes.add(GSON.toJsonTree(node));
+            }
+        }
+        delta.add("nodes", deltaNodes);
+
+        JsonArray deltaSegs = new JsonArray();
+        for (Segment seg : segments.values()) {
+            // Segments don't have modifiedAt, treat all as changed if any node has been modified
+            // For now, include all segments — delta is lightweight
+            deltaSegs.add(GSON.toJsonTree(seg));
+        }
+        delta.add("segments", deltaSegs);
+
+        JsonArray deltaRoads = new JsonArray();
+        for (Road road : roads.values()) {
+            deltaRoads.add(GSON.toJsonTree(road));
+        }
+        delta.add("roads", deltaRoads);
+
+        return delta;
     }
 
     // ---------- Persistence ----------
