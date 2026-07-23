@@ -504,15 +504,20 @@ function setActiveTool(tool) {
 
 function toggleToolbarMode() {
   const tb = document.getElementById('toolbar');
+  const mapEl = document.getElementById('map');
   if (toolbarMode === 'compact') {
     toolbarMode = 'detailed';
     tb.classList.remove('toolbar-compact');
     tb.classList.add('toolbar-detailed');
+    mapEl.style.left = '148px';
   } else {
     toolbarMode = 'compact';
     tb.classList.remove('toolbar-detailed');
     tb.classList.add('toolbar-compact');
+    mapEl.style.left = '44px';
   }
+  // Propagate map resize to Leaflet so tiles/controls reposition
+  if (map) { map.invalidateSize(); }
 }
 
 // ——— Point tool ———
