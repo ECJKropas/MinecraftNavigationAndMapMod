@@ -137,7 +137,7 @@ function initMap() {
     minZoom: -4,
     maxZoom: 8,
     zoomControl: true
-  }).setView([0, 0], 3);
+  }).setView([0, 0], 5);
   map.on('click', onMapClick);
   loadData();
   setInterval(loadDelta, 2000);
@@ -221,7 +221,7 @@ function renderAll() {
 
     const opts = {
       color: isSelected ? '#007AFF' : color,
-      weight: isSelected ? 16 : 8,
+      weight: isSelected ? 4 : 2,
       opacity: isSelected ? 1 : 0.7,
       smoothFactor: 0.2,
     };
@@ -232,11 +232,11 @@ function renderAll() {
 
     const line = L.polyline(pts, opts).addTo(map);
     line.on('mouseover', () => {
-      if (!selectedSegments.has(sid)) line.setStyle({ weight: 12, opacity: 0.9 });
+      if (!selectedSegments.has(sid)) line.setStyle({ weight: 3, opacity: 0.9 });
     });
     line.on('mouseout', () => {
       if (!selectedSegments.has(sid)) {
-        line.setStyle({ weight: 8, opacity: seg.source === 'AUTO' ? 0.5 : 0.7 });
+        line.setStyle({ weight: 2, opacity: seg.source === 'AUTO' ? 0.5 : 0.7 });
       }
     });
     line.on('click', (e) => {
@@ -250,11 +250,11 @@ function renderAll() {
     const fill = node.source === 'AUTO' ? '#aeaeb2'
       : node.cornerType === 'SHARP' ? '#FF3B30' : '#007AFF';
     const marker = L.circleMarker(mc2latlng(node.x, node.z), {
-      radius: 8, fillColor: fill, color: 'rgba(255,255,255,0.9)',
-      weight: 2, fillOpacity: 0.92,
+      radius: 5, fillColor: fill, color: 'rgba(255,255,255,0.9)',
+      weight: 1.5, fillOpacity: 0.92,
     }).addTo(map);
-    marker.on('mouseover', () => marker.setRadius(10));
-    marker.on('mouseout', () => marker.setRadius(8));
+    marker.on('mouseover', () => marker.setRadius(6.5));
+    marker.on('mouseout', () => marker.setRadius(5));
     marker.on('click', (e) => {
       L.DomEvent.stopPropagation(e);
       onNodeClick(nid, e.originalEvent);
