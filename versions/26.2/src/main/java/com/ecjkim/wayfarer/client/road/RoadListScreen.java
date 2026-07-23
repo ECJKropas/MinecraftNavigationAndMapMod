@@ -73,8 +73,10 @@ public class RoadListScreen extends Screen {
     private Segment selectedSegment;
     private Node selectedNode;
 
-    // Drag mode
-    private boolean dragMode;
+    // Drag state
+    private boolean dragging = false;
+    private Segment draggingSegment = null;
+    private Component draggingLabel = null;
 
     // Focused panel for keyboard scroll (0=left, 1=mid, 2=right)
     private int focusedPanel = 0;
@@ -191,8 +193,10 @@ public class RoadListScreen extends Screen {
                 (colMidX + colRightX + colRightW) / 2, 10, 0xFFFFCC00);
         }
 
-        if (dragMode && selectedSegment != null) {
-            g.text(this.font, ">>> " + segShortLabel(selectedSegment), mouseX + 12, mouseY + 4, 0x88FFFF88, true);
+        if (dragging && draggingLabel != null) {
+            int textWidth = this.font.width(draggingLabel);
+            g.text(this.font, draggingLabel, mouseX - textWidth / 2, mouseY - this.font.lineHeight / 2, 0xFFFFFFFF,
+                true);
         }
 
         super.extractRenderState(g, mouseX, mouseY, partialTick);
@@ -358,15 +362,6 @@ public class RoadListScreen extends Screen {
         int mx = (int)event.x();
         int my = (int)event.y();
 
-        if (dragMode && button == 0) {
-            dragMode = false;
-            Road target = roadAtPos(mx, my);
-            if (target != null && selectedSegment != null) {
-                moveSegmentToRoad(selectedSegment, target);
-            }
-            return true;
-        }
-
         if (my < panelTop || my > panelBottom)
             return super.mouseClicked(event, isForwards);
 
@@ -380,7 +375,11 @@ public class RoadListScreen extends Screen {
 
         if (button == 0) {
             if (mx >= colLeftX && mx <= colLeftX + colLeftW) {
-                clickLeft(mx, my);
+                if (dragging) {
+                    dropSegment(mx, my);
+                } else {
+                    clickLeft(mx, my);
+                }
                 return true;
             }
             if (mx >= colMidX && mx <= colMidX + colMidW) {
@@ -404,10 +403,7 @@ public class RoadListScreen extends Screen {
         int key = event.key();
 
         if (key == GLFW.GLFW_KEY_ESCAPE) {
-            if (dragMode) {
-                dragMode = false;
-                return true;
-            }
+            dragging = false;
             if (mode == Mode.SELECT && onCancel != null)
                 onCancel.run();
             this.minecraft.setScreenAndShow(null);
@@ -444,6 +440,22 @@ public class RoadListScreen extends Screen {
     }
 
     // ---- Click handlers ----
+
+    private void dropSegment(int mx, int my) {
+        dragging = false;
+        draggingSegment = null;
+        draggingLabel = null;
+        int off = allUnfiled.isEmpty() ? 0 : 1;
+        int relY = my - panelTop + scrollLeft * ITEM_H;
+        int idx = relY / ITEM_H;
+        int ri = idx - off;
+        if (ri >= 0 && ri < filteredRoads.size() && selectedSegment != null) {
+            Road targetRoad = filteredRoads.get(ri);
+            moveSegmentToRoad(selectedSegment, targetRoad);
+            selectedRoad = targetRoad;
+            selectedSegment = null;
+        }
+    }
 
     private void clickLeft(int mx, int my) {
         int off = allUnfiled.isEmpty() ? 0 : 1;
@@ -486,6 +498,10 @@ public class RoadListScreen extends Screen {
             selectedSegment = segs.get(idx);
             selectedNode = null;
             scrollRight = 0;
+            dragging = true;
+            draggingSegment = selectedSegment;
+            String name = I18n.get("wayfarer.road.gui.segment") + " #" + idx;
+            draggingLabel = Component.literal(name);
         }
     }
 
@@ -574,16 +590,6 @@ public class RoadListScreen extends Screen {
 
     // ---- Drag ----
 
-    private Road roadAtPos(int mx, int my) {
-        int off = allUnfiled.isEmpty() ? 0 : 1;
-        int relY = my - panelTop + scrollLeft * ITEM_H;
-        int idx = relY / ITEM_H;
-        int ri = idx - off;
-        if (ri >= 0 && ri < filteredRoads.size())
-            return filteredRoads.get(ri);
-        return null;
-    }
-
     private void moveSegmentToRoad(Segment seg, Road target) {
         if (seg.getRoadId() != null) {
             Road old = db.getRoad(seg.getRoadId());
@@ -592,7 +598,15 @@ public class RoadListScreen extends Screen {
                 db.updateRoad(old.getId(), old);
             }
         }
-        db.addSegmentToRoad(target.getId(), seg.getId());
+        seg.setRoadId(target.getId());
+        db.updateSegment(seg.getId(), seg);
+        if (target.getSegmentIds() == null) {
+            target.setSegmentIds(new ArrayList<>());
+        }
+        if (!target.getSegmentIds().contains(seg.getId())) {
+            target.getSegmentIds().add(seg.getId());
+        }
+        db.updateRoad(target.getId(), target);
         db.asyncSave();
     }
 
