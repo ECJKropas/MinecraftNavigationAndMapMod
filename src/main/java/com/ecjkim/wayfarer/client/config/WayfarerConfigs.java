@@ -35,11 +35,14 @@ public class WayfarerConfigs {
         public static final ConfigBoolean AUTO_INTEGRAL =
             new ConfigBoolean("autoIntegral", true, "录制道路时是否自动将节点坐标取整（三轴均舍入到整数），默认开启");
 
+        public static final ConfigBoolean AUTO_SNAP_ENDPOINTS =
+            new ConfigBoolean("autoSnapEndpoints", true, "录制结束时自动吸附首尾端点：先找 rdpEpsilon 范围内的现有节点，再找路段折线的垂足插入，均无可创建新节点");
+
         public static final ConfigDouble RDP_EPSILON =
             new ConfigDouble("rdpEpsilon", 1.0, 0.1, 100.0, "RDP 简化容差（格数），值越大简化越激进");
 
         public static final ImmutableList<IConfigBase> OPTIONS =
-            ImmutableList.of(DEFAULT_CLASSIFICATION, AUTO_INTEGRAL, RDP_EPSILON);
+            ImmutableList.of(DEFAULT_CLASSIFICATION, AUTO_INTEGRAL, AUTO_SNAP_ENDPOINTS, RDP_EPSILON);
     }
 
     public static List<IConfigBase> getAllConfigs() {

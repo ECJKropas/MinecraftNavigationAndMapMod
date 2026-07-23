@@ -106,29 +106,138 @@ public class RoadRecordingManager {
 
         LOGGER.log(Level.INFO, "Saving recording with {0} points", sessionPoints.size());
 
-        // 1. Simplify
+        // 0. Copy
         List<double[]> copy = new ArrayList<>(sessionPoints);
         WayfarerConfig config = WayfarerConfig.getInstance();
+        RoadNetworkDatabase db = RoadNetworkDatabase.getInstance();
         double epsilon = config.rdpEpsilon;
+
+        // 1. Snap endpoints (before simplification)
+        UUID snappedStartId = null;
+        UUID snappedEndId = null;
+        if (config.autoSnapEndpoints) {
+            snappedStartId = snapPoint(copy.get(0), epsilon, db);
+            if (snappedStartId != null) {
+                Node sn = db.getNode(snappedStartId);
+                copy.set(0, new double[] {sn.getX(), sn.getY(), sn.getZ()});
+                LOGGER.log(Level.INFO, "Snapped start to node {0}", snappedStartId);
+            }
+            int last = copy.size() - 1;
+            snappedEndId = snapPoint(copy.get(last), epsilon, db);
+            if (snappedEndId != null) {
+                Node en = db.getNode(snappedEndId);
+                copy.set(last, new double[] {en.getX(), en.getY(), en.getZ()});
+                LOGGER.log(Level.INFO, "Snapped end to node {0}", snappedEndId);
+            }
+        }
+
+        // 2. Simplify
         List<double[]> simplified = RoadSimplifier.simplify(copy, BACKTRACK_THRESHOLD, epsilon);
         LOGGER.log(Level.INFO, "Simplified {0} → {1} points (epsilon={2})",
             new Object[] {sessionPoints.size(), simplified.size(), epsilon});
 
-        // 2. Convert to Nodes
-        RoadNetworkDatabase db = RoadNetworkDatabase.getInstance();
+        // 3. Convert to Nodes — reuse snapped nodes for first/last position
         long now = System.currentTimeMillis();
         List<UUID> nodeIds = new ArrayList<>();
-        for (double[] pt : simplified) {
-            Node node = new Node(UUID.randomUUID(), pt[0], pt[1], pt[2], CornerType.AUTO, Source.USER, 1, now);
-            db.addNode(node);
-            nodeIds.add(node.getId());
+        for (int i = 0; i < simplified.size(); i++) {
+            if (i == 0 && snappedStartId != null) {
+                nodeIds.add(snappedStartId);
+            } else if (i == simplified.size() - 1 && snappedEndId != null) {
+                nodeIds.add(snappedEndId);
+            } else {
+                double[] pt = simplified.get(i);
+                Node node = new Node(UUID.randomUUID(), pt[0], pt[1], pt[2], CornerType.AUTO, Source.USER, 1, now);
+                db.addNode(node);
+                nodeIds.add(node.getId());
+            }
         }
 
-        // 3. Create Segment
+        // 4. Create Segment
         Segment segment = new Segment(UUID.randomUUID(), nodeIds, null, Source.USER, Status.CONFIRMED, 1);
         db.addSegment(segment);
 
         sessionPoints.clear();
         return segment;
+    }
+
+    /**
+     * Snap a point to the road network.
+     *
+     * <p>
+     * Level 1: find an existing Node within {@code epsilon} (XZ plane). Level 2: find a Segment whose edge has a
+     * perpendicular foot within {@code epsilon} and t ∈ [0,1], then insert a new Node at the foot and split the edge.
+     * Returns the snapped Node UUID, or {@code null} if no snap target found (caller creates a new Node).
+     * </p>
+     */
+    private static UUID snapPoint(double[] pt, double epsilon, RoadNetworkDatabase db) {
+        double x = pt[0];
+        double y = pt[1];
+        double z = pt[2];
+
+        // Level 1: closest existing node
+        Node closestNode = null;
+        double closestDist = epsilon;
+        for (Node node : db.getAllNodes()) {
+            double dx = x - node.getX();
+            double dz = z - node.getZ();
+            double d = Math.sqrt(dx * dx + dz * dz);
+            if (d < closestDist) {
+                closestDist = d;
+                closestNode = node;
+            }
+        }
+        if (closestNode != null) {
+            return closestNode.getId();
+        }
+
+        // Level 2: closest segment edge with foot on edge
+        double bestDist = epsilon;
+        Segment bestSeg = null;
+        int bestInsertAfter = -1;
+        double bestFootX = 0;
+        double bestFootY = 0;
+        double bestFootZ = 0;
+
+        for (Segment seg : db.getAllSegments()) {
+            List<Node> segNodes = db.getNodesForSegment(seg.getId());
+            for (int i = 0; i < segNodes.size() - 1; i++) {
+                Node a = segNodes.get(i);
+                Node b = segNodes.get(i + 1);
+                double dx2 = b.getX() - a.getX();
+                double dz2 = b.getZ() - a.getZ();
+                double lenSq = dx2 * dx2 + dz2 * dz2;
+                if (lenSq == 0)
+                    continue;
+                double t = ((x - a.getX()) * dx2 + (z - a.getZ()) * dz2) / lenSq;
+                if (t < 0 || t > 1)
+                    continue;
+                double projX = a.getX() + t * dx2;
+                double projZ = a.getZ() + t * dz2;
+                double pdx = x - projX;
+                double pdz = z - projZ;
+                double d = Math.sqrt(pdx * pdx + pdz * pdz);
+                if (d < bestDist) {
+                    bestDist = d;
+                    bestSeg = seg;
+                    bestInsertAfter = i;
+                    bestFootX = projX;
+                    bestFootY = a.getY() + t * (b.getY() - a.getY());
+                    bestFootZ = projZ;
+                }
+            }
+        }
+
+        if (bestSeg != null) {
+            long now = System.currentTimeMillis();
+            Node newNode =
+                new Node(UUID.randomUUID(), bestFootX, bestFootY, bestFootZ, CornerType.AUTO, Source.USER, 1, now);
+            db.addNode(newNode);
+            List<UUID> newIds = new ArrayList<>(bestSeg.getNodeIds());
+            newIds.add(bestInsertAfter + 1, newNode.getId());
+            bestSeg.setNodeIds(newIds);
+            return newNode.getId();
+        }
+
+        return null;
     }
 }

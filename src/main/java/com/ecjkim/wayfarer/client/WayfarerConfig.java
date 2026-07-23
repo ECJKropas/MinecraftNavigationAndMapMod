@@ -30,11 +30,13 @@ public class WayfarerConfig {
 
     public final String defaultClassification;
     public final boolean autoIntegral;
+    public final boolean autoSnapEndpoints;
     public final double rdpEpsilon;
 
     private WayfarerConfig() {
         this.defaultClassification = WayfarerConfigs.Generic.DEFAULT_CLASSIFICATION.getStringValue();
         this.autoIntegral = WayfarerConfigs.Generic.AUTO_INTEGRAL.getBooleanValue();
+        this.autoSnapEndpoints = WayfarerConfigs.Generic.AUTO_SNAP_ENDPOINTS.getBooleanValue();
         this.rdpEpsilon = WayfarerConfigs.Generic.RDP_EPSILON.getDoubleValue();
     }
 

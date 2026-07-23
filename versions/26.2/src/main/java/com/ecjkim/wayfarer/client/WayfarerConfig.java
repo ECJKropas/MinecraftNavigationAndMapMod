@@ -42,6 +42,7 @@ public class WayfarerConfig {
 
     public double rdpEpsilon = 1.0;
     public boolean autoIntegral = true;
+    public boolean autoSnapEndpoints = true;
     public String defaultClassification = "";
     public Map<String, List<HotkeyBind>> hotkeys = defaultHotkeys();
 
