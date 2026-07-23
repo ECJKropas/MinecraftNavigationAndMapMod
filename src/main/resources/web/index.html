@@ -3,61 +3,186 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Wayfarer 道路编辑器</title>
+<title>Wayfarer — 道路编辑器</title>
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
 <style>
+:root {
+  --blue: #007AFF;
+  --blue-hover: #0062CC;
+  --blue-pressed: #004999;
+  --red: #FF3B30;
+  --red-hover: #D63028;
+  --text-primary: #1d1d1f;
+  --text-secondary: #6e6e73;
+  --text-tertiary: #aeaeb2;
+  --surface: #ffffff;
+  --bg: #f5f5f7;
+  --shadow-sm: 0 1px 3px rgba(0,0,0,0.04);
+  --shadow-lg: 0 8px 30px rgba(0,0,0,0.08);
+  --radius-sm: 7px;
+  --radius-lg: 15px;
+  --font: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Helvetica Neue", sans-serif;
+}
+
 * { margin:0; padding:0; box-sizing:border-box; }
-body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background:#1a1a2e; color:#e0e0e0; }
-#map { height:70vh; width:100%; background:#0d1117; }
-#sidebar { height:30vh; padding:12px 16px; overflow-y:auto; border-top:2px solid #303050; }
-.section-title { font-size:14px; font-weight:600; color:#8888cc; margin-bottom:8px; text-transform:uppercase; letter-spacing:1px; }
-.field { margin-bottom:8px; display:flex; align-items:center; gap:8px; }
-.field label { font-size:13px; color:#aaa; min-width:48px; }
-.field input, .field select { background:#2a2a3e; border:1px solid #444; color:#e0e0e0; padding:4px 8px; border-radius:4px; font-size:13px; width:160px; }
-.field input[type="color"] { width:48px; height:28px; padding:2px; }
-.btn-row { display:flex; gap:8px; margin-top:10px; }
-button { background:#3a3a5e; color:#e0e0e0; border:none; padding:6px 14px; border-radius:4px; cursor:pointer; font-size:13px; }
-button:hover { background:#4a4a7e; }
-button.danger { background:#5e2a2a; }
-button.danger:hover { background:#7e3a3a; }
-button.primary { background:#2a4a7e; }
-button.primary:hover { background:#3a5a9e; }
-#status { font-size:12px; color:#888; margin-top:6px; }
-#merge-btn { display:none; }
-.popup-content { color:#222; font-size:12px; max-width:200px; }
-.popup-content strong { display:block; margin-bottom:2px; }
+html { font-size:100%; -webkit-font-smoothing:antialiased; -moz-osx-font-smoothing:grayscale; }
+body { font-family:var(--font); background:var(--bg); color:var(--text-primary); line-height:1.47059; overflow:hidden; }
+
+#map { position:fixed; inset:0; background:#e8e8ed; z-index:0; }
+
+/* Left sidebar */
+#sidebar {
+  position:fixed; top:0; left:0; bottom:0; z-index:10;
+  width:280px;
+  background:rgba(255,255,255,0.72);
+  backdrop-filter:blur(24px) saturate(180%);
+  -webkit-backdrop-filter:blur(24px) saturate(180%);
+  border-right:1px solid rgba(0,0,0,0.08);
+  box-shadow:2px 0 12px rgba(0,0,0,0.04);
+  padding:20px; overflow-y:auto;
+  transition:transform 280ms cubic-bezier(0.22,1,0.36,1);
+  display:flex; flex-direction:column; gap:12px;
+}
+
+/* Floating editor — top-right */
+#editor-panel {
+  position:fixed; top:16px; right:16px; z-index:20;
+  min-width:280px; max-width:340px;
+  background:rgba(255,255,255,0.78);
+  backdrop-filter:blur(28px) saturate(180%);
+  -webkit-backdrop-filter:blur(28px) saturate(180%);
+  border-radius:var(--radius-lg);
+  border:1px solid rgba(255,255,255,0.4);
+  box-shadow:var(--shadow-lg);
+  padding:16px 18px 18px;
+  opacity:0; transform:translateY(-8px) scale(0.97);
+  transition:opacity 220ms ease, transform 280ms cubic-bezier(0.22,1,0.36,1);
+  pointer-events:none;
+}
+#editor-panel.visible {
+  opacity:1; transform:translateY(0) scale(1);
+  pointer-events:auto;
+}
+
+.section-label {
+  font-size:11px; font-weight:600; letter-spacing:0.06em; text-transform:uppercase;
+  color:var(--text-tertiary); margin-bottom:8px;
+}
+.field {
+  display:flex; align-items:center; gap:10px; min-height:30px; margin-bottom:8px;
+}
+.field:last-of-type { margin-bottom:0; }
+.field-label {
+  font-size:12px; font-weight:500; color:var(--text-secondary);
+  min-width:38px; flex-shrink:0;
+}
+.field-value {
+  font-size:12px; color:var(--text-primary); font-weight:400;
+  word-break:break-all; flex:1;
+}
+.field-value.mono {
+  font-family:"SF Mono","Menlo","Monaco",monospace;
+  font-size:11px; color:var(--text-tertiary);
+}
+
+input, select {
+  font-family:var(--font); font-size:12px; font-weight:400;
+  background:rgba(255,255,255,0.7); color:var(--text-primary);
+  border:1px solid rgba(0,0,0,0.12); border-radius:var(--radius-sm);
+  padding:4px 9px; outline:none; transition:border-color 120ms ease, box-shadow 120ms ease;
+  width:110px;
+}
+input:focus, select:focus {
+  border-color:var(--blue);
+  box-shadow:0 0 0 3px rgba(0,122,255,0.16);
+}
+input[type="color"] {
+  width:26px; height:26px; padding:2px; border-radius:var(--radius-sm); cursor:pointer;
+}
+input[type="number"] { -moz-appearance:textfield; }
+input[type="number"]::-webkit-inner-spin-button { -webkit-appearance:none; }
+
+.btn-row { display:flex; gap:7px; flex-wrap:wrap; margin-top:10px; }
+
+button {
+  font-family:var(--font); font-size:11px; font-weight:590; letter-spacing:-0.01em;
+  border:none; border-radius:var(--radius-sm); padding:5px 12px;
+  cursor:pointer; transition:background 120ms ease, transform 80ms ease;
+  display:inline-flex; align-items:center; gap:4px;
+  -webkit-user-select:none; user-select:none;
+}
+button:active { transform:scale(0.97); }
+button.primary { background:var(--blue); color:#fff; }
+button.primary:hover { background:var(--blue-hover); }
+button.primary:active { background:var(--blue-pressed); }
+button.secondary {
+  background:rgba(0,0,0,0.04); color:var(--text-primary);
+  box-shadow:inset 0 0 0 1px rgba(0,0,0,0.06);
+}
+button.secondary:hover { background:rgba(0,0,0,0.08); }
+button.secondary:active { background:rgba(0,0,0,0.12); }
+button.danger { background:var(--red); color:#fff; }
+button.danger:hover { background:var(--red-hover); }
+button.danger:active { background:#B3201A; }
+
+.empty-state {
+  font-size:12px; color:var(--text-tertiary); font-weight:400;
+  display:flex; align-items:center; gap:6px;
+}
+.empty-state::before {
+  content:''; display:block; width:5px; height:5px;
+  border-radius:50%; background:var(--text-tertiary); opacity:0.5;
+}
+
+.leaflet-control-zoom a {
+  color:var(--text-primary) !important;
+  box-shadow:var(--shadow-sm) !important;
+  border-radius:var(--radius-sm) !important;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  * { transition-duration:0ms !important; }
+}
+@media (prefers-reduced-transparency: reduce) {
+  #sidebar, #editor-panel { background:var(--surface); backdrop-filter:none; -webkit-backdrop-filter:none; }
+}
 </style>
 </head>
 <body>
 <div id="map"></div>
-<div id="sidebar">
-  <div id="no-selection" class="section-title">点击节点或路段查看属性</div>
+<div id="sidebar"></div>
+
+<div id="editor-panel">
+  <div id="no-selection" class="empty-state">点击节点或路段查看属性</div>
+
   <div id="node-editor" style="display:none">
-    <div class="section-title">节点属性</div>
-    <div class="field"><label>ID</label><span id="node-id" style="font-size:11px;color:#888"></span></div>
-    <div class="field"><label>X</label><input type="number" id="node-x" step="0.1"></div>
-    <div class="field"><label>Z</label><input type="number" id="node-z" step="0.1"></div>
-    <div class="field"><label>来源</label><span id="node-source" style="font-size:12px"></span></div>
+    <div class="section-label">节点属性</div>
+    <div class="field"><span class="field-label">ID</span><span class="field-value mono" id="node-id"></span></div>
+    <div class="field"><span class="field-label">X</span><input type="number" id="node-x" step="0.1"></div>
+    <div class="field"><span class="field-label">Z</span><input type="number" id="node-z" step="0.1"></div>
+    <div class="field"><span class="field-label">来源</span><span class="field-value" id="node-source"></span></div>
     <div class="btn-row">
       <button class="primary" onclick="saveNode()">保存</button>
-      <button class="danger" onclick="deleteNode()">删除</button>
+      <button class="secondary" onclick="clearSelection()">取消</button>
       <button class="danger" id="node-split-btn" style="display:none" onclick="splitSegment()">在此拆分</button>
+      <button class="danger" onclick="deleteNode()">删除节点</button>
     </div>
   </div>
+
   <div id="segment-editor" style="display:none">
-    <div class="section-title">路段属性</div>
-    <div class="field"><label>ID</label><span id="seg-id" style="font-size:11px;color:#888"></span></div>
-    <div class="field"><label>道路名</label><input type="text" id="seg-road-name" placeholder="关联道路名"></div>
-    <div class="field"><label>颜色</label><input type="color" id="seg-color"></div>
-    <div class="field"><label>来源</label><span id="seg-source" style="font-size:12px"></span></div>
-    <div class="field"><label>状态</label><span id="seg-status" style="font-size:12px"></span></div>
+    <div class="section-label">路段属性</div>
+    <div class="field"><span class="field-label">ID</span><span class="field-value mono" id="seg-id"></span></div>
+    <div class="field"><span class="field-label">道路名</span><input type="text" id="seg-road-name" placeholder="未命名道路"></div>
+    <div class="field"><span class="field-label">颜色</span><input type="color" id="seg-color" value="#007AFF"></div>
+    <div class="field"><span class="field-label">来源</span><span class="field-value" id="seg-source"></span></div>
+    <div class="field"><span class="field-label">状态</span><span class="field-value" id="seg-status"></span></div>
     <div class="btn-row">
       <button class="primary" onclick="saveRoad()">保存道路</button>
+      <button class="secondary" onclick="clearSelection()">取消</button>
+      <button class="primary" id="merge-btn" style="display:none" onclick="mergeSegments()">合并选中</button>
       <button class="danger" onclick="deleteSegment()">删除路段</button>
-      <button class="primary" id="merge-btn" onclick="mergeSegments()">合并选中路段</button>
     </div>
   </div>
-  <div id="status"></div>
 </div>
 
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>

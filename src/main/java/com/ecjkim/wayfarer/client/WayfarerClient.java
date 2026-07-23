@@ -60,7 +60,8 @@ public class WayfarerClient implements ClientModInitializer {
     }
 
     private static void startHttpServer() {
-        if (httpServer != null) return;
+        if (httpServer != null)
+            return;
         httpServer = new WayfarerHttpServer();
         httpThread = new Thread(httpServer, "Wayfarer-HTTP-Main");
         httpThread.setDaemon(true);

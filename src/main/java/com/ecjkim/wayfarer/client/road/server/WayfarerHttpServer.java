@@ -44,7 +44,6 @@ import com.google.gson.GsonBuilder;
 import com.google.gson.JsonArray;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
-import com.google.gson.reflect.TypeToken;
 import com.sun.net.httpserver.HttpExchange;
 import com.sun.net.httpserver.HttpServer;
 
@@ -236,8 +235,7 @@ public class WayfarerHttpServer implements Runnable {
                 os.write(data);
             }
         } catch (IOException e) {
-            LOGGER.log(Level.WARNING, "Failed to serve resource {0}: {1}",
-                new Object[] {resourcePath, e.getMessage()});
+            LOGGER.log(Level.WARNING, "Failed to serve resource {0}: {1}", new Object[] {resourcePath, e.getMessage()});
         }
     }
 
@@ -434,7 +432,8 @@ public class WayfarerHttpServer implements Runnable {
                         if (!database.checkVersion(segId, expected)) {
                             Segment seg = database.getSegment(segId);
                             int cur = seg != null ? seg.getVersion() : -1;
-                            sendJson(req.exchange, 409, errorJson("Version conflict on " + segIdStr + ". Current: " + cur));
+                            sendJson(req.exchange, 409,
+                                errorJson("Version conflict on " + segIdStr + ". Current: " + cur));
                             return;
                         }
                     }
@@ -625,6 +624,6 @@ public class WayfarerHttpServer implements Runnable {
     }
 
     private record Request(HttpExchange exchange, String body, Map<String, String> query,
-            Map<String, String> pathParams) {
+        Map<String, String> pathParams) {
     }
 }

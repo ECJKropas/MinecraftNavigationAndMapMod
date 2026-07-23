@@ -1,31 +1,158 @@
-// Wayfarer Road Editor — Leaflet frontend
+// Wayfarer Road Editor — Apple-style frontend
 // MC coords (X, Z) map to Leaflet [lat=Z/128, lng=X/128]
 
-const SCALE = 128.0; // MC blocks → Leaflet units
+const SCALE = 128.0;
 let map, selectedSegments = new Set(), selectedNodeId = null, selectedSegmentId = null;
-
-// ---- Data cache ----
 let roadStore = { nodes:{}, segments:{}, roads:{} };
 
+// ——— Toast ———
+function showToast(msg, type) {
+  const t = document.createElement('div');
+  t.className = 'toast';
+  t.textContent = msg;
+  t.style.cssText = `
+    position:fixed; bottom:40px; left:50%; transform:translateX(-50%) translateY(12px);
+    background:var(--text-primary); color:#fff; font-size:12px; font-weight:500;
+    padding:8px 18px; border-radius:20px; z-index:9999; pointer-events:none;
+    opacity:0; transition:opacity 200ms ease, transform 300ms cubic-bezier(0.16,1,0.3,1);
+    font-family:var(--font); letter-spacing:-0.01em;
+  `;
+  if (type === 'error') t.style.background = 'var(--red)';
+  document.body.appendChild(t);
+  requestAnimationFrame(() => {
+    t.style.opacity = '1';
+    t.style.transform = 'translateX(-50%) translateY(0)';
+  });
+  setTimeout(() => {
+    t.style.opacity = '0';
+    t.style.transform = 'translateX(-50%) translateY(-4px)';
+    setTimeout(() => t.remove(), 280);
+  }, 2200);
+}
+
+// ——— Sheet (Apple-style confirm) ———
+function showSheet(title, message, actions) {
+  const backdrop = document.createElement('div');
+  backdrop.style.cssText = `
+    position:fixed; inset:0; background:rgba(0,0,0,0.32); z-index:10000;
+    display:flex; align-items:flex-end; justify-content:center;
+    opacity:0; transition:opacity 200ms ease;
+  `;
+
+  const sheet = document.createElement('div');
+  sheet.style.cssText = `
+    background:rgba(255,255,255,0.94);
+    backdrop-filter:blur(32px) saturate(180%);
+    -webkit-backdrop-filter:blur(32px) saturate(180%);
+    border-radius:15px 15px 0 0;
+    width:100%; max-width:480px; padding:24px 20px 30px;
+    transform:translateY(100%);
+    transition:transform 350ms cubic-bezier(0.22,1,0.36,1);
+    font-family:var(--font);
+  `;
+
+  sheet.innerHTML = '<h2 style="font-size:16px;font-weight:590;margin-bottom:6px;color:var(--text-primary);letter-spacing:-0.01em;">' +
+    title + '</h2><p style="font-size:13px;color:var(--text-secondary);margin-bottom:20px;line-height:1.45;">' +
+    message + '</p><div style="display:flex;flex-direction:column;gap:0;"></div>';
+
+  const btnContainer = sheet.querySelector('div');
+  actions.forEach((a, i) => {
+    const btn = document.createElement('button');
+    const isDestructive = a.role === 'destructive';
+    const isCancel = a.role === 'cancel';
+    btn.textContent = a.label;
+    btn.style.cssText = `
+      width:100%; text-align:center; font-size:15px; font-weight:${isCancel ? '590' : '400'};
+      padding:12px 0; border:none; background:none; cursor:pointer;
+      border-top:1px solid rgba(0,0,0,0.08);
+      color:${isDestructive ? 'var(--red)' : 'var(--blue)'};
+      font-family:var(--font); letter-spacing:-0.01em;
+      -webkit-user-select:none; user-select:none;
+    `;
+    if (i === 0 && actions.length === 1) btn.style.borderTop = 'none';
+    btn.addEventListener('pointerdown', () => { btn.style.background = 'rgba(0,0,0,0.04)'; });
+    btn.addEventListener('pointerup', () => { btn.style.background = 'none'; });
+    btn.addEventListener('pointerleave', () => { btn.style.background = 'none'; });
+    btn.addEventListener('click', () => dismiss(() => a.action && a.action()));
+    btnContainer.appendChild(btn);
+  });
+
+  function dismiss(cb) {
+    sheet.style.transform = 'translateY(100%)';
+    backdrop.style.opacity = '0';
+    setTimeout(() => { backdrop.remove(); if (cb) cb(); }, 360);
+  }
+
+  backdrop.addEventListener('click', e => { if (e.target === backdrop) dismiss(); });
+  backdrop.appendChild(sheet);
+  document.body.appendChild(backdrop);
+  requestAnimationFrame(() => {
+    backdrop.style.opacity = '1';
+    sheet.style.transform = 'translateY(0)';
+  });
+}
+
+// ——— Floating editor panel transitions ———
+function showEditor(section) {
+  const panel = document.getElementById('editor-panel');
+  const noSel = document.getElementById('no-selection');
+  const nodeEd = document.getElementById('node-editor');
+  const segEd = document.getElementById('segment-editor');
+
+  const sections = [noSel, nodeEd, segEd];
+  let target = null;
+  if (section === 'no-selection') target = noSel;
+  else if (section === 'node-editor') target = nodeEd;
+  else if (section === 'segment-editor') target = segEd;
+
+  sections.forEach(el => {
+    if (el === target) {
+      el.style.display = '';
+      el.style.opacity = '0';
+      el.style.transform = 'translateY(4px)';
+      el.style.transition = 'opacity 180ms ease, transform 240ms cubic-bezier(0.22,1,0.36,1)';
+      requestAnimationFrame(() => {
+        el.style.opacity = '1';
+        el.style.transform = 'translateY(0)';
+      });
+    } else if (el.style.display !== 'none') {
+      el.style.opacity = '0';
+      el.style.transform = 'translateY(-4px)';
+      el.style.transition = 'opacity 120ms ease, transform 160ms ease';
+      setTimeout(() => { if (el.style.opacity === '0') el.style.display = 'none'; }, 150);
+    }
+  });
+
+  panel.classList.add('visible');
+}
+
+function hideEditor() {
+  document.getElementById('editor-panel').classList.remove('visible');
+}
+
+// ——— Map ———
 function initMap() {
-  map = L.map('map', { crs:L.CRS.Simple, minZoom:-4, maxZoom:8, zoomControl:true }).setView([0,0], -2);
+  map = L.map('map', {
+    crs: L.CRS.Simple,
+    minZoom: -4,
+    maxZoom: 8,
+    zoomControl: true
+  }).setView([0, 0], 3);
   map.on('click', onMapClick);
   loadData();
   setInterval(loadDelta, 2000);
 }
 
-function mc2latlng(x, z) { return [z/SCALE, x/SCALE]; }
+function mc2latlng(x, z) { return [z / SCALE, x / SCALE]; }
 
-// ---- Data loading ----
+// ——— Data ———
 async function loadData() {
   try {
     const res = await fetch('/api/roads');
     const data = await res.json();
-
     roadStore.nodes = {};
     roadStore.segments = {};
     roadStore.roads = {};
-
     if (data.nodes) {
       for (const n of (Array.isArray(data.nodes) ? data.nodes : Object.values(data.nodes))) {
         roadStore.nodes[n.id] = n;
@@ -43,14 +170,13 @@ async function loadData() {
         roadStore.roads = data.roads;
       }
     }
-
     renderAll();
-  } catch(e) { setStatus('加载数据失败: ' + e.message); }
+  } catch (e) { showToast('加载数据失败: ' + e.message, 'error'); }
 }
 
 async function loadDelta() {
   try {
-    const since = Math.floor((Date.now() - 5000));
+    const since = Math.floor(Date.now() - 5000);
     const res = await fetch('/api/roads/delta?since=' + since);
     const data = await res.json();
     let changed = false;
@@ -63,25 +189,23 @@ async function loadDelta() {
       changed = true;
     }
     if (data.roads) {
-      for (const [k,v] of Object.entries(data.roads)) { roadStore.roads[k] = v; }
+      for (const [k, v] of Object.entries(data.roads)) { roadStore.roads[k] = v; }
       changed = true;
     }
     if (changed) renderAll();
-  } catch(e) { /* polling may fail silently */ }
+  } catch (e) { /* silent */ }
 }
 
-// ---- Rendering ----
+// ——— Rendering ———
 let nodeMarkers = new Map();
 let segmentLines = new Map();
 
 function renderAll() {
-  // Clear old
   nodeMarkers.forEach(m => map.removeLayer(m));
   segmentLines.forEach(l => map.removeLayer(l));
   nodeMarkers.clear();
   segmentLines.clear();
 
-  // Draw segments first
   for (const [sid, seg] of Object.entries(roadStore.segments)) {
     const pts = [];
     if (!seg.nodeIds) continue;
@@ -92,21 +216,29 @@ function renderAll() {
     if (pts.length < 2) continue;
 
     const road = seg.roadId ? roadStore.roads[seg.roadId] : null;
-    const color = road ? road.color : '#FFFFFF';
+    const color = road ? road.color : '#CCCCCC';
     const isSelected = selectedSegments.has(sid);
 
     const opts = {
-      color: isSelected ? '#f44' : color,
-      weight: isSelected ? 5 : 2.5,
-      opacity: isSelected ? 1 : 0.8,
+      color: isSelected ? '#007AFF' : color,
+      weight: isSelected ? 4 : 2,
+      opacity: isSelected ? 1 : 0.7,
+      smoothFactor: 0.2,
     };
-
     if (seg.source === 'AUTO') {
       opts.dashArray = '6,4';
-      if (!isSelected) opts.color = '#777';
+      if (!isSelected) opts.color = '#aeaeb2';
     }
 
     const line = L.polyline(pts, opts).addTo(map);
+    line.on('mouseover', () => {
+      if (!selectedSegments.has(sid)) line.setStyle({ weight: 3, opacity: 0.9 });
+    });
+    line.on('mouseout', () => {
+      if (!selectedSegments.has(sid)) {
+        line.setStyle({ weight: 2, opacity: seg.source === 'AUTO' ? 0.5 : 0.7 });
+      }
+    });
     line.on('click', (e) => {
       L.DomEvent.stopPropagation(e);
       onSegmentClick(sid, e.originalEvent);
@@ -114,28 +246,26 @@ function renderAll() {
     segmentLines.set(sid, line);
   }
 
-  // Draw nodes
   for (const [nid, node] of Object.entries(roadStore.nodes)) {
-    const color = node.source === 'AUTO' ? '#888'
-      : node.cornerType === 'SHARP' ? '#f44' : '#48f';
+    const fill = node.source === 'AUTO' ? '#aeaeb2'
+      : node.cornerType === 'SHARP' ? '#FF3B30' : '#007AFF';
     const marker = L.circleMarker(mc2latlng(node.x, node.z), {
-      radius: 4, fillColor:color, color:'#fff', weight:1, fillOpacity:0.9
+      radius: 5, fillColor: fill, color: 'rgba(255,255,255,0.9)',
+      weight: 1.5, fillOpacity: 0.92,
     }).addTo(map);
+    marker.on('mouseover', () => marker.setRadius(6.5));
+    marker.on('mouseout', () => marker.setRadius(5));
     marker.on('click', (e) => {
       L.DomEvent.stopPropagation(e);
       onNodeClick(nid, e.originalEvent);
     });
-    // Drag
-    marker.dragging ? marker.dragging.enable() : null;
     marker.on('dragend', () => onNodeDragEnd(nid, marker));
     nodeMarkers.set(nid, marker);
   }
 }
 
-// ---- Interactions ----
-function onMapClick() {
-  clearSelection();
-}
+// ——— Interactions ———
+function onMapClick() { clearSelection(); }
 
 function onNodeClick(nid, event) {
   if (event.ctrlKey || event.metaKey) return;
@@ -145,11 +275,8 @@ function onNodeClick(nid, event) {
 
 function onSegmentClick(sid, event) {
   if (event.ctrlKey || event.metaKey) {
-    if (selectedSegments.has(sid)) {
-      selectedSegments.delete(sid);
-    } else {
-      selectedSegments.add(sid);
-    }
+    if (selectedSegments.has(sid)) selectedSegments.delete(sid);
+    else selectedSegments.add(sid);
     renderAll();
     updateMergeButton();
     showSegmentEditor(sid);
@@ -169,33 +296,29 @@ function onNodeDragEnd(nid, marker) {
   const node = roadStore.nodes[nid];
   if (!node) return;
   fetch('/api/nodes/' + nid, {
-    method:'PUT',
-    headers:{'Content-Type':'application/json'},
-    body: JSON.stringify({x, z, expectedVersion: node.version})
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ x, z, expectedVersion: node.version })
   }).then(r => {
-    if (r.status === 409) { setStatus('版本冲突，正在刷新...'); loadData(); }
+    if (r.status === 409) { showToast('版本冲突，正在刷新...', 'error'); loadData(); }
     else if (r.ok) return r.json().then(updated => {
       roadStore.nodes[nid] = updated;
       renderAll();
     });
-    else setStatus('保存失败');
-  }).catch(e => setStatus('网络错误: ' + e.message));
+    else showToast('保存失败', 'error');
+  }).catch(() => showToast('网络错误', 'error'));
 }
 
 function selectNode(nid) {
   selectedNodeId = nid;
   const node = roadStore.nodes[nid];
   if (!node) return;
-  document.getElementById('no-selection').style.display = 'none';
-  document.getElementById('segment-editor').style.display = 'none';
-  const ed = document.getElementById('node-editor');
-  ed.style.display = 'block';
-  document.getElementById('node-id').textContent = nid.substring(0,8)+'...';
+  showEditor('node-editor');
+  document.getElementById('node-id').textContent = nid.substring(0, 8) + '...';
   document.getElementById('node-x').value = node.x;
   document.getElementById('node-z').value = node.z;
   document.getElementById('node-source').textContent = node.source;
 
-  // Show split button if this node belongs to a segment
   let inSegment = false;
   for (const seg of Object.values(roadStore.segments)) {
     if (seg.nodeIds && seg.nodeIds.includes(nid)) { inSegment = true; break; }
@@ -207,27 +330,22 @@ function showSegmentEditor(sid) {
   selectedSegmentId = sid;
   const seg = roadStore.segments[sid];
   if (!seg) return;
-  document.getElementById('no-selection').style.display = 'none';
-  document.getElementById('node-editor').style.display = 'none';
-  const ed = document.getElementById('segment-editor');
-  ed.style.display = 'block';
-  document.getElementById('seg-id').textContent = sid.substring(0,8)+'...';
+  showEditor('segment-editor');
+  document.getElementById('seg-id').textContent = sid.substring(0, 8) + '...';
   document.getElementById('seg-source').textContent = seg.source;
   document.getElementById('seg-status').textContent = seg.status;
 
   const road = seg.roadId ? roadStore.roads[seg.roadId] : null;
-  document.getElementById('seg-road-name').value = road ? (road.name||'') : '';
-  document.getElementById('seg-color').value = road ? (road.color||'#FFFFFF') : '#FFFFFF';
+  document.getElementById('seg-road-name').value = road ? (road.name || '') : '';
+  document.getElementById('seg-color').value = road ? (road.color || '#007AFF') : '#007AFF';
 }
 
 function clearSelection() {
   selectedSegments.clear();
   selectedNodeId = null;
   selectedSegmentId = null;
-  document.getElementById('no-selection').style.display = '';
-  document.getElementById('node-editor').style.display = 'none';
-  document.getElementById('segment-editor').style.display = 'none';
   document.getElementById('merge-btn').style.display = 'none';
+  hideEditor();
   renderAll();
 }
 
@@ -236,7 +354,7 @@ function updateMergeButton() {
   btn.style.display = selectedSegments.size >= 2 ? '' : 'none';
 }
 
-// ---- Save / Delete actions ----
+// ——— Actions ———
 async function saveNode() {
   const nid = selectedNodeId;
   if (!nid) return;
@@ -244,34 +362,46 @@ async function saveNode() {
   const x = parseFloat(document.getElementById('node-x').value);
   const z = parseFloat(document.getElementById('node-z').value);
   try {
-    const res = await fetch('/api/nodes/'+nid, {
-      method:'PUT',
-      headers:{'Content-Type':'application/json'},
-      body: JSON.stringify({x, z, expectedVersion: node.version})
+    const res = await fetch('/api/nodes/' + nid, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ x, z, expectedVersion: node.version })
     });
-    if (res.status === 409) { setStatus('版本冲突，正在刷新...'); loadData(); return; }
-    if (!res.ok) { setStatus('保存失败'); return; }
+    if (res.status === 409) { showToast('版本冲突, 正在刷新...', 'error'); loadData(); return; }
+    if (!res.ok) { showToast('保存失败', 'error'); return; }
     const updated = await res.json();
     roadStore.nodes[nid] = updated;
     renderAll();
-    setStatus('节点已保存');
-  } catch(e) { setStatus('网络错误'); }
+    showToast('节点已保存');
+  } catch (e) { showToast('网络错误', 'error'); }
 }
 
 async function deleteNode() {
   const nid = selectedNodeId;
-  if (!nid || !confirm('删除此节点将级联删除关联路段，确定？')) return;
-  const res = await fetch('/api/nodes/'+nid, { method:'DELETE' });
-  if (res.ok) { clearSelection(); loadData(); setStatus('节点已删除'); }
-  else setStatus('删除失败');
+  if (!nid) return;
+  showSheet('删除节点', '此操作将级联删除关联路段，确定要删除吗？', [
+    { label: '取消', role: 'cancel' },
+    { label: '删除', role: 'destructive', action: async () => {
+        const res = await fetch('/api/nodes/' + nid, { method: 'DELETE' });
+        if (res.ok) { clearSelection(); loadData(); showToast('节点已删除'); }
+        else showToast('删除失败', 'error');
+      }
+    }
+  ]);
 }
 
 async function deleteSegment() {
   const sid = selectedSegmentId;
-  if (!sid || !confirm('确定删除此路段？')) return;
-  const res = await fetch('/api/segments/'+sid, { method:'DELETE' });
-  if (res.ok) { clearSelection(); loadData(); setStatus('路段已删除'); }
-  else setStatus('删除失败');
+  if (!sid) return;
+  showSheet('删除路段', '确定要删除此路段吗？', [
+    { label: '取消', role: 'cancel' },
+    { label: '删除', role: 'destructive', action: async () => {
+        const res = await fetch('/api/segments/' + sid, { method: 'DELETE' });
+        if (res.ok) { clearSelection(); loadData(); showToast('路段已删除'); }
+        else showToast('删除失败', 'error');
+      }
+    }
+  ]);
 }
 
 async function saveRoad() {
@@ -281,65 +411,53 @@ async function saveRoad() {
   const name = document.getElementById('seg-road-name').value;
   const color = document.getElementById('seg-color').value;
   const roadId = seg.roadId;
-
   if (roadId) {
     const road = roadStore.roads[roadId];
-    const res = await fetch('/api/roads/'+roadId, {
-      method:'PATCH',
-      headers:{'Content-Type':'application/json'},
-      body: JSON.stringify({name, color, expectedVersion: road ? road.version : 0})
+    const res = await fetch('/api/roads/' + roadId, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name, color, expectedVersion: road ? road.version : 0 })
     });
-    if (res.status === 409) { setStatus('版本冲突，正在刷新...'); loadData(); return; }
+    if (res.status === 409) { showToast('版本冲突, 正在刷新...', 'error'); loadData(); return; }
     if (res.ok) {
       const updated = await res.json();
       roadStore.roads[roadId] = updated;
       renderAll();
-      setStatus('道路已保存');
+      showToast('道路已保存');
     }
   } else {
-    setStatus('该路段未关联道路');
+    showToast('该路段未关联道路', 'error');
   }
 }
 
 async function mergeSegments() {
   if (selectedSegments.size < 2) return;
-  const ids = [...selectedSegments];
   const res = await fetch('/api/merge', {
-    method:'POST',
-    headers:{'Content-Type':'application/json'},
-    body: JSON.stringify({segmentIds: ids})
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ segmentIds: [...selectedSegments] })
   });
-  if (res.ok) { clearSelection(); loadData(); setStatus('路段已合并'); }
-  else setStatus('合并失败');
+  if (res.ok) { clearSelection(); loadData(); showToast('路段已合并'); }
+  else showToast('合并失败', 'error');
 }
 
 async function splitSegment() {
   const nid = selectedNodeId;
   if (!nid) return;
-  // Find which segment contains this node
   let targetSeg = null, nodeIdx = -1;
   for (const [sid, seg] of Object.entries(roadStore.segments)) {
     if (!seg.nodeIds) continue;
     const idx = seg.nodeIds.indexOf(nid);
-    if (idx >= 1 && idx < seg.nodeIds.length-1) {
-      targetSeg = seg; nodeIdx = idx; break;
-    }
+    if (idx >= 1 && idx < seg.nodeIds.length - 1) { targetSeg = seg; nodeIdx = idx; break; }
   }
-  if (!targetSeg) { setStatus('未找到可拆分的路段（节点需位于路段中间）'); return; }
-
-  const res = await fetch('/api/split/'+targetSeg.id, {
-    method:'POST',
-    headers:{'Content-Type':'application/json'},
-    body: JSON.stringify({nodeIndex: nodeIdx, expectedVersion: targetSeg.version})
+  if (!targetSeg) { showToast('未找到可拆分的路段（节点需位于路段中间）', 'error'); return; }
+  const res = await fetch('/api/split/' + targetSeg.id, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ nodeIndex: nodeIdx, expectedVersion: targetSeg.version })
   });
-  if (res.ok) { clearSelection(); loadData(); setStatus('路段已拆分'); }
-  else setStatus('拆分失败');
+  if (res.ok) { clearSelection(); loadData(); showToast('路段已拆分'); }
+  else showToast('拆分失败', 'error');
 }
 
-function setStatus(msg) {
-  document.getElementById('status').textContent = msg;
-  setTimeout(() => { const el = document.getElementById('status'); if(el) el.textContent=''; }, 3000);
-}
-
-// ---- Init ----
 window.addEventListener('load', initMap);

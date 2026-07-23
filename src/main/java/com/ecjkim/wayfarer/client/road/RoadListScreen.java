@@ -455,8 +455,21 @@ public class RoadListScreen extends Screen {
         int off = 1;
         int relY = my - panelTop + scrollLeft * ITEM_H;
         int idx = relY / ITEM_H;
+
+        if (selectedSegment == null)
+            return;
+
+        if (idx == 0) {
+            selectedSegment.setRoadId(null);
+            db.updateSegment(selectedSegment.getId(), selectedSegment);
+            db.asyncSave();
+            selectedRoad = null;
+            selectedSegment = null;
+            return;
+        }
+
         int ri = idx - off;
-        if (ri >= 0 && ri < filteredRoads.size() && selectedSegment != null) {
+        if (ri >= 0 && ri < filteredRoads.size()) {
             Road targetRoad = filteredRoads.get(ri);
             moveSegmentToRoad(selectedSegment, targetRoad);
             selectedRoad = targetRoad;

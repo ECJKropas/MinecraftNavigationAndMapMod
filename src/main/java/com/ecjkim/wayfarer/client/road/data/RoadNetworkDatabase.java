@@ -405,8 +405,8 @@ public class RoadNetworkDatabase {
     }
 
     /**
-     * Returns all entities modified since the given timestamp. The returned JsonObject contains "nodes",
-     * "segments", and "roads" arrays.
+     * Returns all entities modified since the given timestamp. The returned JsonObject contains "nodes", "segments",
+     * and "roads" arrays.
      */
     public JsonObject getDeltaSince(long since) {
         JsonObject delta = new JsonObject();
