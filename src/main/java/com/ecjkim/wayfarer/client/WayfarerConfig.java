@@ -29,10 +29,12 @@ public class WayfarerConfig {
     private static WayfarerConfig instance;
 
     public final String defaultClassification;
+    public final boolean autoIntegral;
     public final double rdpEpsilon;
 
     private WayfarerConfig() {
         this.defaultClassification = WayfarerConfigs.Generic.DEFAULT_CLASSIFICATION.getStringValue();
+        this.autoIntegral = WayfarerConfigs.Generic.AUTO_INTEGRAL.getBooleanValue();
         this.rdpEpsilon = WayfarerConfigs.Generic.RDP_EPSILON.getDoubleValue();
     }
 

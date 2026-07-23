@@ -21,6 +21,7 @@ import java.util.List;
 import com.google.common.collect.ImmutableList;
 
 import fi.dy.masa.malilib.config.IConfigBase;
+import fi.dy.masa.malilib.config.options.ConfigBoolean;
 import fi.dy.masa.malilib.config.options.ConfigDouble;
 import fi.dy.masa.malilib.config.options.ConfigString;
 
@@ -31,10 +32,14 @@ public class WayfarerConfigs {
         public static final ConfigString DEFAULT_CLASSIFICATION =
             new ConfigString("defaultClassification", "", "新建道路时默认使用的分级代码，如 G国道、S省道");
 
+        public static final ConfigBoolean AUTO_INTEGRAL =
+            new ConfigBoolean("autoIntegral", true, "录制道路时是否自动将节点坐标取整（三轴均舍入到整数），默认开启");
+
         public static final ConfigDouble RDP_EPSILON =
             new ConfigDouble("rdpEpsilon", 1.0, 0.1, 100.0, "RDP 简化容差（格数），值越大简化越激进");
 
-        public static final ImmutableList<IConfigBase> OPTIONS = ImmutableList.of(DEFAULT_CLASSIFICATION, RDP_EPSILON);
+        public static final ImmutableList<IConfigBase> OPTIONS =
+            ImmutableList.of(DEFAULT_CLASSIFICATION, AUTO_INTEGRAL, RDP_EPSILON);
     }
 
     public static List<IConfigBase> getAllConfigs() {

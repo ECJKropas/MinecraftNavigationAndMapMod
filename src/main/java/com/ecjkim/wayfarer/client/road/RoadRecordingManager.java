@@ -79,6 +79,12 @@ public class RoadRecordingManager {
         double y = player.getY();
         double z = player.getZ();
 
+        if (WayfarerConfig.getInstance().autoIntegral) {
+            x = Math.round(x);
+            y = Math.round(y);
+            z = Math.round(z);
+        }
+
         if (!sessionPoints.isEmpty()) {
             double[] anchor = sessionPoints.get(sessionPoints.size() - 1);
             double dx = x - anchor[0];
