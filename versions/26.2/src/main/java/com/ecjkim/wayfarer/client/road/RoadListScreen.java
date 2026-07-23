@@ -476,6 +476,13 @@ public class RoadListScreen extends Screen {
             return;
 
         if (idx == 0) {
+            if (selectedSegment.getRoadId() != null) {
+                Road old = db.getRoad(selectedSegment.getRoadId());
+                if (old != null && old.getSegmentIds() != null) {
+                    old.getSegmentIds().remove(selectedSegment.getId());
+                    db.updateRoad(old.getId(), old);
+                }
+            }
             selectedSegment.setRoadId(null);
             db.updateSegment(selectedSegment.getId(), selectedSegment);
             db.asyncSave();

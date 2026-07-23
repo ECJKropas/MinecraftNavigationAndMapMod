@@ -175,30 +175,30 @@ public class RoadMetadataScreen extends Screen {
 
         // Section label
         graphics.text(this.font, Component.literal(I18n.get("wayfarer.road.gui.metadata.create_new")), fieldLeft,
-            separatorY + 20, 11184810, true);
+            separatorY + 20, 0xFFAAAAAA, true);
 
         // Name field
         graphics.text(this.font, Component.literal(I18n.get("wayfarer.road.gui.metadata.field_name")), fieldLeft,
-            separatorY + 40, 11184810, true);
+            separatorY + 40, 0xFFAAAAAA, true);
 
         // Classification / Number
         int nameBoxY = separatorY + 52;
         int classifLabelY = nameBoxY + 28;
         graphics.text(this.font, Component.literal(I18n.get("wayfarer.road.gui.metadata.classification_number")),
-            fieldLeft, classifLabelY, 11184810, true);
+            fieldLeft, classifLabelY, 0xFFAAAAAA, true);
 
         graphics.text(this.font, Component.literal(I18n.get("wayfarer.road.gui.metadata.hint")), fieldLeft,
-            classifLabelY + 46, 8947848, true);
+            classifLabelY + 46, 0xFF888888, true);
 
         // Segment info
         int bottomInfoY = top + PANEL_HEIGHT - 44;
         graphics.text(this.font,
             Component.literal("线段节点数: " + (segment.getNodeIds() != null ? segment.getNodeIds().size() : 0)), fieldLeft,
-            bottomInfoY, 0xCCCCCC, true);
+            bottomInfoY, 0xFFCCCCCC, true);
 
         if (selectedRoad != null) {
             graphics.text(this.font, Component.literal("已关联道路: " + selectedRoad.getName()), fieldLeft, top + 38 + 8,
-                0x66AAFF, true);
+                0xFF66AAFF, true);
         }
 
         super.extractRenderState(graphics, mouseX, mouseY, partialTick);
