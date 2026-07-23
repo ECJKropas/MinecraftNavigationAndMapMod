@@ -44,6 +44,7 @@ wayfarer:
         browser_unsupported: "Cannot auto-open browser. Please manually visit %s"
         browser_failed: "Failed to open browser. Please manually visit %s"
       unfiled_segments: Unfiled Segments
+      segment: Segment
       new_road: New Road
       delete_road: Delete Road
       edit: Edit

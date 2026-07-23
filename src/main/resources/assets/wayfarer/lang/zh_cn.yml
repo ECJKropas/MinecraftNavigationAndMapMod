@@ -44,6 +44,7 @@ wayfarer:
         browser_unsupported: "当前系统不支持自动打开浏览器，请手动访问 %s"
         browser_failed: "打开浏览器失败：请手动访问 %s"
       unfiled_segments: 未归档路段
+      segment: 路段
       new_road: 新建道路
       delete_road: 删除道路
       edit: 编辑

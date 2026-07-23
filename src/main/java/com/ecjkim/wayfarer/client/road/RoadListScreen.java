@@ -191,6 +191,35 @@ public class RoadListScreen extends Screen {
         renderBackground(g);
         refreshCache();
         updateButtonStates();
+
+        // Drag polling: hold left mouse to pick up, release to drop
+        long window = this.minecraft.getWindow().getWindow();
+        boolean leftDown = GLFW.glfwGetMouseButton(window, GLFW.GLFW_MOUSE_BUTTON_LEFT) == GLFW.GLFW_PRESS;
+
+        if (!dragging && leftDown && mouseY >= panelTop && mouseY <= panelBottom && mouseX >= colMidX
+            && mouseX <= colMidX + colMidW) {
+            List<Segment> segs = currentSegments();
+            int headerH = (selectedRoad != null || (selectedRoad == null && selectedSegment != null)) ? HEADER_H : 0;
+            int relY = mouseY - panelTop - headerH + scrollMid * ITEM_H;
+            int idx = relY / ITEM_H;
+            if (idx >= 0 && idx < segs.size()) {
+                Segment seg = segs.get(idx);
+                if (selectedSegment != null && selectedSegment.getId().equals(seg.getId())) {
+                    dragging = true;
+                    draggingSegment = selectedSegment;
+                    draggingLabel = Component.literal(I18n.get("wayfarer.road.gui.segment") + " #" + idx);
+                }
+            }
+        } else if (dragging && !leftDown) {
+            if (mouseY >= panelTop && mouseY <= panelBottom && mouseX >= colLeftX && mouseX <= colLeftX + colLeftW) {
+                dropSegment(mouseX, mouseY);
+            } else {
+                dragging = false;
+                draggingSegment = null;
+                draggingLabel = null;
+            }
+        }
+
         renderLeftColumn(g, mouseX, mouseY);
         renderMidColumn(g, mouseX, mouseY);
         renderRightColumn(g, mouseX, mouseY);
@@ -216,21 +245,19 @@ public class RoadListScreen extends Screen {
         int x = colLeftX, xr = x + colLeftW, y = panelTop;
         g.fill(x, y - 1, xr, y, 0xFF4E5768);
 
-        int total = allUnfiled.isEmpty() ? filteredRoads.size() : 1 + filteredRoads.size();
+        int total = 1 + filteredRoads.size();
         int maxVis = (panelBottom - y) / ITEM_H;
         clampScrollLeft(total, maxVis);
         int idx = -scrollLeft, py = y;
 
-        if (!allUnfiled.isEmpty()) {
-            idx++;
-            if (idx >= 0 && py + ITEM_H <= panelBottom) {
-                boolean sel = selectedRoad == null && selectedSegment != null && allUnfiled.contains(selectedSegment);
-                boolean hov = hit(mx, my, x, py, colLeftW, ITEM_H);
-                drawItem(g, x, py, colLeftW, ITEM_H, I18n.get("wayfarer.road.gui.unfiled_segments"),
-                    String.valueOf(allUnfiled.size()), 0xFFAA88FF, sel, hov);
-            }
-            py += ITEM_H;
+        idx++;
+        if (idx >= 0 && py + ITEM_H <= panelBottom) {
+            boolean sel = selectedRoad == null && selectedSegment != null && allUnfiled.contains(selectedSegment);
+            boolean hov = hit(mx, my, x, py, colLeftW, ITEM_H);
+            drawItem(g, x, py, colLeftW, ITEM_H, I18n.get("wayfarer.road.gui.unfiled_segments"),
+                String.valueOf(allUnfiled.size()), 0xFFAA88FF, sel, hov);
         }
+        py += ITEM_H;
 
         for (Road road : filteredRoads) {
             idx++;
@@ -264,7 +291,7 @@ public class RoadListScreen extends Screen {
             g.drawString(this.font, "> " + selectedRoad.getName(), x + 4, y, 0xFFCCCCFF, false);
             headerH = HEADER_H;
             py += headerH;
-        } else if (!allUnfiled.isEmpty() && selectedRoad == null && selectedSegment != null) {
+        } else if (selectedRoad == null && selectedSegment != null) {
             g.drawString(this.font, "> " + I18n.get("wayfarer.road.gui.unfiled_segments"), x + 4, y, 0xFFCCCCFF, false);
             headerH = HEADER_H;
             py += headerH;
@@ -370,11 +397,7 @@ public class RoadListScreen extends Screen {
 
         if (button == 0) {
             if (ix >= colLeftX && ix <= colLeftX + colLeftW) {
-                if (dragging) {
-                    dropSegment((int)mx, (int)my);
-                } else {
-                    clickLeft(ix, iy);
-                }
+                clickLeft(ix, iy);
                 return true;
             }
             if (ix >= colMidX && ix <= colMidX + colMidW) {
@@ -429,7 +452,7 @@ public class RoadListScreen extends Screen {
         dragging = false;
         draggingSegment = null;
         draggingLabel = null;
-        int off = allUnfiled.isEmpty() ? 0 : 1;
+        int off = 1;
         int relY = my - panelTop + scrollLeft * ITEM_H;
         int idx = relY / ITEM_H;
         int ri = idx - off;
@@ -442,13 +465,13 @@ public class RoadListScreen extends Screen {
     }
 
     private void clickLeft(int mx, int my) {
-        int off = allUnfiled.isEmpty() ? 0 : 1;
+        int off = 1;
         int relY = my - panelTop + scrollLeft * ITEM_H;
         int idx = relY / ITEM_H;
 
-        if (!allUnfiled.isEmpty() && idx == 0) {
+        if (idx == 0) {
             selectedRoad = null;
-            selectedSegment = allUnfiled.get(0);
+            selectedSegment = allUnfiled.isEmpty() ? null : allUnfiled.get(0);
             selectedNode = null;
             scrollMid = 0;
             scrollRight = 0;
@@ -473,19 +496,13 @@ public class RoadListScreen extends Screen {
 
     private void clickMid(int mx, int my) {
         List<Segment> segs = currentSegments();
-        int headerH =
-            (selectedRoad != null || (!allUnfiled.isEmpty() && selectedRoad == null && selectedSegment != null))
-                ? HEADER_H : 0;
+        int headerH = (selectedRoad != null || (selectedRoad == null && selectedSegment != null)) ? HEADER_H : 0;
         int relY = my - panelTop - headerH + scrollMid * ITEM_H;
         int idx = relY / ITEM_H;
         if (idx >= 0 && idx < segs.size()) {
             selectedSegment = segs.get(idx);
             selectedNode = null;
             scrollRight = 0;
-            dragging = true;
-            draggingSegment = selectedSegment;
-            String name = I18n.get("wayfarer.road.gui.segment") + " #" + idx;
-            draggingLabel = Component.literal(name);
         }
     }
 
@@ -506,9 +523,7 @@ public class RoadListScreen extends Screen {
 
     private void rightClickMid(int mx, int my) {
         List<Segment> segs = currentSegments();
-        int headerH =
-            (selectedRoad != null || (!allUnfiled.isEmpty() && selectedRoad == null && selectedSegment != null))
-                ? HEADER_H : 0;
+        int headerH = (selectedRoad != null || (selectedRoad == null && selectedSegment != null)) ? HEADER_H : 0;
         int relY = my - panelTop - headerH + scrollMid * ITEM_H;
         int idx = relY / ITEM_H;
         if (idx >= 0 && idx < segs.size()) {
@@ -614,8 +629,7 @@ public class RoadListScreen extends Screen {
     private List<Segment> currentSegments() {
         if (selectedRoad != null)
             return db.getSegmentsForRoad(selectedRoad.getId());
-        if (!allUnfiled.isEmpty() && selectedRoad == null
-            && (selectedSegment == null || selectedSegment.getRoadId() == null)) {
+        if (selectedRoad == null && (selectedSegment == null || selectedSegment.getRoadId() == null)) {
             return allUnfiled;
         }
         return new ArrayList<>();
