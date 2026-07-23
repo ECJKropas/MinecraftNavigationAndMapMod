@@ -193,7 +193,7 @@ public final class XaeroMapOverlay {
         double cameraZ, double centerX, double centerY, int color, float lineWidth) {
 
         Matrix4f matrix = graphics.pose().last().pose();
-        float half = lineWidth / 2.0f;
+        float half = Math.max(0.5f, (float)(lineWidth * effectiveScale / 2.0));
 
         RenderSystem.setShader(GameRenderer::getPositionColorShader);
 
