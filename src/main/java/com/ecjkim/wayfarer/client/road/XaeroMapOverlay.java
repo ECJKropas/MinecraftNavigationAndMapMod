@@ -23,14 +23,9 @@ import java.util.List;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.screens.Screen;
-import net.minecraft.client.renderer.GameRenderer;
 
 import com.mojang.blaze3d.platform.Window;
 import com.mojang.blaze3d.systems.RenderSystem;
-import com.mojang.blaze3d.vertex.BufferBuilder;
-import com.mojang.blaze3d.vertex.BufferUploader;
-import com.mojang.blaze3d.vertex.DefaultVertexFormat;
-import com.mojang.blaze3d.vertex.VertexFormat;
 
 import net.fabricmc.fabric.api.client.screen.v1.ScreenEvents;
 
@@ -39,7 +34,6 @@ import com.ecjkim.wayfarer.client.road.model.Node;
 import com.ecjkim.wayfarer.client.road.model.Road;
 import com.ecjkim.wayfarer.client.road.model.Segment;
 
-import org.joml.Matrix4f;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -192,28 +186,46 @@ public final class XaeroMapOverlay {
     private static void renderSegment(GuiGraphics graphics, List<Node> nodes, double effectiveScale, double cameraX,
         double cameraZ, double centerX, double centerY, int color, float lineWidth) {
 
-        Matrix4f matrix = graphics.pose().last().pose();
+        int thickness = (int)lineWidth;
 
-        BufferBuilder builder = new BufferBuilder(256);
+        for (int i = 0; i < nodes.size() - 1; i++) {
+            Node n1 = nodes.get(i);
+            Node n2 = nodes.get(i + 1);
 
-        RenderSystem.setShader(GameRenderer::getPositionColorShader);
-        RenderSystem.lineWidth(lineWidth);
+            int sx1 = (int)((n1.getX() - cameraX) * effectiveScale + centerX);
+            int sy1 = (int)((n1.getZ() - cameraZ) * effectiveScale + centerY);
+            int sx2 = (int)((n2.getX() - cameraX) * effectiveScale + centerX);
+            int sy2 = (int)((n2.getZ() - cameraZ) * effectiveScale + centerY);
 
-        builder.begin(VertexFormat.Mode.DEBUG_LINE_STRIP, DefaultVertexFormat.POSITION_COLOR);
-
-        float r = ((color >> 16) & 0xFF) / 255.0f;
-        float g = ((color >> 8) & 0xFF) / 255.0f;
-        float b = (color & 0xFF) / 255.0f;
-        float a = 0.85f;
-
-        for (Node node : nodes) {
-            float sx = (float)((node.getX() - cameraX) * effectiveScale + centerX);
-            float sy = (float)((node.getZ() - cameraZ) * effectiveScale + centerY);
-            builder.vertex(matrix, sx, sy, 0.0f).color(r, g, b, a).endVertex();
+            drawThickLine(graphics, sx1, sy1, sx2, sy2, color, thickness);
         }
+    }
 
-        BufferUploader.drawWithShader(builder.end());
-        RenderSystem.lineWidth(1.0f);
+    private static void drawThickLine(GuiGraphics graphics, int x1, int y1, int x2, int y2, int color, int thickness) {
+        int dx = Math.abs(x2 - x1);
+        int dy = Math.abs(y2 - y1);
+        int sx = x1 < x2 ? 1 : -1;
+        int sy = y1 < y2 ? 1 : -1;
+        int err = dx - dy;
+        int half = thickness / 2;
+
+        int cx = x1, cy = y1;
+        while (true) {
+            graphics.fill(cx - half, cy - half, cx + thickness - half, cy + thickness - half, color);
+
+            if (cx == x2 && cy == y2)
+                break;
+
+            int e2 = 2 * err;
+            if (e2 > -dy) {
+                err -= dy;
+                cx += sx;
+            }
+            if (e2 < dx) {
+                err += dx;
+                cy += sy;
+            }
+        }
     }
 
     private static int classificationColor(String classification) {
