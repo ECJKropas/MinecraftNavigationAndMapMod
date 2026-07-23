@@ -255,7 +255,7 @@ public final class XaeroMapOverlay {
 
     private static float classificationLineWidth(String classification) {
         if (classification == null || classification.isEmpty())
-            return 10.0f;
-        return classification.charAt(0) == 'G' ? 20.0f : (classification.charAt(0) == 'S' ? 15.0f : 10.0f);
+            return 2.5f;
+        return classification.charAt(0) == 'G' ? 5.0f : (classification.charAt(0) == 'S' ? 3.75f : 2.5f);
     }
 }
