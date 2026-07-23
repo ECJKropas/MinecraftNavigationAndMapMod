@@ -87,6 +87,7 @@ public class WayfarerHttpServer implements Runnable {
         routes.add(new Route("DELETE", Pattern.compile("/api/segments/([0-9a-f-]+)"), this::handleDeleteSegment));
         routes.add(new Route("POST", "/api/merge", this::handleMerge));
         routes.add(new Route("POST", Pattern.compile("/api/split/([0-9a-f-]+)"), this::handleSplit));
+        routes.add(new Route("POST", Pattern.compile("/api/segments/([0-9a-f-]+)/insert"), this::handleInsertNode));
         routes.add(new Route("PATCH", Pattern.compile("/api/roads/([0-9a-f-]+)"), this::handleUpdateRoad));
         routes.add(new Route("DELETE", Pattern.compile("/api/roads/([0-9a-f-]+)"), this::handleDeleteRoad));
     }
@@ -499,6 +500,53 @@ public class WayfarerHttpServer implements Runnable {
                 arr.add(GSON.toJsonTree(s));
             }
             sendJson(req.exchange, 200, arr);
+        } catch (Exception e) {
+            sendJson(req.exchange, 400, errorJson("Invalid JSON: " + e.getMessage()));
+        }
+    }
+
+    private void handleInsertNode(Request req) {
+        String segIdStr = req.pathParams.getOrDefault("id", "");
+        UUID segId;
+        try {
+            segId = UUID.fromString(segIdStr);
+        } catch (IllegalArgumentException e) {
+            sendJson(req.exchange, 400, errorJson("Invalid segment ID"));
+            return;
+        }
+
+        if (req.body == null) {
+            sendJson(req.exchange, 400, errorJson("Missing request body"));
+            return;
+        }
+
+        try {
+            JsonObject body = JsonParser.parseString(req.body).getAsJsonObject();
+            double x = body.get("x").getAsDouble();
+            double z = body.get("z").getAsDouble();
+            int insertIndex = body.get("insertIndex").getAsInt();
+
+            if (body.has("expectedVersion")) {
+                int expectedVersion = body.get("expectedVersion").getAsInt();
+                if (!database.checkVersion(segId, expectedVersion)) {
+                    Segment seg = database.getSegment(segId);
+                    int cur = seg != null ? seg.getVersion() : -1;
+                    sendJson(req.exchange, 409, errorJson("Version conflict. Current: " + cur));
+                    return;
+                }
+            }
+
+            Node newNode = database.insertNodeIntoSegment(segId, insertIndex, x, z);
+            if (newNode == null) {
+                sendJson(req.exchange, 400, errorJson("Insert failed: invalid segment or insertIndex"));
+                return;
+            }
+
+            database.saveToDisk();
+
+            JsonObject result = new JsonObject();
+            result.add("node", GSON.toJsonTree(newNode));
+            sendJson(req.exchange, 201, result);
         } catch (Exception e) {
             sendJson(req.exchange, 400, errorJson("Invalid JSON: " + e.getMessage()));
         }

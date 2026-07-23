@@ -4,6 +4,9 @@
 const SCALE = 128.0;
 let map, selectedSegments = new Set(), selectedNodeId = null, selectedSegmentId = null;
 let roadStore = { nodes:{}, segments:{}, roads:{} };
+let activeTool = null;          // 'move' | 'point' | null
+let toolbarMode = 'compact';   // 'compact' | 'detailed'
+const TOOL_TOLERANCE_PX = 12;  // pixel tolerance for point tool segment detection
 
 // ——— Toast ———
 function showToast(msg, type) {
@@ -28,6 +31,14 @@ function showToast(msg, type) {
     t.style.transform = 'translateX(-50%) translateY(-4px)';
     setTimeout(() => t.remove(), 280);
   }, 2200);
+}
+
+// ——— Tool toast (bottom-right) ———
+function showToolToast(msg) {
+  const el = document.getElementById('tool-toast');
+  el.textContent = msg;
+  el.classList.add('visible');
+  setTimeout(() => el.classList.remove('visible'), 2000);
 }
 
 // ——— Sheet (Apple-style confirm) ———
@@ -252,6 +263,7 @@ function renderAll() {
     const marker = L.circleMarker(mc2latlng(node.x, node.z), {
       radius: 5, fillColor: fill, color: 'rgba(255,255,255,0.9)',
       weight: 1.5, fillOpacity: 0.92,
+      draggable: activeTool === 'move',
     }).addTo(map);
     marker.on('mouseover', () => marker.setRadius(6.5));
     marker.on('mouseout', () => marker.setRadius(5));
@@ -265,7 +277,13 @@ function renderAll() {
 }
 
 // ——— Interactions ———
-function onMapClick() { clearSelection(); }
+function onMapClick(e) {
+  if (activeTool === 'point') {
+    handlePointTool(e.latlng);
+    return;
+  }
+  clearSelection();
+}
 
 function onNodeClick(nid, event) {
   if (event.ctrlKey || event.metaKey) return;
@@ -460,4 +478,111 @@ async function splitSegment() {
   else showToast('拆分失败', 'error');
 }
 
-window.addEventListener('load', initMap);
+// ——— Toolbar ———
+function initToolbar() {
+  document.getElementById('tool-move').addEventListener('click', () => toggleTool('move'));
+  document.getElementById('tool-point').addEventListener('click', () => toggleTool('point'));
+  document.getElementById('tool-mode-toggle').addEventListener('click', toggleToolbarMode);
+}
+
+function toggleTool(tool) {
+  if (activeTool === tool) {
+    setActiveTool(null);
+  } else {
+    setActiveTool(tool);
+  }
+}
+
+function setActiveTool(tool) {
+  activeTool = tool;
+  document.querySelectorAll('.tool-btn').forEach(b => b.classList.remove('selected'));
+  if (tool) {
+    document.getElementById('tool-' + tool).classList.add('selected');
+  }
+  renderAll();
+}
+
+function toggleToolbarMode() {
+  const tb = document.getElementById('toolbar');
+  if (toolbarMode === 'compact') {
+    toolbarMode = 'detailed';
+    tb.classList.remove('toolbar-compact');
+    tb.classList.add('toolbar-detailed');
+  } else {
+    toolbarMode = 'compact';
+    tb.classList.remove('toolbar-detailed');
+    tb.classList.add('toolbar-compact');
+  }
+}
+
+// ——— Point tool ———
+function handlePointTool(latlng) {
+  const hit = findNearestSegment(latlng, TOOL_TOLERANCE_PX);
+  if (!hit) {
+    showToolToast('附近没有路段，无法插入孤立节点');
+    return;
+  }
+  insertNodeOnSegment(hit.segmentId, hit.insertIndex, latlng);
+}
+
+function findNearestSegment(latlng, tolerancePx) {
+  const clickPt = map.latLngToContainerPoint(latlng);
+  let best = null;
+  let bestDist = tolerancePx;
+
+  for (const [sid, line] of segmentLines) {
+    const latlngs = line.getLatLngs();
+    if (!latlngs || latlngs.length < 2) continue;
+    for (let i = 0; i < latlngs.length - 1; i++) {
+      const p1 = map.latLngToContainerPoint(latlngs[i]);
+      const p2 = map.latLngToContainerPoint(latlngs[i + 1]);
+      const info = pointToSegmentInfo(clickPt, p1, p2);
+      if (info.dist < bestDist) {
+        bestDist = info.dist;
+        best = { segmentId: sid, insertIndex: i + 1 };
+      }
+    }
+  }
+  return best;
+}
+
+function pointToSegmentInfo(p, p1, p2) {
+  const dx = p2.x - p1.x;
+  const dy = p2.y - p1.y;
+  const lenSq = dx * dx + dy * dy;
+  if (lenSq === 0) return { dist: p.distanceTo(p1), t: 0 };
+  let t = ((p.x - p1.x) * dx + (p.y - p1.y) * dy) / lenSq;
+  t = Math.max(0, Math.min(1, t));
+  const proj = L.point(p1.x + t * dx, p1.y + t * dy);
+  return { dist: p.distanceTo(proj), t };
+}
+
+async function insertNodeOnSegment(segId, insertIndex, latlng) {
+  const seg = roadStore.segments[segId];
+  if (!seg) return;
+  const x = latlng.lng * SCALE;
+  const z = latlng.lat * SCALE;
+  try {
+    const res = await fetch('/api/segments/' + segId + '/insert', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ x, z, insertIndex, expectedVersion: seg.version })
+    });
+    if (res.status === 409) {
+      showToast('版本冲突，正在刷新...', 'error');
+      loadData();
+      return;
+    }
+    if (!res.ok) {
+      showToast('插入失败', 'error');
+      return;
+    }
+    clearSelection();
+    loadData();
+    showToast('节点已插入');
+  } catch (e) {
+    showToast('网络错误', 'error');
+  }
+}
+
+window.addEventListener('load', () => { initToolbar(); initMap(); });

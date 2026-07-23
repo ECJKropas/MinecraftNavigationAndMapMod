@@ -33,6 +33,7 @@ import java.util.logging.Logger;
 
 import net.fabricmc.loader.api.FabricLoader;
 
+import com.ecjkim.wayfarer.client.road.model.CornerType;
 import com.ecjkim.wayfarer.client.road.model.Node;
 import com.ecjkim.wayfarer.client.road.model.Road;
 import com.ecjkim.wayfarer.client.road.model.Segment;
@@ -402,6 +403,53 @@ public class RoadNetworkDatabase {
         segments.remove(segId);
         markDirty();
         return Arrays.asList(left, right);
+    }
+
+    /**
+     * Inserts a new node at a position along a segment, splitting the segment into two.
+     *
+     * @param segId the segment to split
+     * @param insertIndex position in nodeIds where the new node is inserted (must be 1..size-1)
+     * @param x X coordinate of the new node
+     * @param z Z coordinate of the new node
+     * @return the newly created Node, or null if the segment or index is invalid
+     */
+    public synchronized Node insertNodeIntoSegment(UUID segId, int insertIndex, double x, double z) {
+        Segment seg = segments.get(segId);
+        if (seg == null || seg.getNodeIds() == null)
+            return null;
+        List<UUID> ids = seg.getNodeIds();
+        if (insertIndex < 1 || insertIndex >= ids.size())
+            return null;
+
+        long now = System.currentTimeMillis();
+        Node newNode = new Node(UUID.randomUUID(), x, 0, z, CornerType.AUTO, Source.USER, 1, now);
+        nodes.put(newNode.getId(), newNode);
+
+        List<UUID> leftIds = new ArrayList<>(ids.subList(0, insertIndex));
+        leftIds.add(newNode.getId());
+        List<UUID> rightIds = new ArrayList<>();
+        rightIds.add(newNode.getId());
+        rightIds.addAll(ids.subList(insertIndex, ids.size()));
+
+        Segment left = new Segment(UUID.randomUUID(), leftIds, seg.getRoadId(), Source.USER, Status.CONFIRMED, 1);
+        Segment right = new Segment(UUID.randomUUID(), rightIds, seg.getRoadId(), Source.USER, Status.CONFIRMED, 1);
+
+        segments.put(left.getId(), left);
+        segments.put(right.getId(), right);
+
+        if (seg.getRoadId() != null) {
+            Road road = roads.get(seg.getRoadId());
+            if (road != null && road.getSegmentIds() != null) {
+                road.getSegmentIds().remove(segId);
+                road.getSegmentIds().add(left.getId());
+                road.getSegmentIds().add(right.getId());
+            }
+        }
+
+        segments.remove(segId);
+        markDirty();
+        return newNode;
     }
 
     /**
