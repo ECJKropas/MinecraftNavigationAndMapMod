@@ -150,11 +150,11 @@ public final class XaeroMapOverlay {
                 if (!isSegmentVisible(nodes, minWorldX, maxWorldX, minWorldZ, maxWorldZ))
                     continue;
 
-                int lineWidth = 10;
+                int lineWidth = 4;
                 if ("G".equals(classification))
-                    lineWidth = 20;
+                    lineWidth = 8;
                 else if ("S".equals(classification))
-                    lineWidth = 15;
+                    lineWidth = 6;
 
                 renderSegment(graphics, nodes, effectiveScale, cameraX, cameraZ, centerX, centerY, color, lineWidth);
             }
