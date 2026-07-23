@@ -1,4 +1,7 @@
 wayfarer:
+  main:
+    road_management: 道路管理
+    settings: 设置
   toggle_road_recording: 切换道路记录
   open_road_list: 打开路线列表（N）
   road:
@@ -20,7 +23,6 @@ wayfarer:
         name: "名称: %s"
         number: "号: %s"
         number_none: 无
-        width: "宽度: %s 格"
         points: "轨迹点: %d"
         intersections: "交叉点: %d"
         id: "ID: %s"
@@ -55,7 +57,6 @@ wayfarer:
         select_road: 选择已有道路
         create_new: 创建新的道路
         field_name: 道路名
-        field_width: 道路宽度
         field_number: 编号
         classification_default: 道路分级
         classification_number: 道路分级 / 编号
@@ -63,39 +64,14 @@ wayfarer:
         button_save: 保存
         button_cancel_edit: 放弃修改
         button_cancel: 放弃
-        subtitle_width: 记录完成后补充名称和宽度
         subtitle_classify: 记录完成后补充名称和分级
 category:
   wayfarer: Wayfarer
 
 wayfarer.gui.title.configs: Wayfarer 设置
 
-useClassificationWidth: 使用分级道路宽度
-defaultWidth: 道路默认宽度
 defaultClassification: 默认分级代码
 tileProviderMode: 地图瓦片提供者模式
-widthGGuodao: G国道宽度
-widthGGaosu: G高速宽度
-widthSShengdao: S省道宽度
-widthSGaojia: S高架宽度
-widthXXiangdao: X乡道宽度
-widthYXiaodao: Y县道宽度
-widthCCundao: C村道宽度
-rdpEpsilonFormula: RDP简化容差公式
+rdpEpsilon: RDP简化容差
 toggleRecording: 切换道路录制
 openMenu: 打开导航菜单
-
-"是否启用分级道路宽度": 是否启用分级道路宽度
-"道路默认宽度": 道路默认宽度
-"新建道路时默认使用的分级代码，如 G国道、S省道": 新建道路时默认使用的分级代码，如 G国道、S省道
-"地图瓦片提供者模式": 地图瓦片提供者模式
-"G国道宽度": G国道宽度
-"G高速宽度": G高速宽度
-"S省道宽度": S省道宽度
-"S高架宽度": S高架宽度
-"X乡道宽度": X乡道宽度
-"Y县道宽度": Y县道宽度
-"C村道宽度": C村道宽度
-"RDP简化容差公式，[RW]=道路宽度 [DW]=等级默认宽度，支持 + - * / 运算，如 [RW]/2 或 [RW]*2": RDP简化容差公式，[RW]=道路宽度 [DW]=等级默认宽度，支持 + - * / 运算，如 [RW]/2 或 [RW]*2
-"切换道路录制开关": 切换道路录制开关
-"打开导航菜单": 打开导航菜单

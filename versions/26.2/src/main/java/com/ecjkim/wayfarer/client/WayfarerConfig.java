@@ -40,12 +40,9 @@ public class WayfarerConfig {
 
     private static WayfarerConfig instance;
 
-    public boolean useClassificationWidth = false;
-    public Map<String, Double> classificationWidths = defaultClassificationWidths();
-    public double defaultWidth = 7.0;
+    public double rdpEpsilon = 1.0;
     public String defaultClassification = "";
     public Map<String, List<HotkeyBind>> hotkeys = defaultHotkeys();
-    public String rdpEpsilonFormula = "[RW]/2";
 
     private WayfarerConfig() {}
 
@@ -71,9 +68,6 @@ public class WayfarerConfig {
             WayfarerConfig config = GSON.fromJson(json, WayfarerConfig.class);
             if (config == null)
                 return new WayfarerConfig();
-            if (config.classificationWidths == null || config.classificationWidths.isEmpty()) {
-                config.classificationWidths = defaultClassificationWidths();
-            }
             if (config.hotkeys == null || config.hotkeys.isEmpty()) {
                 config.hotkeys = defaultHotkeys();
             }
@@ -105,25 +99,6 @@ public class WayfarerConfig {
             return List.of(new HotkeyBind(WayfarerHotkeys.OPEN_MENU));
         }
         return Collections.emptyList();
-    }
-
-    public double getWidthForClassification(String classification) {
-        if (classification == null || classification.isEmpty())
-            return defaultWidth;
-        Double w = classificationWidths.get(classification);
-        return w != null ? w : defaultWidth;
-    }
-
-    public static LinkedHashMap<String, Double> defaultClassificationWidths() {
-        LinkedHashMap<String, Double> map = new LinkedHashMap<>();
-        map.put("G国道", 21.0);
-        map.put("G高速", 21.0);
-        map.put("S省道", 17.0);
-        map.put("S高架", 17.0);
-        map.put("X乡道", 13.0);
-        map.put("Y县道", 7.0);
-        map.put("C村道", 3.0);
-        return map;
     }
 
     public static Map<String, List<HotkeyBind>> defaultHotkeys() {

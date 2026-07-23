@@ -90,7 +90,8 @@ public class RoadMetadataScreen extends Screen {
         this.nameBox.setValue("");
         this.addRenderableWidget(this.nameBox);
 
-        int classifRowY = nameBoxY + 40;
+        int classifLabelY = nameBoxY + 28;
+        int classifRowY = classifLabelY + 12;
         int halfGap = 8;
         int cycleButtonWidth = 110;
         this.cycleButton = Button.builder(Component.literal(classificationLabel()), btn -> {
@@ -108,14 +109,17 @@ public class RoadMetadataScreen extends Screen {
 
         int buttonY = top + PANEL_HEIGHT - 30;
 
-        this.addRenderableWidget(Button.builder(Component.literal("保存"), button -> {
-            saveRoad();
-        }).bounds(centerX - 116, buttonY, 112, 20).build());
+        this.addRenderableWidget(
+            Button.builder(Component.literal(I18n.get("wayfarer.road.gui.metadata.button_save")), button -> {
+                saveRoad();
+            }).bounds(centerX - 116, buttonY, 112, 20).build());
 
-        this.addRenderableWidget(Button.builder(Component.literal("取消"), button -> {
-            this.onCancel.run();
-            this.minecraft.setScreenAndShow(null);
-        }).bounds(centerX + 4, buttonY, 112, 20).build());
+        this.addRenderableWidget(
+            Button.builder(Component.literal(I18n.get("wayfarer.road.gui.metadata.button_cancel")), button -> {
+                cleanupOrphanData();
+                this.onCancel.run();
+                this.minecraft.setScreenAndShow(null);
+            }).bounds(centerX + 4, buttonY, 112, 20).build());
 
         this.setInitialFocus(this.nameBox);
     }
@@ -139,8 +143,8 @@ public class RoadMetadataScreen extends Screen {
                 roadName = "未命名道路";
             }
 
-            Road road = new Road(UUID.randomUUID(), roadName, "#FFFFFF", classification, number, 7.0,
-                List.of(segment.getId()), 1);
+            Road road =
+                new Road(UUID.randomUUID(), roadName, "#FFFFFF", classification, number, List.of(segment.getId()), 1);
             segment.setRoadId(road.getId());
             db.addRoad(road);
             db.updateSegment(segment.getId(), segment);
@@ -203,6 +207,7 @@ public class RoadMetadataScreen extends Screen {
     @Override
     public boolean keyPressed(net.minecraft.client.input.KeyEvent event) {
         if (event.key() == GLFW.GLFW_KEY_ESCAPE) {
+            cleanupOrphanData();
             this.onCancel.run();
             this.minecraft.setScreenAndShow(null);
             return true;
@@ -213,5 +218,16 @@ public class RoadMetadataScreen extends Screen {
     private String classificationLabel() {
         String val = CLASSIFICATIONS.get(classificationIndex);
         return val.isEmpty() ? "道路分级" : val;
+    }
+
+    private void cleanupOrphanData() {
+        RoadNetworkDatabase db = RoadNetworkDatabase.getInstance();
+        if (segment.getNodeIds() != null) {
+            for (UUID nodeId : segment.getNodeIds()) {
+                db.removeNode(nodeId);
+            }
+        }
+        db.removeSegment(segment.getId());
+        db.asyncSave();
     }
 }

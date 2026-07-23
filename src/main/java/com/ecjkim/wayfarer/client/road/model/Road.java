@@ -23,8 +23,8 @@ import java.util.UUID;
  * A named road composed of ordered segments.
  *
  * <p>
- * Fields {@code classification}, {@code number}, and {@code width} default to empty / 7.0 so that existing
- * {@code roads.json} files deserialize without error (backward-compatible).
+ * Fields {@code classification} and {@code number} default to empty so that existing {@code roads.json} files
+ * deserialize without error (backward-compatible).
  * </p>
  */
 public class Road {
@@ -33,7 +33,6 @@ public class Road {
     private String color;
     private String classification = "";
     private String number = "";
-    private double width = 7.0;
     private List<UUID> segmentIds;
     private int version;
 
@@ -47,14 +46,13 @@ public class Road {
         this.version = version;
     }
 
-    public Road(UUID id, String name, String color, String classification, String number, double width,
-        List<UUID> segmentIds, int version) {
+    public Road(UUID id, String name, String color, String classification, String number, List<UUID> segmentIds,
+        int version) {
         this.id = id;
         this.name = name;
         this.color = color != null ? color : "#FFFFFF";
         this.classification = classification != null ? classification : "";
         this.number = number != null ? number : "";
-        this.width = width > 0.0 ? width : 7.0;
         this.segmentIds = segmentIds;
         this.version = version;
     }
@@ -97,14 +95,6 @@ public class Road {
 
     public void setNumber(String number) {
         this.number = number;
-    }
-
-    public double getWidth() {
-        return width;
-    }
-
-    public void setWidth(double width) {
-        this.width = width;
     }
 
     public List<UUID> getSegmentIds() {

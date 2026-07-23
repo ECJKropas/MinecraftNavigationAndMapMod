@@ -103,13 +103,10 @@ public class RoadRecordingManager {
         // 1. Simplify
         List<double[]> copy = new ArrayList<>(sessionPoints);
         WayfarerConfig config = WayfarerConfig.getInstance();
-        String epsilonFormula = config.rdpEpsilonFormula;
-        double width = config.defaultWidth;
-        String classification = config.defaultClassification;
-        double dw = config.getWidthForClassification(classification);
-        List<double[]> simplified = RoadSimplifier.simplify(copy, BACKTRACK_THRESHOLD, epsilonFormula, width, dw);
-        LOGGER.log(Level.INFO, "Simplified {0} → {1} points (formula={2})",
-            new Object[] {sessionPoints.size(), simplified.size(), epsilonFormula});
+        double epsilon = config.rdpEpsilon;
+        List<double[]> simplified = RoadSimplifier.simplify(copy, BACKTRACK_THRESHOLD, epsilon);
+        LOGGER.log(Level.INFO, "Simplified {0} → {1} points (epsilon={2})",
+            new Object[] {sessionPoints.size(), simplified.size(), epsilon});
 
         // 2. Convert to Nodes
         RoadNetworkDatabase db = RoadNetworkDatabase.getInstance();

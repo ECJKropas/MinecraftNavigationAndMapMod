@@ -18,7 +18,6 @@ package com.ecjkim.wayfarer.client.road;
 
 import java.util.ArrayList;
 import java.util.List;
-import java.util.logging.Level;
 import java.util.logging.Logger;
 
 /**
@@ -43,95 +42,6 @@ public final class RoadSimplifier {
     private static final Logger LOGGER = Logger.getLogger("Wayfarer");
 
     private RoadSimplifier() {}
-
-    // ──────────────────────────────────────────────
-    // Formula evaluation
-    // ──────────────────────────────────────────────
-
-    /**
-     * Evaluate an epsilon formula string.
-     *
-     * <p>
-     * Supports placeholders {@code [RW]} (Road Width) and {@code [DW]} (Default Width). Supports basic arithmetic (+ -
-     * * /) and parentheses. Falls back to {@code rw / 2.0} on parse failure.
-     */
-    public static double evaluateFormula(String formula, double rw, double dw) {
-        if (formula == null || formula.trim().isEmpty()) {
-            return rw / 2.0;
-        }
-        try {
-            String expr = formula.replace("[RW]", Double.toString(rw)).replace("[DW]", Double.toString(dw));
-            double result = parseExpression(expr);
-            return Math.max(0.0, result);
-        } catch (Exception e) {
-            LOGGER.log(Level.WARNING,
-                "[Wayfarer] Failed to evaluate RDP formula '" + formula + "', falling back to RW/2", e);
-            return rw / 2.0;
-        }
-    }
-
-    // ── Recursive descent parser ──
-
-    private static String expr;
-    private static int pos;
-
-    private static double parseExpression(String s) {
-        expr = s.replaceAll("\\s+", "");
-        pos = 0;
-        return parseExpressionInternal();
-    }
-
-    private static double parseExpressionInternal() {
-        double val = parseTerm();
-        while (pos < expr.length()) {
-            char op = expr.charAt(pos);
-            if (op == '+' || op == '-') {
-                pos++;
-                double rhs = parseTerm();
-                val = (op == '+') ? val + rhs : val - rhs;
-            } else {
-                break;
-            }
-        }
-        return val;
-    }
-
-    private static double parseTerm() {
-        double val = parseFactor();
-        while (pos < expr.length()) {
-            char op = expr.charAt(pos);
-            if (op == '*' || op == '/') {
-                pos++;
-                double rhs = parseFactor();
-                val = (op == '*') ? val * rhs : val / rhs;
-            } else {
-                break;
-            }
-        }
-        return val;
-    }
-
-    private static double parseFactor() {
-        if (pos >= expr.length()) {
-            throw new IllegalArgumentException("Unexpected end of expression");
-        }
-        char ch = expr.charAt(pos);
-        if (ch == '(') {
-            pos++;
-            double val = parseExpressionInternal();
-            if (pos < expr.length() && expr.charAt(pos) == ')') {
-                pos++;
-            }
-            return val;
-        }
-        int start = pos;
-        if (ch == '-')
-            pos++;
-        while (pos < expr.length() && (Character.isDigit(expr.charAt(pos)) || expr.charAt(pos) == '.')) {
-            pos++;
-        }
-        return Double.parseDouble(expr.substring(start, pos));
-    }
 
     // ──────────────────────────────────────────────
     // Public API — uses double[]{x, y, z}
@@ -211,14 +121,10 @@ public final class RoadSimplifier {
      *
      * @param points raw trajectory points
      * @param backtrackThreshold backtrack detection threshold (blocks)
-     * @param epsilonFormula epsilon formula string, e.g. {@code "[RW]/2"}
-     * @param rw road width
-     * @param dw default width
+     * @param epsilon RDP simplification tolerance (blocks)
      * @return simplified key-point list
      */
-    public static List<double[]> simplify(List<double[]> points, double backtrackThreshold, String epsilonFormula,
-        double rw, double dw) {
-        double epsilon = evaluateFormula(epsilonFormula, rw, dw);
+    public static List<double[]> simplify(List<double[]> points, double backtrackThreshold, double epsilon) {
         List<double[]> cleaned = removeBacktracking(points, backtrackThreshold);
         return douglasPeucker(cleaned, epsilon);
     }

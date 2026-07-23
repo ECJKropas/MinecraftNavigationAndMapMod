@@ -19,6 +19,7 @@ package com.ecjkim.wayfarer.client;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.components.Button;
 import net.minecraft.client.gui.screens.Screen;
+import net.minecraft.client.resources.language.I18n;
 import net.minecraft.network.chat.Component;
 
 import com.ecjkim.wayfarer.client.gui.WayfarerConfigScreen;
@@ -43,12 +44,12 @@ public class MainMenuScreen extends Screen {
 
         int y = panelTop + 36;
 
-        addRenderableWidget(Button.builder(Component.literal("道路管理"), btn -> {
+        addRenderableWidget(Button.builder(Component.literal(I18n.get("wayfarer.main.road_management")), btn -> {
             this.minecraft.setScreen(new RoadListScreen());
         }).bounds(btnX, y, BUTTON_WIDTH, BUTTON_HEIGHT).build());
         y += BUTTON_HEIGHT + BUTTON_GAP;
 
-        addRenderableWidget(Button.builder(Component.literal("设置"), btn -> {
+        addRenderableWidget(Button.builder(Component.literal(I18n.get("wayfarer.main.settings")), btn -> {
             WayfarerConfigScreen.openConfigScreen();
         }).bounds(btnX, y, BUTTON_WIDTH, BUTTON_HEIGHT).build());
     }

@@ -471,7 +471,6 @@ public class RoadListScreen extends Screen {
             selectedSegment = segs.get(idx);
             selectedNode = null;
             scrollRight = 0;
-            dragMode = true;
         }
     }
 

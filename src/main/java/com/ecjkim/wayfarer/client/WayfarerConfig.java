@@ -17,7 +17,6 @@
 package com.ecjkim.wayfarer.client;
 
 import java.util.List;
-import java.util.Map;
 
 import com.ecjkim.wayfarer.client.config.WayfarerConfigs;
 import com.ecjkim.wayfarer.client.config.WayfarerHotkeys;
@@ -29,18 +28,12 @@ import fi.dy.masa.malilib.hotkeys.IKeybind;
 public class WayfarerConfig {
     private static WayfarerConfig instance;
 
-    public final double defaultWidth;
     public final String defaultClassification;
-    public final boolean useClassificationWidth;
-    public final Map<String, Integer> classificationWidths;
-    public final String rdpEpsilonFormula;
+    public final double rdpEpsilon;
 
     private WayfarerConfig() {
-        this.defaultWidth = WayfarerConfigs.Generic.DEFAULT_WIDTH.getDoubleValue();
         this.defaultClassification = WayfarerConfigs.Generic.DEFAULT_CLASSIFICATION.getStringValue();
-        this.useClassificationWidth = WayfarerConfigs.Generic.USE_CLASSIFICATION_WIDTH.getBooleanValue();
-        this.classificationWidths = WayfarerConfigs.Generic.getClassificationWidths();
-        this.rdpEpsilonFormula = WayfarerConfigs.Generic.RDP_EPSILON_FORMULA.getStringValue();
+        this.rdpEpsilon = WayfarerConfigs.Generic.RDP_EPSILON.getDoubleValue();
     }
 
     public static WayfarerConfig getInstance() {
@@ -62,15 +55,6 @@ public class WayfarerConfig {
             return List.of(new HotkeyBind(WayfarerHotkeys.OPEN_MENU));
         }
         return List.of();
-    }
-
-    /** 根据分级获取宽度 */
-    public double getWidthForClassification(String classification) {
-        if (classification == null || classification.isEmpty()) {
-            return defaultWidth;
-        }
-        Integer w = classificationWidths.get(classification);
-        return w != null ? w.doubleValue() : defaultWidth;
     }
 
     // --- HotkeyBind ---

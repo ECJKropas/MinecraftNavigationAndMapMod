@@ -98,9 +98,8 @@ public class RoadNetworkDatabase {
     public synchronized void updateNode(UUID id, Node updated) {
         Node existing = nodes.get(id);
         if (existing != null) {
-            updated.setId(id);
-            updated.setModifiedAt(System.currentTimeMillis());
-            nodes.put(id, updated);
+            existing.setCornerType(updated.getCornerType());
+            existing.setModifiedAt(System.currentTimeMillis());
             markDirty();
         }
     }
@@ -124,8 +123,11 @@ public class RoadNetworkDatabase {
     public synchronized void updateSegment(UUID id, Segment updated) {
         Segment existing = segments.get(id);
         if (existing != null) {
-            updated.setId(id);
-            segments.put(id, updated);
+            existing.setStatus(updated.getStatus());
+            existing.setRoadId(updated.getRoadId());
+            if (updated.getNodeIds() != null) {
+                existing.setNodeIds(updated.getNodeIds());
+            }
             markDirty();
         }
     }
@@ -149,13 +151,29 @@ public class RoadNetworkDatabase {
     public synchronized void updateRoad(UUID id, Road updated) {
         Road existing = roads.get(id);
         if (existing != null) {
-            updated.setId(id);
-            roads.put(id, updated);
+            existing.setName(updated.getName());
+            existing.setClassification(updated.getClassification());
+            existing.setNumber(updated.getNumber());
+            if (updated.getSegmentIds() != null) {
+                existing.setSegmentIds(updated.getSegmentIds());
+            }
+            if (updated.getColor() != null) {
+                existing.setColor(updated.getColor());
+            }
             markDirty();
         }
     }
 
     public synchronized void removeRoad(UUID id) {
+        Road road = roads.get(id);
+        if (road != null && road.getSegmentIds() != null) {
+            for (UUID segId : road.getSegmentIds()) {
+                Segment seg = segments.get(segId);
+                if (seg != null) {
+                    seg.setRoadId(null);
+                }
+            }
+        }
         roads.remove(id);
         markDirty();
     }

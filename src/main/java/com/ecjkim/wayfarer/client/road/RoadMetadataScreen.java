@@ -82,8 +82,7 @@ public class RoadMetadataScreen extends Screen {
 
         // --- Create new road form (lower half) ---
         int separatorY = selectButtonY + 30;
-        int nameLabelY = separatorY + 20;
-        int nameBoxY = nameLabelY + 12;
+        int nameBoxY = separatorY + 52;
         int classifLabelY = nameBoxY + 28;
         int classifRowY = classifLabelY + 12;
         int buttonY = top + PANEL_HEIGHT - 30;
@@ -115,6 +114,7 @@ public class RoadMetadataScreen extends Screen {
 
         this.addRenderableWidget(
             Button.builder(Component.literal(I18n.get("wayfarer.road.gui.metadata.button_cancel")), button -> {
+                cleanupOrphanData();
                 this.onCancel.run();
                 this.minecraft.setScreen(null);
             }).bounds(centerX + 4, buttonY, 112, 20).build());
@@ -141,8 +141,8 @@ public class RoadMetadataScreen extends Screen {
                 roadName = "未命名道路";
             }
 
-            Road road = new Road(UUID.randomUUID(), roadName, "#FFFFFF", classification, number, 7.0,
-                List.of(segment.getId()), 1);
+            Road road =
+                new Road(UUID.randomUUID(), roadName, "#FFFFFF", classification, number, List.of(segment.getId()), 1);
             segment.setRoadId(road.getId());
             db.addRoad(road);
             db.updateSegment(segment.getId(), segment);
@@ -177,12 +177,11 @@ public class RoadMetadataScreen extends Screen {
             separatorY + 20, 11184810, false);
 
         // Name field
-        int nameBoxY = separatorY + 52;
         graphics.drawString(this.font, Component.literal(I18n.get("wayfarer.road.gui.metadata.field_name")), fieldLeft,
             separatorY + 40, 11184810, false);
 
         // Classification / Number
-        int classifLabelY = nameBoxY + 28;
+        int classifLabelY = separatorY + 80;
         graphics.drawString(this.font, Component.literal(I18n.get("wayfarer.road.gui.metadata.classification_number")),
             fieldLeft, classifLabelY, 11184810, false);
 
@@ -206,11 +205,23 @@ public class RoadMetadataScreen extends Screen {
     @Override
     public boolean keyPressed(int keyCode, int scanCode, int modifiers) {
         if (keyCode == GLFW.GLFW_KEY_ESCAPE) {
+            cleanupOrphanData();
             this.onCancel.run();
             this.minecraft.setScreen(null);
             return true;
         }
         return super.keyPressed(keyCode, scanCode, modifiers);
+    }
+
+    private void cleanupOrphanData() {
+        RoadNetworkDatabase db = RoadNetworkDatabase.getInstance();
+        if (segment.getNodeIds() != null) {
+            for (UUID nodeId : segment.getNodeIds()) {
+                db.removeNode(nodeId);
+            }
+        }
+        db.removeSegment(segment.getId());
+        db.asyncSave();
     }
 
     private String classificationLabel() {

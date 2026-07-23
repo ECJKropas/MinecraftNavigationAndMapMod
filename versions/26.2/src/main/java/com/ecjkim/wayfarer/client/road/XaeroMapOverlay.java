@@ -225,18 +225,20 @@ public final class XaeroMapOverlay {
 
     private static int classificationColor(String classification) {
         if (classification == null || classification.isEmpty())
-            return 0xFFa0b0c0;
+            return 0xFFFFFFFF;
         switch (classification.charAt(0)) {
             case 'G':
-                return 0xFFD9432B;
+                return 0xFFFF8800;
             case 'S':
-                return 0xFFF0A030;
+                return 0xFFFFFF00;
             case 'X':
-                return 0xFF5a6a7a;
+                return 0xFF00FF00;
             case 'Y':
-                return 0xFF8899aa;
+                return 0xFF4488FF;
+            case 'C':
+                return 0xFF888888;
             default:
-                return 0xFFa0b0c0;
+                return 0xFFFFFFFF;
         }
     }
 }

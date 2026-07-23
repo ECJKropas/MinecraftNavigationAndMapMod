@@ -1,4 +1,7 @@
 wayfarer:
+  main:
+    road_management: Road Management
+    settings: Settings
   toggle_road_recording: Toggle road recording
   open_road_list: Open road list (N)
   road:
@@ -20,7 +23,6 @@ wayfarer:
         name: "Name: %s"
         number: "Number: %s"
         number_none: "None"
-        width: "Width: %s blocks"
         points: "Track points: %d"
         intersections: "Intersections: %d"
         id: "ID: %s"
@@ -55,7 +57,6 @@ wayfarer:
         select_road: Select Existing Road
         create_new: Create New Road
         field_name: Road Name
-        field_width: Road Width
         field_number: Number
         classification_default: Classification
         classification_number: Classification / Number
@@ -63,39 +64,14 @@ wayfarer:
         button_save: Save
         button_cancel_edit: Discard Changes
         button_cancel: Cancel
-        subtitle_width: Fill in name and width after recording
         subtitle_classify: Fill in name and classification after recording
 category:
   wayfarer: Wayfarer
 
 wayfarer.gui.title.configs: Wayfarer Settings
 
-useClassificationWidth: Use Classification Width
-defaultWidth: Default Width
 defaultClassification: Default Classification
 tileProviderMode: Tile Provider Mode
-widthGGuodao: G-National Road Width
-widthGGaosu: G-Expressway Width
-widthSShengdao: S-Provincial Road Width
-widthSGaojia: S-Elevated Road Width
-widthXXiangdao: X-Township Road Width
-widthYXiaodao: Y-County Road Width
-widthCCundao: C-Village Road Width
 rdpEpsilon: RDP Epsilon
 toggleRecording: Toggle Recording
 openMenu: Open Menu
-
-"是否启用分级道路宽度": Enable classification-based road width
-"道路默认宽度": Default road width
-"新建道路时默认使用的分级代码，如 G国道、S省道": Default classification code for new roads, e.g. G (National), S (Provincial)
-"地图瓦片提供者模式": Map tile provider mode
-"G国道宽度": G-National road width
-"G高速宽度": G-Expressway width
-"S省道宽度": S-Provincial road width
-"S高架宽度": S-Elevated road width
-"X乡道宽度": X-Township road width
-"Y县道宽度": Y-County road width
-"C村道宽度": C-Village road width
-"RDP简化容差公式，[RW]=道路宽度 [DW]=等级默认宽度，支持 + - * / 运算，如 [RW]/2 或 [RW]*2": RDP epsilon formula. [RW]=road width [DW]=classification default width. Supports + - * /. E.g. [RW]/2 or [RW]*2
-"切换道路录制开关": Toggle road recording on/off
-"打开导航菜单": Open navigation menu
