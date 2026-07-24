@@ -235,6 +235,7 @@ function renderAll() {
       weight: isSelected ? 4 : 2,
       opacity: isSelected ? 1 : 0.7,
       smoothFactor: 0.2,
+      tolerance: 8,
     };
     if (seg.source === 'AUTO') {
       opts.dashArray = '6,4';
