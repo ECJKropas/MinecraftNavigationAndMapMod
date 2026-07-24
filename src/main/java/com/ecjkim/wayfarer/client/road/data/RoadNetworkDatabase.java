@@ -559,6 +559,102 @@ public class RoadNetworkDatabase {
         }
     }
 
+    // Guard against recursive graphify when splitting inside graphify
+    private boolean graphifying = false;
+
+    /**
+     * Runs {@link #graphify()} when the auto-graphify toggle is enabled and we are not already inside a graphify call.
+     */
+    private void maybeGraphify() {
+        if (!graphifying && WayfarerConfig.getInstance().autoGraphify) {
+            graphifying = true;
+            try {
+                graphify();
+            } finally {
+                graphifying = false;
+            }
+        }
+    }
+
+    /**
+     * Auto-graphifies the road network: for every node with degree &gt; 2 that is still an interior node in any
+     * segment, splits that segment at this node so the node becomes a proper graph vertex (an endpoint in all incident
+     * segments). This ensures Dijkstra / A* can operate on endpoints only.
+     *
+     * @return number of segments split
+     */
+    public synchronized int graphify() {
+        int splits = 0;
+
+        // Phase 1: collect nodes with degree > 2 and their interior segments
+        // Iterate snapshots to avoid concurrent modification
+        java.util.List<Node> allNodes = new java.util.ArrayList<>(nodes.values());
+        java.util.List<Segment> allSegments = new java.util.ArrayList<>(segments.values());
+
+        // nodeId -> list of segIds where node is interior (not endpoint)
+        java.util.LinkedHashMap<UUID, java.util.List<UUID>> nodeToInteriorSegments = new java.util.LinkedHashMap<>();
+
+        for (Node node : allNodes) {
+            UUID nodeId = node.getId();
+
+            // Find all segments containing this node
+            java.util.List<Segment> containingSegments = new java.util.ArrayList<>();
+            for (Segment seg : allSegments) {
+                if (seg.getNodeIds() != null && seg.getNodeIds().contains(nodeId)) {
+                    containingSegments.add(seg);
+                }
+            }
+            if (containingSegments.size() <= 2)
+                continue;
+
+            // Compute degree: count unique neighbour nodes
+            java.util.Set<UUID> neighbours = new java.util.HashSet<>();
+            for (Segment seg : containingSegments) {
+                java.util.List<UUID> ids = seg.getNodeIds();
+                int idx = ids.indexOf(nodeId);
+                if (idx > 0)
+                    neighbours.add(ids.get(idx - 1));
+                if (idx < ids.size() - 1)
+                    neighbours.add(ids.get(idx + 1));
+            }
+            if (neighbours.size() <= 2)
+                continue;
+
+            // Find segments where node is interior (not an endpoint)
+            java.util.List<UUID> interiorSegIds = new java.util.ArrayList<>();
+            for (Segment seg : containingSegments) {
+                java.util.List<UUID> ids = seg.getNodeIds();
+                int idx = ids.indexOf(nodeId);
+                if (idx > 0 && idx < ids.size() - 1) {
+                    interiorSegIds.add(seg.getId());
+                }
+            }
+            if (!interiorSegIds.isEmpty()) {
+                nodeToInteriorSegments.put(nodeId, interiorSegIds);
+            }
+        }
+
+        // Phase 2: split interior segments
+        for (java.util.Map.Entry<UUID, java.util.List<UUID>> entry : nodeToInteriorSegments.entrySet()) {
+            UUID nodeId = entry.getKey();
+            for (UUID segId : entry.getValue()) {
+                Segment seg = segments.get(segId);
+                if (seg == null || seg.getNodeIds() == null)
+                    continue;
+                int idx = seg.getNodeIds().indexOf(nodeId);
+                if (idx <= 0 || idx >= seg.getNodeIds().size() - 1)
+                    continue;
+                splitSegment(segId, idx);
+                splits++;
+            }
+        }
+
+        if (splits > 0) {
+            saveToDisk();
+        }
+        return splits;
+    }
+
     // ---------- Road CRUD ----------
 
     public synchronized void addRoad(Road road) {
@@ -1041,6 +1137,7 @@ public class RoadNetworkDatabase {
      * Serializes the full network to disk synchronously.
      */
     public synchronized void saveToDisk() {
+        maybeGraphify();
         try {
             Files.createDirectories(savePath.getParent());
 
@@ -1132,6 +1229,8 @@ public class RoadNetworkDatabase {
             dirty = false;
             LOGGER.log(Level.INFO, "Loaded {0} nodes, {1} segments, {2} roads from {3}",
                 new Object[] {nodes.size(), segments.size(), roads.size(), savePath});
+            // Auto-graphify on load so that any legacy data gets cleaned up
+            maybeGraphify();
         } catch (IOException e) {
             LOGGER.log(Level.SEVERE, "Failed to load road network: {0}", e.getMessage());
         }

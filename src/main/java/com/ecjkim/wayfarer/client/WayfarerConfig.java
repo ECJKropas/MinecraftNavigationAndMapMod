@@ -33,6 +33,7 @@ public class WayfarerConfig {
     public final boolean autoSnapEndpoints;
     public final double rdpEpsilon;
     public final boolean autoDeleteOrphanNodes;
+    public final boolean autoGraphify;
 
     private WayfarerConfig() {
         this.defaultClassification = WayfarerConfigs.Generic.DEFAULT_CLASSIFICATION.getStringValue();
@@ -40,6 +41,7 @@ public class WayfarerConfig {
         this.autoSnapEndpoints = WayfarerConfigs.Generic.AUTO_SNAP_ENDPOINTS.getBooleanValue();
         this.rdpEpsilon = WayfarerConfigs.Generic.RDP_EPSILON.getDoubleValue();
         this.autoDeleteOrphanNodes = WayfarerConfigs.Generic.AUTO_DELETE_ORPHAN_NODES.getBooleanValue();
+        this.autoGraphify = WayfarerConfigs.Generic.AUTO_GRAPHIFY.getBooleanValue();
     }
 
     public static WayfarerConfig getInstance() {

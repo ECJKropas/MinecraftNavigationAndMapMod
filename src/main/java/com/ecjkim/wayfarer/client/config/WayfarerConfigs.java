@@ -48,8 +48,11 @@ public class WayfarerConfigs {
         public static final ConfigInteger WEB_MAX_ZOOM =
             new ConfigInteger("webMaxZoom", 10, 10, 20, "网页端地图最大放大等级（10-20，默认10），数值越高可放大越近");
 
+        public static final ConfigBoolean AUTO_GRAPHIFY = new ConfigBoolean("autoGraphify", true,
+            "自动图化：自动将道路网转化为信息学意义上的图（所有度数>2的节点均为端点），消除被穿越的非端节点，确保 Dijkstra / A* 等算法可直接基于端点运行。默认开启");
+
         public static final ImmutableList<IConfigBase> OPTIONS = ImmutableList.of(DEFAULT_CLASSIFICATION, AUTO_INTEGRAL,
-            AUTO_SNAP_ENDPOINTS, RDP_EPSILON, AUTO_DELETE_ORPHAN_NODES, WEB_MAX_ZOOM);
+            AUTO_SNAP_ENDPOINTS, RDP_EPSILON, AUTO_DELETE_ORPHAN_NODES, WEB_MAX_ZOOM, AUTO_GRAPHIFY);
     }
 
     public static List<IConfigBase> getAllConfigs() {
