@@ -209,12 +209,18 @@ async function loadDelta() {
       changed = true;
     }
     if (data.segments && data.segments.length > 0) {
+      // Always updates but skip renderAll unless node count changed
+      // (segment/road metadata changes don't affect polyline geometry)
+      const oldSegCount = Object.keys(roadStore.segments).length;
       for (const s of data.segments) { roadStore.segments[s.id] = s; }
-      changed = true;
+      const newSegCount = Object.keys(roadStore.segments).length;
+      if (newSegCount !== oldSegCount) changed = true;
     }
     if (data.roads) {
+      const oldRoadCount = Object.keys(roadStore.roads).length;
       for (const [k, v] of Object.entries(data.roads)) { roadStore.roads[k] = v; }
-      changed = true;
+      const newRoadCount = Object.keys(roadStore.roads).length;
+      if (newRoadCount !== oldRoadCount) changed = true;
     }
     if (changed) renderAll();
   } catch (e) { /* silent */ }
@@ -228,12 +234,15 @@ const ROAD_STYLES = {
 
 let nodeMarkers = new Map();
 let segmentLines = new Map();
+let segmentFills = new Map();  // fill polylines for dual-layer roads
 
 function renderAll() {
   nodeMarkers.forEach(m => map.removeLayer(m));
   segmentLines.forEach(l => map.removeLayer(l));
+  segmentFills.forEach(l => map.removeLayer(l));
   nodeMarkers.clear();
   segmentLines.clear();
+  segmentFills.clear();
 
   // Clear label markers
   if (!window._roadLabels) window._roadLabels = new Set();
@@ -282,6 +291,7 @@ function renderAll() {
       line.on('click', (e) => { L.DomEvent.stopPropagation(e); if (activeTool === 'point') { handlePointTool(e.latlng); return; } onSegmentClick(sid, e.originalEvent); });
     });
     segmentLines.set(sid, edge);
+    segmentFills.set(sid, fill);
   }
 
   // Render road groups + labels
@@ -324,6 +334,7 @@ function renderAll() {
           line.on('click', (e) => { L.DomEvent.stopPropagation(e); if (activeTool === 'point') { handlePointTool(e.latlng); return; } onSegmentClick(sid, e.originalEvent); });
         });
         segmentLines.set(sid, edge);
+        segmentFills.set(sid, fill);
       }
     }
 
