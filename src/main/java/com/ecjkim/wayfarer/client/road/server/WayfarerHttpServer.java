@@ -83,6 +83,7 @@ public class WayfarerHttpServer implements Runnable {
         routes.add(new Route("GET", Pattern.compile("/api/roads/delta(?:\\?.*)?"), this::handleGetDelta));
         routes.add(new Route("PUT", Pattern.compile("/api/nodes/([0-9a-f-]+)"), this::handleUpdateNode));
         routes.add(new Route("DELETE", Pattern.compile("/api/nodes/([0-9a-f-]+)"), this::handleDeleteNode));
+        routes.add(new Route("POST", "/api/nodes/merge", this::handleMergeNodes));
         routes.add(new Route("POST", "/api/segments", this::handleCreateSegment));
         routes.add(new Route("DELETE", Pattern.compile("/api/segments/([0-9a-f-]+)"), this::handleDeleteSegment));
         routes.add(new Route("POST", "/api/merge", this::handleMerge));
@@ -350,6 +351,39 @@ public class WayfarerHttpServer implements Runnable {
         database.removeNode(id);
         database.saveToDisk();
         sendJson(req.exchange, 200, okJson("Node deleted"));
+    }
+
+    private void handleMergeNodes(Request req) {
+        if (req.body == null) {
+            sendJson(req.exchange, 400, errorJson("Missing request body"));
+            return;
+        }
+
+        try {
+            JsonObject body = JsonParser.parseString(req.body).getAsJsonObject();
+            UUID nodeToDeleteId = UUID.fromString(body.get("nodeToDeleteId").getAsString());
+            UUID targetNodeId = UUID.fromString(body.get("targetNodeId").getAsString());
+
+            if (database.getNode(nodeToDeleteId) == null) {
+                sendJson(req.exchange, 404, errorJson("Node not found: " + nodeToDeleteId));
+                return;
+            }
+            if (database.getNode(targetNodeId) == null) {
+                sendJson(req.exchange, 404, errorJson("Node not found: " + targetNodeId));
+                return;
+            }
+
+            database.mergeNodes(nodeToDeleteId, targetNodeId);
+            database.saveToDisk();
+
+            JsonObject result = new JsonObject();
+            result.addProperty("ok", true);
+            result.addProperty("deletedNodeId", nodeToDeleteId.toString());
+            result.addProperty("targetNodeId", targetNodeId.toString());
+            sendJson(req.exchange, 200, result);
+        } catch (Exception e) {
+            sendJson(req.exchange, 400, errorJson("Invalid JSON: " + e.getMessage()));
+        }
     }
 
     private void handleCreateSegment(Request req) {

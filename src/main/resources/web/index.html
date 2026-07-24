@@ -5,6 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Wayfarer — 道路编辑器</title>
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+<link rel="stylesheet" href="https://unpkg.com/@geoman-io/leaflet-geoman-free@latest/dist/leaflet-geoman.css" />
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" />
 <style>
 :root {
@@ -211,6 +212,16 @@ button.danger:active { background:#B3201A; }
 @media (prefers-reduced-transparency: reduce) {
   #toolbar, #editor-panel { background:var(--surface); backdrop-filter:none; -webkit-backdrop-filter:none; }
 }
+/* Geoman — suppress drag handle icon on CircleMarker, keep grab cursor */
+.leaflet-pm-draggable {
+  cursor: grab !important;
+  background: transparent !important;
+  border: none !important;
+  box-shadow: none !important;
+}
+.leaflet-pm-draggable:active {
+  cursor: grabbing !important;
+}
 </style>
 </head>
 <body>
@@ -224,6 +235,10 @@ button.danger:active { background:#B3201A; }
   <button class="tool-btn" id="tool-point" title="描点">
     <i class="fa-solid fa-circle-plus"></i>
     <span class="tool-label">描点</span>
+  </button>
+  <button class="tool-btn" id="tool-merge" title="合并节点">
+    <i class="fa-solid fa-object-group"></i>
+    <span class="tool-label">合并</span>
   </button>
   <div class="toolbar-divider"></div>
   <button class="tool-btn" id="tool-mode-toggle" title="展开工具栏">
@@ -268,6 +283,7 @@ button.danger:active { background:#B3201A; }
 </div>
 
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="https://unpkg.com/@geoman-io/leaflet-geoman-free@latest/dist/leaflet-geoman.min.js"></script>
 <script src="/static/app.js"></script>
 </body>
 </html>

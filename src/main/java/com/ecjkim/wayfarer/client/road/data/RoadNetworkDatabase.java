@@ -129,6 +129,41 @@ public class RoadNetworkDatabase {
         markDirty();
     }
 
+    /**
+     * Merges nodeToDelete into targetNode: all segments referencing nodeToDelete are rewired to targetNode, consecutive
+     * duplicates are collapsed, and nodeToDelete is removed.
+     */
+    public synchronized void mergeNodes(UUID nodeToDeleteId, UUID targetNodeId) {
+        for (Segment seg : getAllSegments()) {
+            List<UUID> ids = seg.getNodeIds();
+            if (ids == null)
+                continue;
+            boolean changed = false;
+            for (int i = 0; i < ids.size(); i++) {
+                if (ids.get(i).equals(nodeToDeleteId)) {
+                    ids.set(i, targetNodeId);
+                    changed = true;
+                }
+            }
+            if (!changed)
+                continue;
+
+            // collapse consecutive duplicates
+            List<UUID> deduped = new ArrayList<>();
+            UUID prev = null;
+            for (UUID id : ids) {
+                if (!id.equals(prev)) {
+                    deduped.add(id);
+                }
+                prev = id;
+            }
+            seg.setNodeIds(deduped);
+            seg.setVersion(seg.getVersion() + 1);
+        }
+        nodes.remove(nodeToDeleteId);
+        markDirty();
+    }
+
     // ---------- Segment CRUD ----------
 
     public synchronized void addSegment(Segment segment) {

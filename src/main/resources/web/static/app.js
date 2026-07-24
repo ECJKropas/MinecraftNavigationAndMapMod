@@ -4,8 +4,9 @@
 const SCALE = 128.0;
 let map, selectedSegments = new Set(), selectedNodeId = null, selectedSegmentId = null;
 let roadStore = { nodes:{}, segments:{}, roads:{} };
-let activeTool = null;          // 'move' | 'point' | null
+let activeTool = null;          // 'move' | 'point' | 'merge' | null
 let toolbarMode = 'compact';   // 'compact' | 'detailed'
+let mergeFirstNodeId = null;   // first node selected in merge tool
 const TOOL_TOLERANCE_PX = 12;  // pixel tolerance for point tool segment detection
 
 // ——— Toast ———
@@ -265,22 +266,39 @@ function renderAll() {
   for (const [nid, node] of Object.entries(roadStore.nodes)) {
     const fill = node.source === 'AUTO' ? '#aeaeb2'
       : node.cornerType === 'SHARP' ? '#FF3B30' : '#007AFF';
+    const isMergeTarget = activeTool === 'merge' && nid === mergeFirstNodeId;
     const marker = L.circleMarker(mc2latlng(node.x, node.z), {
-      radius: 5, fillColor: fill, color: 'rgba(255,255,255,0.9)',
-      weight: 1.5, fillOpacity: 0.92,
-      draggable: activeTool === 'move',
+      radius: isMergeTarget ? 7 : 5,
+      fillColor: isMergeTarget ? '#FFD60A' : fill,
+      color: isMergeTarget ? '#FF9500' : 'rgba(255,255,255,0.9)',
+      weight: isMergeTarget ? 2.5 : 1.5,
+      fillOpacity: 0.92,
     }).addTo(map);
-    marker.on('mouseover', () => marker.setRadius(6.5));
-    marker.on('mouseout', () => marker.setRadius(5));
+    // Geoman drag via pm.enableLayerDrag
+    if (activeTool === 'move') {
+      marker.pm.enableLayerDrag({ snappable: false, snapDistance: 0 });
+      marker.on('pm:dragstart', () => {
+        marker.setStyle({ fillOpacity: 0.55, radius: 6.5 });
+      });
+      marker.on('pm:dragend', () => {
+        marker.setStyle({ fillOpacity: 0.92, radius: 5 });
+        onNodeDragEnd(nid, marker);
+      });
+    }
+    marker.on('mouseover', () => { if (activeTool !== 'move') marker.setRadius(6.5); });
+    marker.on('mouseout', () => { if (activeTool !== 'move') marker.setRadius(5); });
     marker.on('click', (e) => {
       L.DomEvent.stopPropagation(e);
       if (activeTool === 'point') {
         handlePointTool(e.latlng);
         return;
       }
+      if (activeTool === 'merge') {
+        handleMergeTool(nid);
+        return;
+      }
       onNodeClick(nid, e.originalEvent);
     });
-    marker.on('dragend', () => onNodeDragEnd(nid, marker));
     nodeMarkers.set(nid, marker);
   }
 }
@@ -491,6 +509,7 @@ async function splitSegment() {
 function initToolbar() {
   document.getElementById('tool-move').addEventListener('click', () => toggleTool('move'));
   document.getElementById('tool-point').addEventListener('click', () => toggleTool('point'));
+  document.getElementById('tool-merge').addEventListener('click', () => toggleTool('merge'));
   document.getElementById('tool-mode-toggle').addEventListener('click', toggleToolbarMode);
 }
 
@@ -504,11 +523,13 @@ function toggleTool(tool) {
 
 function setActiveTool(tool) {
   activeTool = tool;
+  mergeFirstNodeId = null;
   document.querySelectorAll('.tool-btn').forEach(b => b.classList.remove('selected'));
   if (tool) {
     document.getElementById('tool-' + tool).classList.add('selected');
   }
-  if (tool === 'move') {
+  // Move: Geoman handles map-drag conflict internally; Merge: disable map dragging
+  if (tool === 'merge') {
     map.dragging.disable();
   } else {
     map.dragging.enable();
@@ -599,6 +620,44 @@ async function insertNodeOnSegment(segId, insertIndex, latlng) {
     clearSelection();
     loadData();
     showToast('节点已插入');
+  } catch (e) {
+    showToast('网络错误', 'error');
+  }
+}
+
+async function handleMergeTool(nid) {
+  if (!mergeFirstNodeId) {
+    mergeFirstNodeId = nid;
+    renderAll(); // re-render to highlight the selected node
+    showToolToast('已选中节点 ' + nid.substring(nid.length - 4) + '，再点击目标节点完成合并');
+    return;
+  }
+
+  if (nid === mergeFirstNodeId) {
+    mergeFirstNodeId = null;
+    renderAll();
+    showToolToast('已取消选择');
+    return;
+  }
+
+  try {
+    const res = await fetch('/api/nodes/merge', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        nodeToDeleteId: mergeFirstNodeId,
+        targetNodeId: nid
+      })
+    });
+    if (!res.ok) {
+      const err = await res.json();
+      showToast('合并失败：' + (err.error || res.status), 'error');
+      return;
+    }
+    clearSelection();
+    mergeFirstNodeId = null;
+    loadData();
+    showToolToast('节点已合并');
   } catch (e) {
     showToast('网络错误', 'error');
   }
