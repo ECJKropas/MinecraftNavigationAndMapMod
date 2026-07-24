@@ -127,9 +127,6 @@ public class RoadListScreen extends Screen {
         searchBox.setResponder(t -> {
             searchFilter = t.toLowerCase().trim();
             scrollLeft = 0;
-            selectedRoad = null;
-            selectedSegment = null;
-            selectedNode = null;
         });
         addRenderableWidget(searchBox);
         setInitialFocus(searchBox);
@@ -248,29 +245,31 @@ public class RoadListScreen extends Screen {
         int total = 1 + filteredRoads.size();
         int maxVis = (panelBottom - y) / ITEM_H;
         clampScrollLeft(total, maxVis);
-        int idx = -scrollLeft, py = y;
 
-        idx++;
-        if (idx >= 0 && py + ITEM_H <= panelBottom) {
+        int py = y;
+        int rendered = 0;
+
+        // Unfiled at virtual index 0
+        if (scrollLeft == 0 && rendered < maxVis) {
             boolean sel = selectedRoad == null && selectedSegment != null && allUnfiled.contains(selectedSegment);
             boolean hov = hit(mx, my, x, py, colLeftW, ITEM_H);
             drawItem(g, x, py, colLeftW, ITEM_H, I18n.get("wayfarer.road.gui.unfiled_segments"),
                 String.valueOf(allUnfiled.size()), 0xFFAA88FF, sel, hov);
+            py += ITEM_H;
+            rendered++;
         }
-        py += ITEM_H;
 
-        for (Road road : filteredRoads) {
-            idx++;
-            if (idx < 0)
-                continue;
-            if (py + ITEM_H > panelBottom)
-                break;
+        // Roads at virtual index 1..n
+        int firstRoad = Math.max(0, scrollLeft - 1);
+        for (int i = firstRoad; i < filteredRoads.size() && rendered < maxVis; i++) {
+            Road road = filteredRoads.get(i);
             boolean sel = selectedRoad != null && selectedRoad.getId().equals(road.getId());
             boolean hov = hit(mx, my, x, py, colLeftW, ITEM_H);
             int n = road.getSegmentIds() != null ? road.getSegmentIds().size() : 0;
             drawItem(g, x, py, colLeftW, ITEM_H, roadLabel(road), String.valueOf(n),
                 classificationColor(road.getClassification()), sel, hov);
             py += ITEM_H;
+            rendered++;
         }
 
         if (total > maxVis) {
