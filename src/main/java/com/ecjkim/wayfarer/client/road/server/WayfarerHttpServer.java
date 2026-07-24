@@ -622,6 +622,12 @@ public class WayfarerHttpServer implements Runnable {
             if (body.has("color")) {
                 existing.setColor(body.get("color").getAsString());
             }
+            if (body.has("classification")) {
+                existing.setClassification(body.get("classification").getAsString());
+            }
+            if (body.has("number")) {
+                existing.setNumber(body.get("number").getAsString());
+            }
 
             int nextVer = existing.getVersion() + 1;
             existing.setVersion(nextVer);

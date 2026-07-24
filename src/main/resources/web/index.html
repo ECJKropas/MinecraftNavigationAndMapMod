@@ -269,8 +269,18 @@ button.danger:active { background:#B3201A; }
   <div id="segment-editor" style="display:none">
     <div class="section-label">路段属性</div>
     <div class="field"><span class="field-label">ID</span><span class="field-value mono" id="seg-id"></span></div>
+    <div class="field"><span class="field-label">等级</span>
+      <select id="seg-classification">
+        <option value="">—</option>
+        <option value="G">国道/高速</option>
+        <option value="S">省道/高架</option>
+        <option value="X">县道</option>
+        <option value="Y">乡道</option>
+        <option value="C">村道</option>
+      </select>
+    </div>
+    <div class="field"><span class="field-label">编号</span><input type="text" id="seg-number" placeholder="如 107"></div>
     <div class="field"><span class="field-label">道路名</span><input type="text" id="seg-road-name" placeholder="未命名道路"></div>
-    <div class="field"><span class="field-label">颜色</span><input type="color" id="seg-color" value="#007AFF"></div>
     <div class="field"><span class="field-label">来源</span><span class="field-value" id="seg-source"></span></div>
     <div class="field"><span class="field-label">状态</span><span class="field-value" id="seg-status"></span></div>
     <div class="btn-row">

@@ -208,7 +208,12 @@ async function loadDelta() {
   } catch (e) { /* silent */ }
 }
 
-// ——— Rendering ———
+// ——— Road styling ———
+const ROAD_STYLES = {
+  G: { lineColor: '#DD3800', lineWeight: 3.5, badgeBg: '#DD0000', badgeBorder: '#FFFFFF', badgeColor: '#FFFFFF' },
+  S: { lineColor: '#E89200', lineWeight: 3, badgeBg: '#FFD700', badgeColor: '#000000' },
+};
+
 let nodeMarkers = new Map();
 let segmentLines = new Map();
 
@@ -218,51 +223,125 @@ function renderAll() {
   nodeMarkers.clear();
   segmentLines.clear();
 
-  for (const [sid, seg] of Object.entries(roadStore.segments)) {
+  // Clear label markers
+  if (!window._roadLabels) window._roadLabels = new Set();
+  window._roadLabels.forEach(l => map.removeLayer(l));
+  window._roadLabels.clear();
+
+  // Build point arrays helper
+  function buildPoints(seg) {
     const pts = [];
-    if (!seg.nodeIds) continue;
+    if (!seg.nodeIds) return pts;
     for (const nid of seg.nodeIds) {
       const node = roadStore.nodes[nid];
       if (node) pts.push(mc2latlng(node.x, node.z));
     }
-    if (pts.length < 2) continue;
-
-    const road = seg.roadId ? roadStore.roads[seg.roadId] : null;
-    const color = road ? road.color : '#CCCCCC';
-    const isSelected = selectedSegments.has(sid);
-
-    const opts = {
-      color: isSelected ? '#007AFF' : color,
-      weight: isSelected ? 4 : 2,
-      opacity: isSelected ? 1 : 0.7,
-      smoothFactor: 0.2,
-      tolerance: 8,
-    };
-    if (seg.source === 'AUTO') {
-      opts.dashArray = '6,4';
-      if (!isSelected) opts.color = '#aeaeb2';
-    }
-
-    const line = L.polyline(pts, opts).addTo(map);
-    line.on('mouseover', () => {
-      if (!selectedSegments.has(sid)) line.setStyle({ weight: 3, opacity: 0.9 });
-    });
-    line.on('mouseout', () => {
-      if (!selectedSegments.has(sid)) {
-        line.setStyle({ weight: 2, opacity: seg.source === 'AUTO' ? 0.5 : 0.7 });
-      }
-    });
-    line.on('click', (e) => {
-      L.DomEvent.stopPropagation(e);
-      if (activeTool === 'point') {
-        handlePointTool(e.latlng);
-        return;
-      }
-      onSegmentClick(sid, e.originalEvent);
-    });
-    segmentLines.set(sid, line);
+    return pts;
   }
 
+  // Group segments by road
+  const roadGroups = {};
+  const unassigned = [];
+  for (const [sid, seg] of Object.entries(roadStore.segments)) {
+    if (!seg.nodeIds) continue;
+    if (seg.roadId && roadStore.roads[seg.roadId]) {
+      const rid = seg.roadId;
+      if (!roadGroups[rid]) roadGroups[rid] = { road: roadStore.roads[rid], items: [] };
+      roadGroups[rid].items.push({ id: sid, seg });
+    } else {
+      unassigned.push({ id: sid, seg });
+    }
+  }
+
+  // Render unassigned (gray edge + white fill)
+  for (const { id: sid, seg } of unassigned) {
+    const pts = buildPoints(seg);
+    if (pts.length < 2) continue;
+    const isSelected = selectedSegments.has(sid);
+    const eo = { color: '#BBBBBB', weight: isSelected ? 3.5 : 2.5, opacity: isSelected ? 1 : 0.5, smoothFactor: 0.2 };
+    const fo = { color: '#F8F8F8', weight: isSelected ? 2 : 1.5, opacity: isSelected ? 1 : 0.92, smoothFactor: 0.2 };
+    const edge = L.polyline(pts, eo).addTo(map);
+    const fill = L.polyline(pts, fo).addTo(map);
+    [edge, fill].forEach(line => {
+      line.on('mouseover', () => { if (!isSelected) { edge.setStyle({ weight: 3.5, opacity: 0.7 }); fill.setStyle({ weight: 2.5 }); } });
+      line.on('mouseout', () => { if (!isSelected) { edge.setStyle(eo); fill.setStyle(fo); } });
+      line.on('click', (e) => { L.DomEvent.stopPropagation(e); if (activeTool === 'point') { handlePointTool(e.latlng); return; } onSegmentClick(sid, e.originalEvent); });
+    });
+    segmentLines.set(sid, edge);
+  }
+
+  // Render road groups + labels
+  for (const [rid, group] of Object.entries(roadGroups)) {
+    const road = group.road;
+    const cls = road.classification || '';
+    const num = road.number || '';
+    const styl = ROAD_STYLES[cls] || null;
+    const isGorS = styl != null;
+
+    const allPts = [];
+
+    for (const { id: sid, seg } of group.items) {
+      const pts = buildPoints(seg);
+      if (pts.length < 2) continue;
+      allPts.push(pts[Math.floor(pts.length / 2)]); // use midpoint for label calc
+      const isSelected = selectedSegments.has(sid);
+
+      if (isGorS) {
+        // Colored line
+        const c = isSelected ? '#007AFF' : styl.lineColor;
+        const opts = { color: c, weight: isSelected ? 4.5 : styl.lineWeight, opacity: isSelected ? 1 : 0.88, smoothFactor: 0.2 };
+        const line = L.polyline(pts, opts).addTo(map);
+        line.on('mouseover', () => { if (!isSelected) line.setStyle({ weight: styl.lineWeight + 1.5, opacity: 1 }); });
+        line.on('mouseout', () => { if (!isSelected) line.setStyle({ weight: styl.lineWeight, opacity: 0.88 }); });
+        line.on('click', (e) => { L.DomEvent.stopPropagation(e); if (activeTool === 'point') { handlePointTool(e.latlng); return; } onSegmentClick(sid, e.originalEvent); });
+        segmentLines.set(sid, line);
+      } else {
+        // White fill + gray edge
+        const eo = { color: '#BBBBBB', weight: isSelected ? 3.5 : 2.5, opacity: isSelected ? 1 : 0.5, smoothFactor: 0.2 };
+        const fo = { color: '#F8F8F8', weight: isSelected ? 2 : 1.5, opacity: isSelected ? 1 : 0.92, smoothFactor: 0.2 };
+        const edge = L.polyline(pts, eo).addTo(map);
+        const fill = L.polyline(pts, fo).addTo(map);
+        [edge, fill].forEach(line => {
+          line.on('mouseover', () => { if (!isSelected) { edge.setStyle({ weight: 3.5, opacity: 0.7 }); fill.setStyle({ weight: 2.5 }); } });
+          line.on('mouseout', () => { if (!isSelected) { edge.setStyle(eo); fill.setStyle(fo); } });
+          line.on('click', (e) => { L.DomEvent.stopPropagation(e); if (activeTool === 'point') { handlePointTool(e.latlng); return; } onSegmentClick(sid, e.originalEvent); });
+        });
+        segmentLines.set(sid, edge);
+      }
+    }
+
+    // Place label at centroid of segment midpoints
+    if (allPts.length === 0) continue;
+    let sumLat = 0, sumLng = 0;
+    for (const pt of allPts) { sumLat += pt.lat; sumLng += pt.lng; }
+    const cLat = sumLat / allPts.length, cLng = sumLng / allPts.length;
+
+    const roadName = road.name || '';
+    let labelHtml = '';
+
+    if (isGorS) {
+      const badgeText = cls + (num || '');
+      const showName = roadName && roadName !== badgeText && roadName !== cls && roadName !== num;
+      labelHtml = `<div style="position:absolute;transform:translate(-50%,-50%);display:flex;flex-direction:column;align-items:center;gap:3px;pointer-events:none;">
+        <div style="background:${styl.badgeBg};${styl.badgeBorder ? 'border:1.5px solid ' + styl.badgeBorder + ';' : ''}color:${styl.badgeColor};font-size:11px;font-weight:700;padding:2px 7px;border-radius:4px;white-space:nowrap;letter-spacing:0.02em;line-height:1.3;">${badgeText}</div>`;
+      if (showName) {
+        labelHtml += `<div style="color:#999;font-size:10px;font-weight:400;text-shadow:0 0 2px #fff;white-space:nowrap;letter-spacing:0.01em;">${roadName}</div>`;
+      }
+      labelHtml += `</div>`;
+    } else if (roadName) {
+      labelHtml = `<div style="position:absolute;transform:translate(-50%,-50%);display:flex;flex-direction:column;align-items:center;pointer-events:none;">
+        <div style="color:#999;font-size:10px;font-weight:400;text-shadow:0 0 2px #fff,0 0 2px #fff;white-space:nowrap;letter-spacing:0.01em;">${roadName}</div>
+      </div>`;
+    }
+
+    if (labelHtml) {
+      const icon = L.divIcon({ className: '', html: labelHtml, iconSize: [0, 0], iconAnchor: [0, 0] });
+      const marker = L.marker([cLat, cLng], { icon, interactive: false }).addTo(map);
+      window._roadLabels.add(marker);
+    }
+  }
+
+  // Render nodes
   for (const [nid, node] of Object.entries(roadStore.nodes)) {
     const fill = node.source === 'AUTO' ? '#aeaeb2'
       : node.cornerType === 'SHARP' ? '#FF3B30' : '#007AFF';
@@ -274,29 +353,17 @@ function renderAll() {
       weight: isMergeTarget ? 2.5 : 1.5,
       fillOpacity: 0.92,
     }).addTo(map);
-    // Geoman drag via pm.enableLayerDrag
     if (activeTool === 'move') {
       marker.pm.enableLayerDrag({ snappable: false, snapDistance: 0 });
-      marker.on('pm:dragstart', () => {
-        marker.setStyle({ fillOpacity: 0.55, radius: 6.5 });
-      });
-      marker.on('pm:dragend', () => {
-        marker.setStyle({ fillOpacity: 0.92, radius: 5 });
-        onNodeDragEnd(nid, marker);
-      });
+      marker.on('pm:dragstart', () => { marker.setStyle({ fillOpacity: 0.55, radius: 6.5 }); });
+      marker.on('pm:dragend', () => { marker.setStyle({ fillOpacity: 0.92, radius: 5 }); onNodeDragEnd(nid, marker); });
     }
     marker.on('mouseover', () => { if (activeTool !== 'move') marker.setRadius(6.5); });
     marker.on('mouseout', () => { if (activeTool !== 'move') marker.setRadius(5); });
     marker.on('click', (e) => {
       L.DomEvent.stopPropagation(e);
-      if (activeTool === 'point') {
-        handlePointTool(e.latlng);
-        return;
-      }
-      if (activeTool === 'merge') {
-        handleMergeTool(nid);
-        return;
-      }
+      if (activeTool === 'point') { handlePointTool(e.latlng); return; }
+      if (activeTool === 'merge') { handleMergeTool(nid); return; }
       onNodeClick(nid, e.originalEvent);
     });
     nodeMarkers.set(nid, marker);
@@ -382,7 +449,8 @@ function showSegmentEditor(sid) {
 
   const road = seg.roadId ? roadStore.roads[seg.roadId] : null;
   document.getElementById('seg-road-name').value = road ? (road.name || '') : '';
-  document.getElementById('seg-color').value = road ? (road.color || '#007AFF') : '#007AFF';
+  document.getElementById('seg-classification').value = road ? (road.classification || '') : '';
+  document.getElementById('seg-number').value = road ? (road.number || '') : '';
 }
 
 function clearSelection() {
@@ -454,14 +522,15 @@ async function saveRoad() {
   if (!sid) return;
   const seg = roadStore.segments[sid];
   const name = document.getElementById('seg-road-name').value;
-  const color = document.getElementById('seg-color').value;
+  const classification = document.getElementById('seg-classification').value;
+  const number = document.getElementById('seg-number').value;
   const roadId = seg.roadId;
   if (roadId) {
     const road = roadStore.roads[roadId];
     const res = await fetch('/api/roads/' + roadId, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ name, color, expectedVersion: road ? road.version : 0 })
+      body: JSON.stringify({ name, classification, number, expectedVersion: road ? road.version : 0 })
     });
     if (res.status === 409) { showToast('版本冲突, 正在刷新...', 'error'); loadData(); return; }
     if (res.ok) {
