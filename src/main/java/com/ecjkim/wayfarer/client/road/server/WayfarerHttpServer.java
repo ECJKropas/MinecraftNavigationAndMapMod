@@ -88,6 +88,7 @@ public class WayfarerHttpServer implements Runnable {
         routes.add(new Route("POST", "/api/nodes/merge", this::handleMergeNodes));
         routes.add(new Route("POST", "/api/nodes/merge-clean", this::handleMergeCleanNodes));
         routes.add(new Route("POST", "/api/nodes/soft-delete", this::handleSoftDeleteNode));
+        routes.add(new Route("POST", "/api/nodes/merge-segments", this::handleMergeSegmentsAtNode));
         routes.add(new Route("POST", "/api/segments", this::handleCreateSegment));
         routes.add(new Route("DELETE", Pattern.compile("/api/segments/([0-9a-f-]+)"), this::handleDeleteSegment));
         routes.add(new Route("POST", "/api/merge", this::handleMerge));
@@ -459,6 +460,35 @@ public class WayfarerHttpServer implements Runnable {
 
             JsonObject result = database.softDeleteNode(nodeId);
             sendJson(req.exchange, result.get("ok").getAsBoolean() ? 200 : 400, result);
+        } catch (Exception e) {
+            sendJson(req.exchange, 400, errorJson("Invalid JSON: " + e.getMessage()));
+        }
+    }
+
+    private void handleMergeSegmentsAtNode(Request req) {
+        if (req.body == null) {
+            sendJson(req.exchange, 400, errorJson("Missing request body"));
+            return;
+        }
+
+        try {
+            JsonObject body = JsonParser.parseString(req.body).getAsJsonObject();
+            UUID nodeId = UUID.fromString(body.get("nodeId").getAsString());
+
+            if (database.getNode(nodeId) == null) {
+                sendJson(req.exchange, 404, errorJson("Node not found: " + nodeId));
+                return;
+            }
+
+            Segment merged = database.mergeSegmentsAtNode(nodeId);
+            if (merged == null) {
+                sendJson(req.exchange, 400,
+                    errorJson("Merge failed: node must be a degree-2 shared endpoint of two compatible segments"));
+                return;
+            }
+
+            database.saveToDisk();
+            sendJson(req.exchange, 200, GSON.toJsonTree(merged));
         } catch (Exception e) {
             sendJson(req.exchange, 400, errorJson("Invalid JSON: " + e.getMessage()));
         }

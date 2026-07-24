@@ -773,6 +773,93 @@ public class RoadNetworkDatabase {
     }
 
     /**
+     * Merges the two segments that share {@code nodeId} as a common endpoint. The node must have degree 2 (exactly two
+     * segments meeting at this node as endpoints). Returns the merged Segment, or null if the node is not a valid merge
+     * point.
+     */
+    public synchronized Segment mergeSegmentsAtNode(UUID nodeId) {
+        List<Segment> candidates = new ArrayList<>();
+        // position: 0 = starts with node; -1 = ends with node
+        java.util.Map<Segment, Integer> positions = new java.util.HashMap<>();
+
+        for (Segment seg : segments.values()) {
+            List<UUID> ids = seg.getNodeIds();
+            if (ids == null || ids.size() < 2)
+                continue;
+            if (ids.get(0).equals(nodeId)) {
+                candidates.add(seg);
+                positions.put(seg, 0);
+            } else if (ids.get(ids.size() - 1).equals(nodeId)) {
+                candidates.add(seg);
+                positions.put(seg, -1);
+            }
+        }
+
+        if (candidates.size() != 2)
+            return null;
+
+        Segment s1 = candidates.get(0);
+        Segment s2 = candidates.get(1);
+        int pos1 = positions.get(s1);
+        int pos2 = positions.get(s2);
+
+        // Road check: both must be same road or at least one Unfiled
+        Road road1 = findRoadForSegment(s1.getId());
+        Road road2 = findRoadForSegment(s2.getId());
+        if (road1 != null && road2 != null && !road1.getId().equals(road2.getId()))
+            return null;
+
+        // Build merged node list
+        List<UUID> merged = new ArrayList<>();
+        List<UUID> ids1 = s1.getNodeIds();
+        List<UUID> ids2 = s2.getNodeIds();
+
+        if (pos1 == -1) {
+            // s1 ends with node
+            merged.addAll(ids1);
+            if (pos2 == 0) {
+                // s2 starts with node — skip first
+                for (int i = 1; i < ids2.size(); i++)
+                    merged.add(ids2.get(i));
+            } else {
+                // s2 also ends with node — reverse s2 and skip
+                for (int i = ids2.size() - 2; i >= 0; i--)
+                    merged.add(ids2.get(i));
+            }
+        } else {
+            // s1 starts with node
+            if (pos2 == -1) {
+                // s2 ends with node — s2 + s1 (skip duplicate)
+                merged.addAll(ids2);
+                for (int i = 1; i < ids1.size(); i++)
+                    merged.add(ids1.get(i));
+            } else {
+                // s2 also starts with node — reverse s1 + s2
+                for (int i = ids1.size() - 2; i >= 0; i--)
+                    merged.add(ids1.get(i));
+                merged.addAll(ids2);
+            }
+        }
+
+        Segment mergedSeg = new Segment(UUID.randomUUID(), merged, null, Source.USER, Status.CONFIRMED, 1);
+        segments.put(mergedSeg.getId(), mergedSeg);
+
+        // Road inheritance
+        Road targetRoad = road1 != null ? road1 : road2;
+        if (targetRoad != null && targetRoad.getSegmentIds() != null) {
+            targetRoad.getSegmentIds().add(mergedSeg.getId());
+            targetRoad.getSegmentIds().remove(s1.getId());
+            targetRoad.getSegmentIds().remove(s2.getId());
+        }
+
+        segments.remove(s1.getId());
+        segments.remove(s2.getId());
+        markDirty();
+        maybeCleanupOrphans();
+        return mergedSeg;
+    }
+
+    /**
      * Splits a segment at the given node index. The node at nodeIndex belongs to both resulting segments. Returns the
      * two new Segments, or null on failure.
      */

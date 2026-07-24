@@ -255,6 +255,10 @@ button.danger:active { background:#B3201A; }
     <i class="fa-solid fa-object-group"></i>
     <span class="tool-label">合并</span>
   </button>
+  <button class="tool-btn" id="tool-fenhe" title="分合 (路段拆分/合并)">
+    <i class="fa-solid fa-code-branch"></i>
+    <span class="tool-label">分合</span>
+  </button>
   <button class="tool-btn" id="tool-softdelete" title="软删除 (删除节点保留路段连续性)">
     <i class="fa-solid fa-eraser"></i>
     <span class="tool-label">软删</span>
@@ -289,7 +293,7 @@ button.danger:active { background:#B3201A; }
     <div class="btn-row">
       <button class="primary" onclick="saveNode()">保存</button>
       <button class="secondary" onclick="clearSelection()">取消</button>
-      <button class="danger" id="node-split-btn" style="display:none" onclick="splitSegment()">在此拆分</button>
+
       <button class="danger" onclick="deleteNode()">删除节点</button>
     </div>
   </div>

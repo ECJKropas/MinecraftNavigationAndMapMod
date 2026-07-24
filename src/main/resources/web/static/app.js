@@ -4,7 +4,7 @@
 const SCALE = 128.0;
 let map, selectedSegments = new Set(), selectedNodeId = null, selectedSegmentId = null;
 let roadStore = { nodes:{}, segments:{}, roads:{} };
-let activeTool = null;          // 'move' | 'point' | 'merge' | 'softdelete' | null
+let activeTool = null;          // 'move' | 'point' | 'merge' | 'fenhe' | 'softdelete' | null
 let toolbarMode = 'compact';   // 'compact' | 'detailed'
 let mergeFirstNodeId = null;   // first node selected in merge tool
 const TOOL_TOLERANCE_PX = 12;  // pixel tolerance for point tool segment detection
@@ -174,9 +174,10 @@ function showToast(msg, type) {
 }
 
 // ——— Tool toast (bottom-right) ———
-function showToolToast(msg) {
+function showToolToast(msg, type) {
   const el = document.getElementById('tool-toast');
   el.textContent = msg;
+  el.style.color = type === 'green' ? '#34c759' : 'var(--red)';
   el.classList.add('visible');
   setTimeout(() => el.classList.remove('visible'), 2000);
 }
@@ -599,6 +600,7 @@ function renderAll() {
       if (dragJustEnded) { dragJustEnded = false; return; }
       if (activeTool === 'point') { handlePointTool(e.latlng); return; }
       if (activeTool === 'merge') { handleMergeTool(nid); return; }
+      if (activeTool === 'fenhe') { handleFenHeTool(nid); return; }
       if (activeTool === 'softdelete') { handleSoftDeleteTool(nid); return; }
       onNodeClick(nid, e.originalEvent);
     });
@@ -667,12 +669,6 @@ function selectNode(nid) {
   document.getElementById('node-x').value = node.x;
   document.getElementById('node-z').value = node.z;
   document.getElementById('node-source').textContent = node.source;
-
-  let inSegment = false;
-  for (const seg of Object.values(roadStore.segments)) {
-    if (seg.nodeIds && seg.nodeIds.includes(nid)) { inSegment = true; break; }
-  }
-  document.getElementById('node-split-btn').style.display = inSegment ? '' : 'none';
 }
 
 function showSegmentEditor(sid) {
@@ -797,26 +793,6 @@ async function mergeSegments() {
   else showToast('合并失败', 'error');
 }
 
-async function splitSegment() {
-  const nid = selectedNodeId;
-  if (!nid) return;
-  let targetSeg = null, nodeIdx = -1;
-  for (const [sid, seg] of Object.entries(roadStore.segments)) {
-    if (!seg.nodeIds) continue;
-    const idx = seg.nodeIds.indexOf(nid);
-    if (idx >= 1 && idx < seg.nodeIds.length - 1) { targetSeg = seg; nodeIdx = idx; break; }
-  }
-  if (!targetSeg) { showToast('未找到可拆分的路段（节点需位于路段中间）', 'error'); return; }
-  pushUndo();
-  const res = await fetch('/api/split/' + targetSeg.id, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ nodeIndex: nodeIdx, expectedVersion: targetSeg.version })
-  });
-  if (res.ok) { clearSelection(); loadData(); showToast('路段已拆分'); }
-  else showToast('拆分失败', 'error');
-}
-
 // ——— Toolbar ———
 function initToolbar() {
   document.getElementById('tool-move').addEventListener('click', () => toggleTool('move'));
@@ -854,6 +830,7 @@ function initToolbar() {
   });
   document.getElementById('tool-point').addEventListener('click', () => toggleTool('point'));
   document.getElementById('tool-merge').addEventListener('click', () => toggleTool('merge'));
+  document.getElementById('tool-fenhe').addEventListener('click', () => toggleTool('fenhe'));
   document.getElementById('tool-softdelete').addEventListener('click', () => toggleTool('softdelete'));
   document.getElementById('tool-undo').addEventListener('click', undo);
   document.getElementById('tool-redo').addEventListener('click', redo);
@@ -883,7 +860,7 @@ function setActiveTool(tool) {
     document.getElementById('tool-' + tool).classList.add('selected');
   }
   // Disable map dragging in move/merge so it doesn't conflict
-  if (tool === 'move' || tool === 'merge' || tool === 'softdelete') {
+  if (tool === 'move' || tool === 'merge' || tool === 'fenhe' || tool === 'softdelete') {
     map.dragging.disable();
   } else {
     map.dragging.enable();
@@ -1226,6 +1203,82 @@ async function handleSoftDeleteTool(nid) {
   }
 }
 
+// ——— 分合 tool ———
+function findRoadForSegment(segId) {
+  for (const [rid, road] of Object.entries(roadStore.roads)) {
+    if (road.segmentIds && road.segmentIds.includes(segId)) return road;
+  }
+  return null;
+}
+
+async function handleFenHeTool(nid) {
+  // 1. Try split: node is interior of a segment
+  for (const [sid, seg] of Object.entries(roadStore.segments)) {
+    if (!seg.nodeIds) continue;
+    const idx = seg.nodeIds.indexOf(nid);
+    if (idx >= 1 && idx < seg.nodeIds.length - 1) {
+      pushUndo();
+      const res = await fetch('/api/split/' + seg.id, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ nodeIndex: idx, expectedVersion: seg.version })
+      });
+      if (res.ok) {
+        clearSelection();
+        await loadData();
+        showToolToast('拆分成功'); // red (default)
+      } else {
+        showToolToast('拆分失败');
+      }
+      return;
+    }
+  }
+
+  // 2. Try merge: node is degree-2 shared endpoint of two compatible segments
+  if (getDegree(nid) !== 2) {
+    showToolToast('无法使用该工具');
+    return;
+  }
+
+  const endpointSegs = [];
+  for (const [sid, seg] of Object.entries(roadStore.segments)) {
+    if (!seg.nodeIds || seg.nodeIds.length < 2) continue;
+    if (seg.nodeIds[0] === nid || seg.nodeIds[seg.nodeIds.length - 1] === nid) {
+      endpointSegs.push(seg);
+    }
+  }
+
+  if (endpointSegs.length !== 2) {
+    showToolToast('无法使用该工具');
+    return;
+  }
+
+  const road1 = findRoadForSegment(endpointSegs[0].id);
+  const road2 = findRoadForSegment(endpointSegs[1].id);
+  if (road1 && road2 && road1.id !== road2.id) {
+    showToolToast('路段属于不同道路，无法合并');
+    return;
+  }
+
+  pushUndo();
+  try {
+    const res = await fetch('/api/nodes/merge-segments', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ nodeId: nid })
+    });
+    if (res.ok) {
+      clearSelection();
+      await loadData();
+      showToolToast('合并成功', 'green');
+    } else {
+      const err = await res.json();
+      showToolToast('合并失败：' + (err.error || ''));
+    }
+  } catch (e) {
+    showToast('网络错误', 'error');
+  }
+}
 window.addEventListener('load', () => { initToolbar(); initMap(); });
 
 document.addEventListener('keydown', e => {
