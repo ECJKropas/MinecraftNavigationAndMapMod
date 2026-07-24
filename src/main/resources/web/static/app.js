@@ -1072,6 +1072,37 @@ async function insertNodeAtIntersection(data) {
   }
 }
 
+function getDegree(nid) {
+  const neighbors = new Set();
+  for (const seg of Object.values(roadStore.segments)) {
+    if (!seg.nodeIds) continue;
+    const idx = seg.nodeIds.indexOf(nid);
+    if (idx === -1) continue;
+    if (idx > 0) neighbors.add(seg.nodeIds[idx - 1]);
+    if (idx < seg.nodeIds.length - 1) neighbors.add(seg.nodeIds[idx + 1]);
+  }
+  return neighbors.size;
+}
+
+function detectMergeSpecialCase(nid1, nid2) {
+  for (const [sid, seg] of Object.entries(roadStore.segments)) {
+    if (!seg.nodeIds) continue;
+    const i1 = seg.nodeIds.indexOf(nid1);
+    const i2 = seg.nodeIds.indexOf(nid2);
+    if (i1 === -1 || i2 === -1) continue;
+    const dist = Math.abs(i1 - i2);
+    if (dist === 1) {
+      return { type: 'adjacent', segmentId: sid, segmentOnlyTwoNodes: seg.nodeIds.length === 2 };
+    }
+    if (dist > 1) {
+      const minI = Math.min(i1, i2);
+      const maxI = Math.max(i1, i2);
+      return { type: 'separated', segmentId: sid, intermediateNodes: seg.nodeIds.slice(minI + 1, maxI) };
+    }
+  }
+  return null;
+}
+
 async function handleMergeTool(nid) {
   if (!mergeFirstNodeId) {
     mergeFirstNodeId = nid;
@@ -1087,14 +1118,73 @@ async function handleMergeTool(nid) {
     return;
   }
 
-  try {
+  const specialCase = detectMergeSpecialCase(mergeFirstNodeId, nid);
+
+  // Case 2: separated nodes on same segment → check intermediate node degrees
+  if (specialCase && specialCase.type === 'separated') {
+    const allDegree2 = specialCase.intermediateNodes.every(mid => getDegree(mid) === 2);
+    if (!allDegree2) {
+      showToolToast('这可不能合并啊！');
+      mergeFirstNodeId = null;
+      renderAll();
+      return;
+    }
+    showSheet('合并节点', '合并该节点会删除中间所有节点，是否继续？', [
+      {
+        label: '取消', role: 'cancel', action: () => { mergeFirstNodeId = null; renderAll(); }
+      },
+      {
+        label: '合并', role: 'destructive', action: async () => {
+          await doMergeClean(mergeFirstNodeId, nid, specialCase);
+        }
+      }
+    ]);
+    return;
+  }
+
+  // Case 1: adjacent nodes, only 2-node segment → delete segment before merge
+  if (specialCase && specialCase.type === 'adjacent' && specialCase.segmentOnlyTwoNodes) {
     pushUndo();
+    await fetch(`/api/segments/${specialCase.segmentId}`, { method: 'DELETE' });
+  } else {
+    pushUndo();
+  }
+
+  await doMerge(mergeFirstNodeId, nid);
+}
+
+async function doMerge(nodeToDeleteId, targetNodeId) {
+  try {
     const res = await fetch('/api/nodes/merge', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ nodeToDeleteId, targetNodeId })
+    });
+    if (!res.ok) {
+      const err = await res.json();
+      showToast('合并失败：' + (err.error || res.status), 'error');
+      return;
+    }
+    clearSelection();
+    mergeFirstNodeId = null;
+    loadData();
+    showToolToast('节点已合并');
+  } catch (e) {
+    showToast('网络错误', 'error');
+  }
+}
+
+async function doMergeClean(nodeToDeleteId, targetNodeId, specialCase) {
+  pushUndo();
+  try {
+    const res = await fetch('/api/nodes/merge-clean', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        nodeToDeleteId: mergeFirstNodeId,
-        targetNodeId: nid
+        nodeToDeleteId,
+        targetNodeId,
+        segmentId: specialCase.segmentId,
+        intermediateNodeIds: specialCase.intermediateNodes
       })
     });
     if (!res.ok) {

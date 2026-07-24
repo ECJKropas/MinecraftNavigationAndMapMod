@@ -86,6 +86,7 @@ public class WayfarerHttpServer implements Runnable {
         routes.add(new Route("PUT", Pattern.compile("/api/nodes/([0-9a-f-]+)"), this::handleUpdateNode));
         routes.add(new Route("DELETE", Pattern.compile("/api/nodes/([0-9a-f-]+)"), this::handleDeleteNode));
         routes.add(new Route("POST", "/api/nodes/merge", this::handleMergeNodes));
+        routes.add(new Route("POST", "/api/nodes/merge-clean", this::handleMergeCleanNodes));
         routes.add(new Route("POST", "/api/segments", this::handleCreateSegment));
         routes.add(new Route("DELETE", Pattern.compile("/api/segments/([0-9a-f-]+)"), this::handleDeleteSegment));
         routes.add(new Route("POST", "/api/merge", this::handleMerge));
@@ -384,6 +385,50 @@ public class WayfarerHttpServer implements Runnable {
             }
 
             database.mergeNodes(nodeToDeleteId, targetNodeId);
+            database.saveToDisk();
+
+            JsonObject result = new JsonObject();
+            result.addProperty("ok", true);
+            result.addProperty("deletedNodeId", nodeToDeleteId.toString());
+            result.addProperty("targetNodeId", targetNodeId.toString());
+            sendJson(req.exchange, 200, result);
+        } catch (Exception e) {
+            sendJson(req.exchange, 400, errorJson("Invalid JSON: " + e.getMessage()));
+        }
+    }
+
+    private void handleMergeCleanNodes(Request req) {
+        if (req.body == null) {
+            sendJson(req.exchange, 400, errorJson("Missing request body"));
+            return;
+        }
+
+        try {
+            JsonObject body = JsonParser.parseString(req.body).getAsJsonObject();
+            UUID nodeToDeleteId = UUID.fromString(body.get("nodeToDeleteId").getAsString());
+            UUID targetNodeId = UUID.fromString(body.get("targetNodeId").getAsString());
+            UUID segmentId = UUID.fromString(body.get("segmentId").getAsString());
+            JsonArray midArr = body.getAsJsonArray("intermediateNodeIds");
+
+            if (database.getNode(nodeToDeleteId) == null) {
+                sendJson(req.exchange, 404, errorJson("Node not found: " + nodeToDeleteId));
+                return;
+            }
+            if (database.getNode(targetNodeId) == null) {
+                sendJson(req.exchange, 404, errorJson("Node not found: " + targetNodeId));
+                return;
+            }
+            if (database.getSegment(segmentId) == null) {
+                sendJson(req.exchange, 404, errorJson("Segment not found: " + segmentId));
+                return;
+            }
+
+            List<UUID> intermediateIds = new ArrayList<>();
+            for (int i = 0; i < midArr.size(); i++) {
+                intermediateIds.add(UUID.fromString(midArr.get(i).getAsString()));
+            }
+
+            database.mergeNodesWithCleanup(nodeToDeleteId, targetNodeId, segmentId, intermediateIds);
             database.saveToDisk();
 
             JsonObject result = new JsonObject();

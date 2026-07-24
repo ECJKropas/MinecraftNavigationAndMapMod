@@ -23,8 +23,10 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
@@ -163,6 +165,71 @@ public class RoadNetworkDatabase {
         }
         nodes.remove(nodeToDeleteId);
         maybeCleanupOrphans();
+    }
+
+    /**
+     * Merges two nodes that are non-adjacent on the same segment. Shortens the segment by removing all intermediate
+     * nodes, cleans them from any other segments that reference them, deletes the intermediate nodes, then performs the
+     * normal merge.
+     */
+    public synchronized void mergeNodesWithCleanup(UUID nodeToDeleteId, UUID targetNodeId, UUID segmentId,
+        List<UUID> intermediateIds) {
+        Set<UUID> toRemove = new HashSet<>(intermediateIds);
+
+        // 1. Shorten all segments by removing intermediate node IDs
+        java.util.List<UUID> segsToRemove = new ArrayList<>();
+        for (Segment seg : getAllSegments()) {
+            List<UUID> ids = seg.getNodeIds();
+            if (ids == null || ids.isEmpty())
+                continue;
+
+            List<UUID> filtered = new ArrayList<>();
+            for (UUID id : ids) {
+                if (!toRemove.contains(id)) {
+                    filtered.add(id);
+                }
+            }
+
+            if (filtered.size() < ids.size()) {
+                seg.setNodeIds(filtered);
+                seg.setVersion(seg.getVersion() + 1);
+            }
+
+            if (seg.getNodeIds().size() < 2) {
+                segsToRemove.add(seg.getId());
+            }
+        }
+
+        // 2. Remove invalid segments (fewer than 2 nodes)
+        for (UUID segId : segsToRemove) {
+            segments.remove(segId);
+        }
+
+        // 3. Delete intermediate nodes from the nodes map
+        for (UUID midId : intermediateIds) {
+            nodes.remove(midId);
+        }
+
+        // 4. Perform normal merge (rewires nodeToDelete → targetNode, collapses dupes, removes nodeToDelete)
+        mergeNodes(nodeToDeleteId, targetNodeId);
+
+        // 5. After merge, clean up any segments that became invalid (e.g. 2-node segment collapsed to 1 node)
+        segsToRemove.clear();
+        for (Segment seg : getAllSegments()) {
+            if (seg.getNodeIds() == null || seg.getNodeIds().size() < 2) {
+                segsToRemove.add(seg.getId());
+            }
+        }
+        for (UUID segId : segsToRemove) {
+            segments.remove(segId);
+        }
+
+        if (!segsToRemove.isEmpty()) {
+            markDirty();
+        }
+        maybeCleanupOrphans();
+        markDirty();
+        // markDirty already called by mergeNodes; extra call harmless
     }
 
     // ---------- Segment CRUD ----------
