@@ -192,7 +192,10 @@ public final class XaeroMapOverlay {
     private static void renderSegment(GuiGraphics graphics, List<Node> nodes, double effectiveScale, double cameraX,
         double cameraZ, double centerX, double centerY, int color, float lineWidth) {
 
-        Matrix4f matrix = graphics.pose().last().pose();
+        // Use identity matrix: we already compute screen-space coordinates manually.
+        // graphics.pose() may carry residual transformations from Xaero's render pass,
+        // causing the overlay to shake instead of being locked to the map.
+        Matrix4f matrix = new Matrix4f();
         float half = Math.max(0.5f, (float)(lineWidth * effectiveScale / 2.0));
 
         RenderSystem.setShader(GameRenderer::getPositionColorShader);
