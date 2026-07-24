@@ -246,7 +246,9 @@ function renderAll() {
     if (!seg.nodeIds) return pts;
     for (const nid of seg.nodeIds) {
       const node = roadStore.nodes[nid];
-      if (node) pts.push(mc2latlng(node.x, node.z));
+      if (node && typeof node.x === 'number' && typeof node.z === 'number' && isFinite(node.x) && isFinite(node.z)) {
+        pts.push(mc2latlng(node.x, node.z));
+      }
     }
     return pts;
   }
@@ -295,7 +297,10 @@ function renderAll() {
     for (const { id: sid, seg } of group.items) {
       const pts = buildPoints(seg);
       if (pts.length < 2) continue;
-      allPts.push(pts[Math.floor(pts.length / 2)]); // use midpoint for label calc
+      const mid = pts[Math.floor(pts.length / 2)];
+      if (mid && isFinite(mid.lat) && isFinite(mid.lng)) {
+        allPts.push(mid);
+      }
       const isSelected = selectedSegments.has(sid);
 
       if (isGorS) {
