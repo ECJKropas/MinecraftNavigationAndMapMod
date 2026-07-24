@@ -252,6 +252,10 @@ function renderAll() {
     });
     line.on('click', (e) => {
       L.DomEvent.stopPropagation(e);
+      if (activeTool === 'point') {
+        handlePointTool(e.latlng);
+        return;
+      }
       onSegmentClick(sid, e.originalEvent);
     });
     segmentLines.set(sid, line);
@@ -269,6 +273,10 @@ function renderAll() {
     marker.on('mouseout', () => marker.setRadius(5));
     marker.on('click', (e) => {
       L.DomEvent.stopPropagation(e);
+      if (activeTool === 'point') {
+        handlePointTool(e.latlng);
+        return;
+      }
       onNodeClick(nid, e.originalEvent);
     });
     marker.on('dragend', () => onNodeDragEnd(nid, marker));
@@ -498,6 +506,11 @@ function setActiveTool(tool) {
   document.querySelectorAll('.tool-btn').forEach(b => b.classList.remove('selected'));
   if (tool) {
     document.getElementById('tool-' + tool).classList.add('selected');
+  }
+  if (tool === 'move') {
+    map.dragging.disable();
+  } else {
+    map.dragging.enable();
   }
   renderAll();
 }

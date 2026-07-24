@@ -316,7 +316,8 @@ public class RoadListScreen extends Screen {
             int n = seg.getNodeIds() != null ? seg.getNodeIds().size() : 0;
             String src = seg.getSource() != null ? seg.getSource().name() : "";
             String st = seg.getStatus() != null ? " " + seg.getStatus().name() : "";
-            String label = "Seg-" + (segs.indexOf(seg) + 1) + " (" + n + "n)" + st + " [" + src + "]";
+            String sid = seg.getId().toString();
+            String label = "Seg-" + sid.substring(sid.length() - 4) + " (" + n + "n)" + st + " [" + src + "]";
             drawItem(g, x, py, colMidW, ITEM_H, label, null, sel ? 0xFF88FF88 : (hov ? 0xFFCCCCCC : 0xFFAAAAAA), sel,
                 hov);
             py += ITEM_H;
@@ -337,8 +338,9 @@ public class RoadListScreen extends Screen {
         int headerH = 0, py = y;
         if (selectedSegment != null) {
             int n = nodes.size();
-            g.drawString(this.font, "Seg-" + (currentSegments().indexOf(selectedSegment) + 1) + " (" + n + " nodes)",
-                x + 4, y, 0xFFCCCCFF, false);
+            String sid = selectedSegment.getId().toString();
+            g.drawString(this.font, "Seg-" + sid.substring(sid.length() - 4) + " (" + n + " nodes)", x + 4, y,
+                0xFFCCCCFF, false);
             headerH = HEADER_H;
             py += headerH;
         }
@@ -360,8 +362,9 @@ public class RoadListScreen extends Screen {
             boolean sel = selectedNode != null && selectedNode.getId().equals(node.getId());
             boolean hov = hit(mx, my, x, py, colRightW, ITEM_H);
             String ct = node.getCornerType() != null ? node.getCornerType().name() : "?";
-            String label = "N-" + (i + 1) + " (" + fmt(node.getX()) + "," + fmt(node.getY()) + "," + fmt(node.getZ())
-                + ") [" + ct + "]";
+            String nid = node.getId().toString();
+            String label = "N-" + nid.substring(nid.length() - 4) + " (" + fmt(node.getX()) + "," + fmt(node.getY())
+                + "," + fmt(node.getZ()) + ") [" + ct + "]";
             drawItem(g, x, py, colRightW, ITEM_H, label, null, sel ? 0xFF88FFFF : (hov ? 0xFFDDDDDD : 0xFFFFFFFF), sel,
                 hov);
             py += ITEM_H;
