@@ -535,6 +535,61 @@ public class RoadNetworkDatabase {
     }
 
     /**
+     * Inserts a single shared node at the intersection of two segments, splitting each into two. The two original
+     * segments are replaced with four new ones (left + right of each), all referencing the same new node as their
+     * junction point. Any road associations are preserved.
+     */
+    public synchronized Node insertNodeAtIntersection(UUID segIdA, int insertIndexA, UUID segIdB, int insertIndexB,
+        double x, double z) {
+        if (segIdA.equals(segIdB)) {
+            return null;
+        }
+        long now = System.currentTimeMillis();
+        Node newNode = new Node(UUID.randomUUID(), x, 0, z, CornerType.AUTO, Source.USER, 1, now);
+        nodes.put(newNode.getId(), newNode);
+
+        splitSegmentWithNode(segIdA, insertIndexA, newNode.getId());
+        splitSegmentWithNode(segIdB, insertIndexB, newNode.getId());
+
+        markDirty();
+        maybeCleanupOrphans();
+        return newNode;
+    }
+
+    /** Splits a segment at {@code insertIndex}, inserting {@code newNodeId} at that position. */
+    private void splitSegmentWithNode(UUID segId, int insertIndex, UUID newNodeId) {
+        Segment seg = segments.get(segId);
+        if (seg == null || seg.getNodeIds() == null)
+            return;
+        List<UUID> ids = seg.getNodeIds();
+        if (insertIndex < 1 || insertIndex >= ids.size())
+            return;
+
+        List<UUID> leftIds = new ArrayList<>(ids.subList(0, insertIndex));
+        leftIds.add(newNodeId);
+        List<UUID> rightIds = new ArrayList<>();
+        rightIds.add(newNodeId);
+        rightIds.addAll(ids.subList(insertIndex, ids.size()));
+
+        Segment left = new Segment(UUID.randomUUID(), leftIds, seg.getRoadId(), Source.USER, Status.CONFIRMED, 1);
+        Segment right = new Segment(UUID.randomUUID(), rightIds, seg.getRoadId(), Source.USER, Status.CONFIRMED, 1);
+
+        segments.put(left.getId(), left);
+        segments.put(right.getId(), right);
+
+        if (seg.getRoadId() != null) {
+            Road road = roads.get(seg.getRoadId());
+            if (road != null && road.getSegmentIds() != null) {
+                road.getSegmentIds().remove(segId);
+                road.getSegmentIds().add(left.getId());
+                road.getSegmentIds().add(right.getId());
+            }
+        }
+
+        segments.remove(segId);
+    }
+
+    /**
      * Returns all entities modified since the given timestamp. The returned JsonObject contains "nodes", "segments",
      * and "roads" arrays.
      */

@@ -8,6 +8,7 @@ let activeTool = null;          // 'move' | 'point' | 'merge' | null
 let toolbarMode = 'compact';   // 'compact' | 'detailed'
 let mergeFirstNodeId = null;   // first node selected in merge tool
 const TOOL_TOLERANCE_PX = 12;  // pixel tolerance for point tool segment detection
+const INTERSECTION_SNAP_PX = 15;  // pixel tolerance for intersection snapping in point tool
 
 // ——— Toast ———
 function showToast(msg, type) {
@@ -654,6 +655,13 @@ function toggleToolbarMode() {
 
 // ——— Point tool ———
 function handlePointTool(latlng) {
+  // 1. Check for intersection snap
+  const inter = findNearestIntersection(latlng);
+  if (inter) {
+    insertNodeAtIntersection(inter);
+    return;
+  }
+  // 2. Fall back to segment snap
   const hit = findNearestSegment(latlng, TOOL_TOLERANCE_PX);
   if (!hit) {
     showToolToast('附近没有路段，无法插入孤立节点');
@@ -694,6 +702,56 @@ function pointToSegmentInfo(p, p1, p2) {
   return { dist: p.distanceTo(proj), t };
 }
 
+// ——— Intersection math (MC coordinate space) ———
+function lineIntersection(x1, z1, x2, z2, x3, z3, x4, z4) {
+  const denom = (x1 - x2) * (z3 - z4) - (z1 - z2) * (x3 - x4);
+  if (Math.abs(denom) < 1e-10) return null;
+  const t = ((x1 - x3) * (z3 - z4) - (z1 - z3) * (x3 - x4)) / denom;
+  const u = -((x1 - x2) * (z1 - z3) - (z1 - z2) * (x1 - x3)) / denom;
+  if (t >= 0 && t <= 1 && u >= 0 && u <= 1) {
+    return { x: x1 + t * (x2 - x1), z: z1 + t * (z2 - z1) };
+  }
+  return null;
+}
+
+function findNearestIntersection(latlng) {
+  const clickPt = map.latLngToContainerPoint(latlng);
+  let best = null;
+  let bestDist = INTERSECTION_SNAP_PX;
+  const segs = Object.entries(roadStore.segments);
+  for (let i = 0; i < segs.length; i++) {
+    const [sidA, segA] = segs[i];
+    if (!segA.nodeIds || segA.nodeIds.length < 2) continue;
+    for (let j = i + 1; j < segs.length; j++) {
+      const [sidB, segB] = segs[j];
+      if (!segB.nodeIds || segB.nodeIds.length < 2) continue;
+      for (let ai = 0; ai < segA.nodeIds.length - 1; ai++) {
+        const na1 = roadStore.nodes[segA.nodeIds[ai]];
+        const na2 = roadStore.nodes[segA.nodeIds[ai + 1]];
+        if (!na1 || !na2) continue;
+        for (let bi = 0; bi < segB.nodeIds.length - 1; bi++) {
+          const nb1 = roadStore.nodes[segB.nodeIds[bi]];
+          const nb2 = roadStore.nodes[segB.nodeIds[bi + 1]];
+          if (!nb1 || !nb2) continue;
+          const pt = lineIntersection(na1.x, na1.z, na2.x, na2.z, nb1.x, nb1.z, nb2.x, nb2.z);
+          if (!pt) continue;
+          const intPt = map.latLngToContainerPoint(L.latLng(pt.z / SCALE, pt.x / SCALE));
+          const dist = clickPt.distanceTo(intPt);
+          if (dist < bestDist) {
+            bestDist = dist;
+            best = {
+              x: pt.x, z: pt.z,
+              segmentIdA: sidA, insertIndexA: ai + 1,
+              segmentIdB: sidB, insertIndexB: bi + 1
+            };
+          }
+        }
+      }
+    }
+  }
+  return best;
+}
+
 async function insertNodeOnSegment(segId, insertIndex, latlng) {
   const seg = roadStore.segments[segId];
   if (!seg) return;
@@ -717,6 +775,42 @@ async function insertNodeOnSegment(segId, insertIndex, latlng) {
     clearSelection();
     loadData();
     showToast('节点已插入');
+  } catch (e) {
+    showToast('网络错误', 'error');
+  }
+}
+
+async function insertNodeAtIntersection(data) {
+  const segA = roadStore.segments[data.segmentIdA];
+  const segB = roadStore.segments[data.segmentIdB];
+  if (!segA || !segB) return;
+  try {
+    const res = await fetch('/api/segments/intersection', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        x: data.x,
+        z: data.z,
+        segmentIdA: data.segmentIdA,
+        insertIndexA: data.insertIndexA,
+        segmentIdB: data.segmentIdB,
+        insertIndexB: data.insertIndexB,
+        expectedVersionA: segA.version,
+        expectedVersionB: segB.version
+      })
+    });
+    if (res.status === 409) {
+      showToast('版本冲突，正在刷新...', 'error');
+      loadData();
+      return;
+    }
+    if (!res.ok) {
+      showToast('交点插入失败', 'error');
+      return;
+    }
+    clearSelection();
+    loadData();
+    showToolToast('已在交点插入节点');
   } catch (e) {
     showToast('网络错误', 'error');
   }

@@ -90,6 +90,7 @@ public class WayfarerHttpServer implements Runnable {
         routes.add(new Route("DELETE", Pattern.compile("/api/segments/([0-9a-f-]+)"), this::handleDeleteSegment));
         routes.add(new Route("POST", "/api/merge", this::handleMerge));
         routes.add(new Route("POST", Pattern.compile("/api/split/([0-9a-f-]+)"), this::handleSplit));
+        routes.add(new Route("POST", "/api/segments/intersection", this::handleSegmentIntersection));
         routes.add(new Route("POST", Pattern.compile("/api/segments/([0-9a-f-]+)/insert"), this::handleInsertNode));
         routes.add(new Route("PATCH", Pattern.compile("/api/roads/([0-9a-f-]+)"), this::handleUpdateRoad));
         routes.add(new Route("DELETE", Pattern.compile("/api/roads/([0-9a-f-]+)"), this::handleDeleteRoad));
@@ -586,6 +587,61 @@ public class WayfarerHttpServer implements Runnable {
 
             database.saveToDisk();
 
+            JsonObject result = new JsonObject();
+            result.add("node", GSON.toJsonTree(newNode));
+            sendJson(req.exchange, 201, result);
+        } catch (Exception e) {
+            sendJson(req.exchange, 400, errorJson("Invalid JSON: " + e.getMessage()));
+        }
+    }
+
+    private void handleSegmentIntersection(Request req) {
+        if (req.body == null) {
+            sendJson(req.exchange, 400, errorJson("Missing request body"));
+            return;
+        }
+
+        try {
+            JsonObject body = JsonParser.parseString(req.body).getAsJsonObject();
+            double x = body.get("x").getAsDouble();
+            double z = body.get("z").getAsDouble();
+            UUID segIdA = UUID.fromString(body.get("segmentIdA").getAsString());
+            int indexA = body.get("insertIndexA").getAsInt();
+            UUID segIdB = UUID.fromString(body.get("segmentIdB").getAsString());
+            int indexB = body.get("insertIndexB").getAsInt();
+
+            // Version checks
+            if (body.has("expectedVersionA")) {
+                int va = body.get("expectedVersionA").getAsInt();
+                if (!database.checkVersion(segIdA, va)) {
+                    Segment s = database.getSegment(segIdA);
+                    int cur = s != null ? s.getVersion() : -1;
+                    sendJson(req.exchange, 409, errorJson("Version conflict on A. Current: " + cur));
+                    return;
+                }
+            }
+            if (body.has("expectedVersionB")) {
+                int vb = body.get("expectedVersionB").getAsInt();
+                if (!database.checkVersion(segIdB, vb)) {
+                    Segment s = database.getSegment(segIdB);
+                    int cur = s != null ? s.getVersion() : -1;
+                    sendJson(req.exchange, 409, errorJson("Version conflict on B. Current: " + cur));
+                    return;
+                }
+            }
+
+            if (database.getSegment(segIdA) == null || database.getSegment(segIdB) == null) {
+                sendJson(req.exchange, 404, errorJson("Segment not found"));
+                return;
+            }
+
+            Node newNode = database.insertNodeAtIntersection(segIdA, indexA, segIdB, indexB, x, z);
+            if (newNode == null) {
+                sendJson(req.exchange, 400, errorJson("Insertion failed (invalid indices or same segment)"));
+                return;
+            }
+
+            database.saveToDisk();
             JsonObject result = new JsonObject();
             result.add("node", GSON.toJsonTree(newNode));
             sendJson(req.exchange, 201, result);
