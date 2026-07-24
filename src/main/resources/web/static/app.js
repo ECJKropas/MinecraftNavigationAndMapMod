@@ -10,6 +10,74 @@ let mergeFirstNodeId = null;   // first node selected in merge tool
 const TOOL_TOLERANCE_PX = 12;  // pixel tolerance for point tool segment detection
 const INTERSECTION_SNAP_PX = 15;  // pixel tolerance for intersection snapping in point tool
 
+// ——— Manual node drag state ———
+let dragState = null;  // { nid, marker, axisDx, axisDz, startMcX, startMcZ }
+let dragJustEnded = false;
+
+function getNodeDragAxis(nid) {
+  const neighbors = new Set();
+  for (const seg of Object.values(roadStore.segments)) {
+    if (!seg.nodeIds) continue;
+    const idx = seg.nodeIds.indexOf(nid);
+    if (idx === -1) continue;
+    if (idx > 0) neighbors.add(seg.nodeIds[idx - 1]);
+    if (idx < seg.nodeIds.length - 1) neighbors.add(seg.nodeIds[idx + 1]);
+  }
+  const nbrs = [...neighbors];
+  if (nbrs.length === 0) return null; // isolated node: free drag
+
+  let dx = 0, dz = 0;
+  if (nbrs.length === 1) {
+    // Endpoint: axis along the segment direction through this node
+    const nb = roadStore.nodes[nbrs[0]];
+    const node = roadStore.nodes[nid];
+    if (!nb || !node) return null;
+    dx = node.x - nb.x;
+    dz = node.z - nb.z;
+  } else {
+    // Middle node or junction (≥2 neighbors): use first two for axis
+    const n1 = roadStore.nodes[nbrs[0]];
+    const n2 = roadStore.nodes[nbrs[1]];
+    if (!n1 || !n2) return null;
+    dx = n2.x - n1.x;
+    dz = n2.z - n1.z;
+  }
+
+  const len = Math.sqrt(dx * dx + dz * dz);
+  if (len < 1e-6) return null;
+  return { dx: dx / len, dz: dz / len };
+}
+
+function getConnectedSegmentIds(nid) {
+  const ids = [];
+  for (const [sid, seg] of Object.entries(roadStore.segments)) {
+    if (seg.nodeIds && seg.nodeIds.includes(nid)) ids.push(sid);
+  }
+  return ids;
+}
+
+function updateConnectedSegmentPolylines(nid, newX, newZ) {
+  const connectedSegs = getConnectedSegmentIds(nid);
+  for (const sid of connectedSegs) {
+    const seg = roadStore.segments[sid];
+    const idx = seg.nodeIds.indexOf(nid);
+    const newLL = mc2latlng(newX, newZ);
+
+    const line = segmentLines.get(sid);
+    if (line) {
+      const lls = line.getLatLngs();
+      lls[idx] = newLL;
+      line.setLatLngs(lls);
+    }
+    const fill = segmentFills.get(sid);
+    if (fill) {
+      const lls = fill.getLatLngs();
+      lls[idx] = newLL;
+      fill.setLatLngs(lls);
+    }
+  }
+}
+
 // ——— Undo / Redo ———
 let undoStack = [];
 let redoStack = [];
@@ -215,6 +283,48 @@ function initMap() {
   loadConfig();
   loadData();
   setInterval(loadDelta, 2000);
+
+  // Global drag handlers (document-level to catch mouse outside map)
+  document.addEventListener('mousemove', onGlobalMouseMove);
+  document.addEventListener('mouseup', onGlobalMouseUp);
+}
+
+function onGlobalMouseMove(e) {
+  if (!dragState) return;
+  const ds = dragState;
+  const mcX = e.clientX;
+  const mcY = e.clientY;
+  // Convert screen coords to map container point, then to latlng, then to MC
+  const container = map.getContainer();
+  const rect = container.getBoundingClientRect();
+  const cp = L.point(mcX - rect.left, mcY - rect.top);
+  const ll = map.containerPointToLatLng(cp);
+  let newX = ll.lng * SCALE;
+  let newZ = ll.lat * SCALE;
+
+  if (ds.axisDx != null) {
+    // Project mouse position onto the axis line through start position
+    const dx = newX - ds.startMcX;
+    const dz = newZ - ds.startMcZ;
+    const proj = dx * ds.axisDx + dz * ds.axisDz;
+    newX = ds.startMcX + proj * ds.axisDx;
+    newZ = ds.startMcZ + proj * ds.axisDz;
+  }
+
+  ds.marker.setLatLng(mc2latlng(newX, newZ));
+  updateConnectedSegmentPolylines(ds.nid, newX, newZ);
+}
+
+function onGlobalMouseUp(e) {
+  if (!dragState) return;
+  const ds = dragState;
+  dragState = null;
+  ds.marker.setStyle({ fillOpacity: 0.92, radius: 5 });
+  ds.marker._path.style.cursor = 'grab';
+  dragJustEnded = true;
+  // Defer reset so the synchronous click event (mouseup→click) sees this flag
+  setTimeout(() => { dragJustEnded = false; }, 0);
+  onNodeDragEnd(ds.nid, ds.marker);
 }
 
 async function loadConfig() {
@@ -444,14 +554,31 @@ function renderAll() {
       fillOpacity: 0.92,
     }).addTo(map);
     if (activeTool === 'move') {
-      marker.pm.enableLayerDrag({ snappable: false, snapDistance: 0 });
-      marker.on('pm:dragstart', () => { marker.setStyle({ fillOpacity: 0.55, radius: 6.5 }); });
-      marker.on('pm:dragend', () => { marker.setStyle({ fillOpacity: 0.92, radius: 5 }); onNodeDragEnd(nid, marker); });
+      marker._path.style.cursor = 'grab';
+      L.DomEvent.on(marker._path, 'mousedown', (e) => {
+        L.DomEvent.stopPropagation(e);
+        L.DomEvent.preventDefault(e);
+        // Find latest marker for this nid (renderAll may recreate)
+        const m = nodeMarkers.get(nid);
+        if (!m) return;
+        const axis = getNodeDragAxis(nid);
+        const node = roadStore.nodes[nid];
+        dragState = {
+          nid, marker: m,
+          axisDx: axis ? axis.dx : null,
+          axisDz: axis ? axis.dz : null,
+          startMcX: node.x,
+          startMcZ: node.z
+        };
+        m.setStyle({ fillOpacity: 0.55, radius: 6.5 });
+        m._path.style.cursor = 'grabbing';
+      });
     }
     marker.on('mouseover', () => { if (activeTool !== 'move') marker.setRadius(6.5); });
     marker.on('mouseout', () => { if (activeTool !== 'move') marker.setRadius(5); });
     marker.on('click', (e) => {
       L.DomEvent.stopPropagation(e);
+      if (dragJustEnded) { dragJustEnded = false; return; }
       if (activeTool === 'point') { handlePointTool(e.latlng); return; }
       if (activeTool === 'merge') { handleMergeTool(nid); return; }
       onNodeClick(nid, e.originalEvent);
@@ -693,12 +820,18 @@ function toggleTool(tool) {
 function setActiveTool(tool) {
   activeTool = tool;
   mergeFirstNodeId = null;
+  // Cancel any in-progress drag
+  if (dragState) {
+    dragState.marker.setStyle({ fillOpacity: 0.92, radius: 5 });
+    dragState.marker._path.style.cursor = 'grab';
+    dragState = null;
+  }
   document.querySelectorAll('.tool-btn').forEach(b => b.classList.remove('selected'));
   if (tool) {
     document.getElementById('tool-' + tool).classList.add('selected');
   }
-  // Move: Geoman handles map-drag conflict internally; Merge: disable map dragging
-  if (tool === 'merge') {
+  // Disable map dragging in move/merge so it doesn't conflict
+  if (tool === 'move' || tool === 'merge') {
     map.dragging.disable();
   } else {
     map.dragging.enable();
