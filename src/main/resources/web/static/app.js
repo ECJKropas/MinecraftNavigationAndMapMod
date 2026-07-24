@@ -218,7 +218,7 @@ async function loadDelta() {
     }
     if (data.roads) {
       const oldRoadCount = Object.keys(roadStore.roads).length;
-      for (const [k, v] of Object.entries(data.roads)) { roadStore.roads[k] = v; }
+      for (const r of data.roads) { roadStore.roads[r.id] = r; }
       const newRoadCount = Object.keys(roadStore.roads).length;
       if (newRoadCount !== oldRoadCount) changed = true;
     }
