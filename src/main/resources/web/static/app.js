@@ -147,12 +147,24 @@ function initMap() {
   map = L.map('map', {
     crs: L.CRS.Simple,
     minZoom: -4,
-    maxZoom: 10,
+    maxZoom: 20,
     zoomControl: true
   }).setView([0, 0], 5);
   map.on('click', onMapClick);
+  loadConfig();
   loadData();
   setInterval(loadDelta, 2000);
+}
+
+async function loadConfig() {
+  try {
+    const res = await fetch('/api/config');
+    if (!res.ok) return;
+    const cfg = await res.json();
+    if (cfg.maxZoom && typeof cfg.maxZoom === 'number') {
+      map.options.maxZoom = cfg.maxZoom;
+    }
+  } catch (e) { /* use defaults */ }
 }
 
 function mc2latlng(x, z) { return [z / SCALE, x / SCALE]; }

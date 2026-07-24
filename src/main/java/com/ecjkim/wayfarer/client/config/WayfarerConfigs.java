@@ -23,6 +23,7 @@ import com.google.common.collect.ImmutableList;
 import fi.dy.masa.malilib.config.IConfigBase;
 import fi.dy.masa.malilib.config.options.ConfigBoolean;
 import fi.dy.masa.malilib.config.options.ConfigDouble;
+import fi.dy.masa.malilib.config.options.ConfigInteger;
 import fi.dy.masa.malilib.config.options.ConfigString;
 
 public class WayfarerConfigs {
@@ -44,8 +45,11 @@ public class WayfarerConfigs {
         public static final ConfigBoolean AUTO_DELETE_ORPHAN_NODES =
             new ConfigBoolean("autoDeleteOrphanNodes", true, "开启后每次增删改节点后自动删除没有路段连接的孤立节点");
 
+        public static final ConfigInteger WEB_MAX_ZOOM =
+            new ConfigInteger("webMaxZoom", 10, 10, 20, "网页端地图最大放大等级（10-20，默认10），数值越高可放大越近");
+
         public static final ImmutableList<IConfigBase> OPTIONS = ImmutableList.of(DEFAULT_CLASSIFICATION, AUTO_INTEGRAL,
-            AUTO_SNAP_ENDPOINTS, RDP_EPSILON, AUTO_DELETE_ORPHAN_NODES);
+            AUTO_SNAP_ENDPOINTS, RDP_EPSILON, AUTO_DELETE_ORPHAN_NODES, WEB_MAX_ZOOM);
     }
 
     public static List<IConfigBase> getAllConfigs() {

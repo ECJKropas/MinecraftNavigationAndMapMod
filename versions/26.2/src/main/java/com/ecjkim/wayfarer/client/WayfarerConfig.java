@@ -44,6 +44,7 @@ public class WayfarerConfig {
     public boolean autoIntegral = true;
     public boolean autoSnapEndpoints = true;
     public boolean autoDeleteOrphanNodes = true;
+    public int webMaxZoom = 10;
     public String defaultClassification = "";
     public Map<String, List<HotkeyBind>> hotkeys = defaultHotkeys();
 

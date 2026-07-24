@@ -33,6 +33,7 @@ import java.util.logging.Logger;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
+import com.ecjkim.wayfarer.client.config.WayfarerConfigs;
 import com.ecjkim.wayfarer.client.road.data.RoadNetworkDatabase;
 import com.ecjkim.wayfarer.client.road.model.Node;
 import com.ecjkim.wayfarer.client.road.model.Road;
@@ -78,6 +79,7 @@ public class WayfarerHttpServer implements Runnable {
 
     private void registerRoutes() {
         routes.add(new Route("GET", "/", this::serveIndexHtml));
+        routes.add(new Route("GET", "/api/config", this::handleGetConfig));
         routes.add(new Route("GET", Pattern.compile("/static/(.+)"), this::serveStaticFile));
         routes.add(new Route("GET", "/api/roads", this::handleGetRoads));
         routes.add(new Route("GET", Pattern.compile("/api/roads/delta(?:\\?.*)?"), this::handleGetDelta));
@@ -242,6 +244,12 @@ public class WayfarerHttpServer implements Runnable {
     }
 
     // -------- API handlers --------
+
+    private void handleGetConfig(Request req) {
+        JsonObject config = new JsonObject();
+        config.addProperty("maxZoom", WayfarerConfigs.Generic.WEB_MAX_ZOOM.getIntegerValue());
+        sendJson(req.exchange, 200, config);
+    }
 
     private void handleGetRoads(Request req) {
         JsonObject geojson = database.toGeoJSON();
