@@ -316,26 +316,37 @@ public class RoadNetworkDatabase {
             int idx = ids.indexOf(centerId);
             idxs[i] = idx;
 
-            // Center node MUST be interior in every segment for even-degree case
-            if (idx <= 0 || idx >= ids.size() - 1) {
-                // This shouldn't happen for even degree, but guard anyway
-                return errorResult("unsupported", "该节点不支持软删除");
+            // Compute through-direction. If the center node is at an endpoint of this
+            // segment, use the center's own position as the anchor on that side.
+            double leftX, leftZ, rightX, rightZ;
+
+            if (idx > 0) {
+                Node leftNode = nodes.get(ids.get(idx - 1));
+                if (leftNode == null)
+                    return errorResult("not_found");
+                leftX = leftNode.getX();
+                leftZ = leftNode.getZ();
+            } else {
+                leftX = center.getX();
+                leftZ = center.getZ();
             }
 
-            UUID leftAdjId = ids.get(idx - 1);
-            UUID rightAdjId = ids.get(idx + 1);
-            adjs[i][0] = leftAdjId;
-            adjs[i][1] = rightAdjId;
-
-            Node leftNode = nodes.get(leftAdjId);
-            Node rightNode = nodes.get(rightAdjId);
-            if (leftNode == null || rightNode == null) {
-                return errorResult("not_found");
+            if (idx < ids.size() - 1) {
+                Node rightNode = nodes.get(ids.get(idx + 1));
+                if (rightNode == null)
+                    return errorResult("not_found");
+                rightX = rightNode.getX();
+                rightZ = rightNode.getZ();
+            } else {
+                rightX = center.getX();
+                rightZ = center.getZ();
             }
 
-            // Through-direction: rightAdj - leftAdj (normalised)
-            double dx = rightNode.getX() - leftNode.getX();
-            double dz = rightNode.getZ() - leftNode.getZ();
+            adjs[i][0] = idx > 0 ? ids.get(idx - 1) : centerId;
+            adjs[i][1] = idx < ids.size() - 1 ? ids.get(idx + 1) : centerId;
+
+            double dx = rightX - leftX;
+            double dz = rightZ - leftZ;
             double len = Math.sqrt(dx * dx + dz * dz);
             if (len < 1e-6) {
                 return errorResult("unsupported", "该节点不支持软删除");
