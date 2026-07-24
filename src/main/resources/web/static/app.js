@@ -4,7 +4,7 @@
 const SCALE = 128.0;
 let map, selectedSegments = new Set(), selectedNodeId = null, selectedSegmentId = null;
 let roadStore = { nodes:{}, segments:{}, roads:{} };
-let activeTool = null;          // 'move' | 'point' | 'merge' | null
+let activeTool = null;          // 'move' | 'point' | 'merge' | 'softdelete' | null
 let toolbarMode = 'compact';   // 'compact' | 'detailed'
 let mergeFirstNodeId = null;   // first node selected in merge tool
 const TOOL_TOLERANCE_PX = 12;  // pixel tolerance for point tool segment detection
@@ -599,6 +599,7 @@ function renderAll() {
       if (dragJustEnded) { dragJustEnded = false; return; }
       if (activeTool === 'point') { handlePointTool(e.latlng); return; }
       if (activeTool === 'merge') { handleMergeTool(nid); return; }
+      if (activeTool === 'softdelete') { handleSoftDeleteTool(nid); return; }
       onNodeClick(nid, e.originalEvent);
     });
     nodeMarkers.set(nid, marker);
@@ -853,6 +854,7 @@ function initToolbar() {
   });
   document.getElementById('tool-point').addEventListener('click', () => toggleTool('point'));
   document.getElementById('tool-merge').addEventListener('click', () => toggleTool('merge'));
+  document.getElementById('tool-softdelete').addEventListener('click', () => toggleTool('softdelete'));
   document.getElementById('tool-undo').addEventListener('click', undo);
   document.getElementById('tool-redo').addEventListener('click', redo);
   document.getElementById('tool-mode-toggle').addEventListener('click', toggleToolbarMode);
@@ -881,7 +883,7 @@ function setActiveTool(tool) {
     document.getElementById('tool-' + tool).classList.add('selected');
   }
   // Disable map dragging in move/merge so it doesn't conflict
-  if (tool === 'move' || tool === 'merge') {
+  if (tool === 'move' || tool === 'merge' || tool === 'softdelete') {
     map.dragging.disable();
   } else {
     map.dragging.enable();
@@ -1196,6 +1198,29 @@ async function doMergeClean(nodeToDeleteId, targetNodeId, specialCase) {
     mergeFirstNodeId = null;
     loadData();
     showToolToast('节点已合并');
+  } catch (e) {
+    showToast('网络错误', 'error');
+  }
+}
+
+async function handleSoftDeleteTool(nid) {
+  pushUndo();
+  try {
+    const res = await fetch('/api/nodes/soft-delete', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ nodeId: nid })
+    });
+    const data = await res.json();
+    if (!res.ok || !data.ok) {
+      const msg = data.message || data.error || '未知错误';
+      showToolToast(msg);
+      return;
+    }
+    clearSelection();
+    loadData();
+    const label = data.action === 'endpoint_shortened' ? '端点已软删除' : '节点已软删除';
+    showToolToast(label);
   } catch (e) {
     showToast('网络错误', 'error');
   }

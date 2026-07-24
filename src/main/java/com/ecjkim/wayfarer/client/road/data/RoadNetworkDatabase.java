@@ -232,6 +232,262 @@ public class RoadNetworkDatabase {
         // markDirty already called by mergeNodes; extra call harmless
     }
 
+    /**
+     * Soft-deletes a node with different strategies depending on its degree:
+     * <ul>
+     * <li>Degree 1 (endpoint): Shortens the segment by removing the endpoint.</li>
+     * <li>Even degree (center node): Pairs opposite-direction segments and merges them, removing the center node and
+     * collapsing the junction.</li>
+     * <li>Odd degree >1 or 2-node segment endpoint: Returns error.</li>
+     * </ul>
+     *
+     * @return a result object with keys "ok" (boolean), "action" (String), and optionally "error" and "message".
+     */
+    public synchronized JsonObject softDeleteNode(UUID nodeId) {
+        Node center = nodes.get(nodeId);
+        if (center == null) {
+            return errorResult("not_found");
+        }
+
+        // Find all segments containing this node
+        List<Segment> connectedSegments = new ArrayList<>();
+        for (Segment seg : getAllSegments()) {
+            if (seg.getNodeIds() != null && seg.getNodeIds().contains(nodeId)) {
+                connectedSegments.add(seg);
+            }
+        }
+
+        // Compute degree: count unique neighbour nodes across all segments
+        Set<UUID> neighbours = new HashSet<>();
+        for (Segment seg : connectedSegments) {
+            List<UUID> ids = seg.getNodeIds();
+            int idx = ids.indexOf(nodeId);
+            if (idx > 0)
+                neighbours.add(ids.get(idx - 1));
+            if (idx < ids.size() - 1)
+                neighbours.add(ids.get(idx + 1));
+        }
+        int degree = neighbours.size();
+
+        // --- Degree 1: endpoint ---
+        if (degree == 1) {
+            Segment seg = connectedSegments.get(0);
+            if (seg.getNodeIds().size() <= 2) {
+                return errorResult("unsupported", "该节点不支持软删除");
+            }
+            // Shorten: remove endpoint from segment
+            List<UUID> newIds = new ArrayList<>(seg.getNodeIds());
+            newIds.remove(nodeId);
+            seg.setNodeIds(newIds);
+            seg.setVersion(seg.getVersion() + 1);
+            nodes.remove(nodeId);
+            maybeCleanupOrphans();
+            saveToDisk();
+            JsonObject result = new JsonObject();
+            result.addProperty("ok", true);
+            result.addProperty("action", "endpoint_shortened");
+            return result;
+        }
+
+        // --- Non-even degree > 1: unsupported ---
+        if (degree % 2 != 0) {
+            return errorResult("unsupported", "该节点不支持软删除");
+        }
+
+        // --- Even degree: center node ---
+        return softDeleteCenter(nodeId, connectedSegments, center);
+    }
+
+    /**
+     * Soft-deletes an even-degree center node by pairing opposite-direction segments and merging each pair. Rolls back
+     * if any pair fails the road-name constraint.
+     */
+    private JsonObject softDeleteCenter(UUID centerId, List<Segment> connectedSegments, Node center) {
+        int n = connectedSegments.size();
+
+        // Collect per-segment info: through-direction and adjacent node IDs
+        double[][] dirs = new double[n][2];
+        UUID[][] adjs = new UUID[n][2]; // [leftAdj, rightAdj]
+        int[] idxs = new int[n];
+
+        for (int i = 0; i < n; i++) {
+            Segment seg = connectedSegments.get(i);
+            List<UUID> ids = seg.getNodeIds();
+            int idx = ids.indexOf(centerId);
+            idxs[i] = idx;
+
+            // Center node MUST be interior in every segment for even-degree case
+            if (idx <= 0 || idx >= ids.size() - 1) {
+                // This shouldn't happen for even degree, but guard anyway
+                return errorResult("unsupported", "该节点不支持软删除");
+            }
+
+            UUID leftAdjId = ids.get(idx - 1);
+            UUID rightAdjId = ids.get(idx + 1);
+            adjs[i][0] = leftAdjId;
+            adjs[i][1] = rightAdjId;
+
+            Node leftNode = nodes.get(leftAdjId);
+            Node rightNode = nodes.get(rightAdjId);
+            if (leftNode == null || rightNode == null) {
+                return errorResult("not_found");
+            }
+
+            // Through-direction: rightAdj - leftAdj (normalised)
+            double dx = rightNode.getX() - leftNode.getX();
+            double dz = rightNode.getZ() - leftNode.getZ();
+            double len = Math.sqrt(dx * dx + dz * dz);
+            if (len < 1e-6) {
+                return errorResult("unsupported", "该节点不支持软删除");
+            }
+            dirs[i][0] = dx / len;
+            dirs[i][1] = dz / len;
+        }
+
+        // Greedy pairing: pick first unpaired, find best 180° match that passes road check
+        boolean[] paired = new boolean[n];
+        int[][] pairIndices = new int[n / 2][2];
+        int pairCount = 0;
+
+        for (int i = 0; i < n; i++) {
+            if (paired[i])
+                continue;
+
+            // Sort remaining unpaired segments by dot product (ascending → closest to -1 = 180°)
+            final int fi = i;
+            List<Integer> candidates = new ArrayList<>();
+            for (int j = 0; j < n; j++) {
+                if (j != fi && !paired[j]) {
+                    candidates.add(j);
+                }
+            }
+            candidates.sort((a, b) -> {
+                double dotA = dirs[fi][0] * dirs[a][0] + dirs[fi][1] * dirs[a][1];
+                double dotB = dirs[fi][0] * dirs[b][0] + dirs[fi][1] * dirs[b][1];
+                return Double.compare(dotA, dotB); // smallest (closest to -1) first
+            });
+
+            boolean found = false;
+            for (int j : candidates) {
+                UUID segIdI = connectedSegments.get(fi).getId();
+                UUID segIdJ = connectedSegments.get(j).getId();
+                if (sameRoadOrUnfiled(segIdI, segIdJ)) {
+                    pairIndices[pairCount][0] = fi;
+                    pairIndices[pairCount][1] = j;
+                    pairCount++;
+                    paired[fi] = true;
+                    paired[j] = true;
+                    found = true;
+                    break;
+                }
+            }
+
+            if (!found) {
+                return errorResult("road_mismatch", "软删除失败，有不同名路段");
+            }
+        }
+
+        // All pairs matched successfully. Execute merges.
+        for (int p = 0; p < pairCount; p++) {
+            int i = pairIndices[p][0];
+            int j = pairIndices[p][1];
+            Segment segI = connectedSegments.get(i);
+            Segment segJ = connectedSegments.get(j);
+            mergeSegmentPair(segI, idxs[i], segJ, idxs[j], centerId);
+        }
+
+        // Delete center node
+        nodes.remove(centerId);
+        maybeCleanupOrphans();
+        saveToDisk();
+
+        JsonObject result = new JsonObject();
+        result.addProperty("ok", true);
+        result.addProperty("action", "center_merged");
+        return result;
+    }
+
+    /**
+     * Merges two segments at their shared center node by removing the center and concatenating the two segments' node
+     * lists.
+     */
+    private void mergeSegmentPair(Segment s1, int idx1, Segment s2, int idx2, UUID centerId) {
+        List<UUID> ids1 = s1.getNodeIds();
+        List<UUID> ids2 = s2.getNodeIds();
+
+        // Build merged list: s1_before + s1_after + s2_before + s2_after (center removed)
+        List<UUID> mergedIds = new ArrayList<>();
+        for (int k = 0; k < idx1; k++)
+            mergedIds.add(ids1.get(k));
+        for (int k = idx1 + 1; k < ids1.size(); k++)
+            mergedIds.add(ids1.get(k));
+        for (int k = 0; k < idx2; k++)
+            mergedIds.add(ids2.get(k));
+        for (int k = idx2 + 1; k < ids2.size(); k++)
+            mergedIds.add(ids2.get(k));
+
+        // Determine road membership
+        Road road1 = findRoadForSegment(s1.getId());
+        Road road2 = findRoadForSegment(s2.getId());
+
+        Segment merged = new Segment(UUID.randomUUID(), mergedIds, null, null, null, 1);
+        segments.put(merged.getId(), merged);
+
+        if (road1 != null && road2 != null && road1.getId().equals(road2.getId())) {
+            road1.getSegmentIds().add(merged.getId());
+            road1.getSegmentIds().remove(s1.getId());
+            road1.getSegmentIds().remove(s2.getId());
+        } else if (road1 != null) {
+            road1.getSegmentIds().add(merged.getId());
+            road1.getSegmentIds().remove(s1.getId());
+        } else if (road2 != null) {
+            road2.getSegmentIds().add(merged.getId());
+            road2.getSegmentIds().remove(s2.getId());
+        }
+
+        // Remove original segments
+        segments.remove(s1.getId());
+        segments.remove(s2.getId());
+        markDirty();
+    }
+
+    /**
+     * Returns the road that contains the given segment, or null if unfiled.
+     */
+    private Road findRoadForSegment(UUID segmentId) {
+        for (Road road : roads.values()) {
+            if (road.getSegmentIds() != null && road.getSegmentIds().contains(segmentId)) {
+                return road;
+            }
+        }
+        return null;
+    }
+
+    /**
+     * Checks whether two segments can be paired: same road or at least one is unfiled.
+     */
+    private boolean sameRoadOrUnfiled(UUID segId1, UUID segId2) {
+        Road road1 = findRoadForSegment(segId1);
+        Road road2 = findRoadForSegment(segId2);
+        if (road1 == null || road2 == null) {
+            return true; // at least one unfiled
+        }
+        return road1.getId().equals(road2.getId());
+    }
+
+    private static JsonObject errorResult(String error) {
+        JsonObject obj = new JsonObject();
+        obj.addProperty("ok", false);
+        obj.addProperty("error", error);
+        return obj;
+    }
+
+    private static JsonObject errorResult(String error, String message) {
+        JsonObject obj = errorResult(error);
+        obj.addProperty("message", message);
+        return obj;
+    }
+
     // ---------- Segment CRUD ----------
 
     public synchronized void addSegment(Segment segment) {

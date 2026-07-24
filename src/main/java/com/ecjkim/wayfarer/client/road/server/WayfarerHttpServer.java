@@ -87,6 +87,7 @@ public class WayfarerHttpServer implements Runnable {
         routes.add(new Route("DELETE", Pattern.compile("/api/nodes/([0-9a-f-]+)"), this::handleDeleteNode));
         routes.add(new Route("POST", "/api/nodes/merge", this::handleMergeNodes));
         routes.add(new Route("POST", "/api/nodes/merge-clean", this::handleMergeCleanNodes));
+        routes.add(new Route("POST", "/api/nodes/soft-delete", this::handleSoftDeleteNode));
         routes.add(new Route("POST", "/api/segments", this::handleCreateSegment));
         routes.add(new Route("DELETE", Pattern.compile("/api/segments/([0-9a-f-]+)"), this::handleDeleteSegment));
         routes.add(new Route("POST", "/api/merge", this::handleMerge));
@@ -436,6 +437,28 @@ public class WayfarerHttpServer implements Runnable {
             result.addProperty("deletedNodeId", nodeToDeleteId.toString());
             result.addProperty("targetNodeId", targetNodeId.toString());
             sendJson(req.exchange, 200, result);
+        } catch (Exception e) {
+            sendJson(req.exchange, 400, errorJson("Invalid JSON: " + e.getMessage()));
+        }
+    }
+
+    private void handleSoftDeleteNode(Request req) {
+        if (req.body == null) {
+            sendJson(req.exchange, 400, errorJson("Missing request body"));
+            return;
+        }
+
+        try {
+            JsonObject body = JsonParser.parseString(req.body).getAsJsonObject();
+            UUID nodeId = UUID.fromString(body.get("nodeId").getAsString());
+
+            if (database.getNode(nodeId) == null) {
+                sendJson(req.exchange, 404, errorJson("Node not found: " + nodeId));
+                return;
+            }
+
+            JsonObject result = database.softDeleteNode(nodeId);
+            sendJson(req.exchange, result.get("ok").getAsBoolean() ? 200 : 400, result);
         } catch (Exception e) {
             sendJson(req.exchange, 400, errorJson("Invalid JSON: " + e.getMessage()));
         }
