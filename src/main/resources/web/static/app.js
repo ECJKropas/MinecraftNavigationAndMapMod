@@ -13,39 +13,49 @@ const INTERSECTION_SNAP_PX = 15;  // pixel tolerance for intersection snapping i
 // ——— Manual node drag state ———
 let dragState = null;  // { nid, marker, axisDx, axisDz, startMcX, startMcZ }
 let dragJustEnded = false;
+let constrainDrag = true;  // toggled by popup button
 
-function getNodeDragAxis(nid) {
-  const neighbors = new Set();
+function getNodeDragAxes(nid) {
+  const axes = [];
+  const seen = new Set();
+  const node = roadStore.nodes[nid];
+  if (!node) return axes;
+
   for (const seg of Object.values(roadStore.segments)) {
     if (!seg.nodeIds) continue;
     const idx = seg.nodeIds.indexOf(nid);
     if (idx === -1) continue;
-    if (idx > 0) neighbors.add(seg.nodeIds[idx - 1]);
-    if (idx < seg.nodeIds.length - 1) neighbors.add(seg.nodeIds[idx + 1]);
+    for (const ni of [idx - 1, idx + 1]) {
+      if (ni < 0 || ni >= seg.nodeIds.length) continue;
+      const nb = roadStore.nodes[seg.nodeIds[ni]];
+      if (!nb) continue;
+      let dx = node.x - nb.x;
+      let dz = node.z - nb.z;
+      const len = Math.sqrt(dx * dx + dz * dz);
+      if (len < 1e-6) continue;
+      dx /= len; dz /= len;
+      // Canonicalise direction: ensure first non-zero component is positive
+      if (dx < -1e-6 || (Math.abs(dx) < 1e-6 && dz < -1e-6)) { dx = -dx; dz = -dz; }
+      const key = dx.toFixed(6) + ',' + dz.toFixed(6);
+      if (seen.has(key)) continue;
+      seen.add(key);
+      axes.push({ dx, dz });
+    }
   }
-  const nbrs = [...neighbors];
-  if (nbrs.length === 0) return null; // isolated node: free drag
+  return axes;
+}
 
-  let dx = 0, dz = 0;
-  if (nbrs.length === 1) {
-    // Endpoint: axis along the segment direction through this node
-    const nb = roadStore.nodes[nbrs[0]];
-    const node = roadStore.nodes[nid];
-    if (!nb || !node) return null;
-    dx = node.x - nb.x;
-    dz = node.z - nb.z;
-  } else {
-    // Middle node or junction (≥2 neighbors): use first two for axis
-    const n1 = roadStore.nodes[nbrs[0]];
-    const n2 = roadStore.nodes[nbrs[1]];
-    if (!n1 || !n2) return null;
-    dx = n2.x - n1.x;
-    dz = n2.z - n1.z;
+function pickAxisFromMouse(axes, nodeMc, mouseMcX, mouseMcZ) {
+  // Pick the axis whose direction is closest to the mouse movement from the node
+  const mdX = mouseMcX - nodeMc.x;
+  const mdZ = mouseMcZ - nodeMc.z;
+  let best = axes[0];
+  let bestDot = -Infinity;
+  for (const a of axes) {
+    const dot = Math.abs(mdX * a.dx + mdZ * a.dz);
+    if (dot > bestDot) { bestDot = dot; best = a; }
   }
-
-  const len = Math.sqrt(dx * dx + dz * dz);
-  if (len < 1e-6) return null;
-  return { dx: dx / len, dz: dz / len };
+  return best;
 }
 
 function getConnectedSegmentIds(nid) {
@@ -558,18 +568,26 @@ function renderAll() {
       L.DomEvent.on(marker._path, 'mousedown', (e) => {
         L.DomEvent.stopPropagation(e);
         L.DomEvent.preventDefault(e);
-        // Find latest marker for this nid (renderAll may recreate)
         const m = nodeMarkers.get(nid);
         if (!m) return;
-        const axis = getNodeDragAxis(nid);
         const node = roadStore.nodes[nid];
-        dragState = {
-          nid, marker: m,
-          axisDx: axis ? axis.dx : null,
-          axisDz: axis ? axis.dz : null,
-          startMcX: node.x,
-          startMcZ: node.z
-        };
+        if (!node) return;
+
+        let axisDx = null, axisDz = null;
+        if (constrainDrag) {
+          // Convert mouse screen→MC to pick the axis closest to drag direction
+          const container = map.getContainer();
+          const rect = container.getBoundingClientRect();
+          const cp = L.point(e.clientX - rect.left, e.clientY - rect.top);
+          const ll = map.containerPointToLatLng(cp);
+          const axes = getNodeDragAxes(nid);
+          if (axes.length > 0) {
+            const best = pickAxisFromMouse(axes, node, ll.lng * SCALE, ll.lat * SCALE);
+            axisDx = best.dx; axisDz = best.dz;
+          }
+        }
+
+        dragState = { nid, marker: m, axisDx, axisDz, startMcX: node.x, startMcZ: node.z };
         m.setStyle({ fillOpacity: 0.55, radius: 6.5 });
         m._path.style.cursor = 'grabbing';
       });
@@ -801,6 +819,38 @@ async function splitSegment() {
 // ——— Toolbar ———
 function initToolbar() {
   document.getElementById('tool-move').addEventListener('click', () => toggleTool('move'));
+  document.getElementById('tool-move').addEventListener('contextmenu', (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    const popup = document.getElementById('constrain-popup');
+    const moveBtn = document.getElementById('tool-move');
+    const toolbar = document.getElementById('toolbar');
+    const moveRect = moveBtn.getBoundingClientRect();
+    const tbRect = toolbar.getBoundingClientRect();
+    popup.style.top = (moveRect.top - tbRect.top) + 'px';
+    popup.classList.toggle('visible');
+  });
+  document.getElementById('constrain-btn').addEventListener('click', (e) => {
+    e.stopPropagation();
+    constrainDrag = !constrainDrag;
+    const btn = document.getElementById('constrain-btn');
+    if (constrainDrag) {
+      btn.classList.add('active');
+      btn.title = '延长';
+    } else {
+      btn.classList.remove('active');
+      btn.title = '自由拖动';
+    }
+    document.getElementById('constrain-popup').classList.remove('visible');
+  });
+  // Close popup on any outside click
+  document.addEventListener('click', (e) => {
+    const popup = document.getElementById('constrain-popup');
+    if (!popup.classList.contains('visible')) return;
+    if (!popup.contains(e.target) && e.target.id !== 'tool-move' && !document.getElementById('tool-move').contains(e.target)) {
+      popup.classList.remove('visible');
+    }
+  });
   document.getElementById('tool-point').addEventListener('click', () => toggleTool('point'));
   document.getElementById('tool-merge').addEventListener('click', () => toggleTool('merge'));
   document.getElementById('tool-undo').addEventListener('click', undo);

@@ -35,6 +35,27 @@ body { font-family:var(--font); background:var(--bg); color:var(--text-primary);
   transition:left 260ms cubic-bezier(0.22,1,0.36,1);
 }
 
+.constrain-popup {
+  position:absolute; left:100%;
+  display:none; align-items:center; justify-content:center;
+  width:28px; height:28px;
+  background:rgba(255,255,255,0.94);
+  backdrop-filter:blur(16px); -webkit-backdrop-filter:blur(16px);
+  border-radius:8px; box-shadow:var(--shadow-md);
+  border:1px solid rgba(0,0,0,0.08);
+  z-index:100;
+}
+.constrain-popup.visible { display:flex; }
+.constrain-btn {
+  width:22px; height:22px;
+  display:flex; align-items:center; justify-content:center;
+  border:none; background:none; border-radius:5px;
+  cursor:pointer; color:var(--text-secondary); font-size:12px;
+  transition:background 120ms, color 120ms;
+}
+.constrain-btn:hover { background:rgba(0,0,0,0.06); }
+.constrain-btn.active { background:var(--blue); color:#fff; }
+
 /* Toolbar — left sidebar */
 #toolbar {
   position:fixed; top:0; left:0; bottom:0; z-index:10;
@@ -221,6 +242,11 @@ button.danger:active { background:#B3201A; }
     <i class="fa-solid fa-arrows-up-down-left-right"></i>
     <span class="tool-label">移动</span>
   </button>
+  <div class="constrain-popup" id="constrain-popup">
+    <button class="constrain-btn active" id="constrain-btn" title="延长">
+      <i class="fa-solid fa-angle-up"></i>
+    </button>
+  </div>
   <button class="tool-btn" id="tool-point" title="描点">
     <i class="fa-solid fa-circle-plus"></i>
     <span class="tool-label">描点</span>
