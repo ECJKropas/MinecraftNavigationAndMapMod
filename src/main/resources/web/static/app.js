@@ -456,7 +456,7 @@ function selectNode(nid) {
   const node = roadStore.nodes[nid];
   if (!node) return;
   showEditor('node-editor');
-  document.getElementById('node-id').textContent = nid.substring(0, 8) + '...';
+  document.getElementById('node-id').textContent = nid.substring(0, 4) + '...' + nid.substring(nid.length - 4);
   document.getElementById('node-x').value = node.x;
   document.getElementById('node-z').value = node.z;
   document.getElementById('node-source').textContent = node.source;
