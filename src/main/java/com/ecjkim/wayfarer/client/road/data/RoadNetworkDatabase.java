@@ -33,6 +33,7 @@ import java.util.logging.Logger;
 
 import net.fabricmc.loader.api.FabricLoader;
 
+import com.ecjkim.wayfarer.client.WayfarerConfig;
 import com.ecjkim.wayfarer.client.road.model.CornerType;
 import com.ecjkim.wayfarer.client.road.model.Node;
 import com.ecjkim.wayfarer.client.road.model.Road;
@@ -126,7 +127,7 @@ public class RoadNetworkDatabase {
 
     public synchronized void removeNode(UUID id) {
         nodes.remove(id);
-        markDirty();
+        maybeCleanupOrphans();
     }
 
     /**
@@ -161,7 +162,7 @@ public class RoadNetworkDatabase {
             seg.setVersion(seg.getVersion() + 1);
         }
         nodes.remove(nodeToDeleteId);
-        markDirty();
+        maybeCleanupOrphans();
     }
 
     // ---------- Segment CRUD ----------
@@ -183,13 +184,56 @@ public class RoadNetworkDatabase {
             if (updated.getNodeIds() != null) {
                 existing.setNodeIds(updated.getNodeIds());
             }
-            markDirty();
+            maybeCleanupOrphans();
         }
     }
 
     public synchronized void removeSegment(UUID id) {
         segments.remove(id);
         markDirty();
+        maybeCleanupOrphans();
+    }
+
+    /**
+     * Removes nodes that are not referenced by any segment's nodeIds list. Honors the
+     * {@code WayfarerConfig.Generic.AUTO_DELETE_ORPHAN_NODES} toggle. Returns the number of nodes removed (0 if the
+     * feature is disabled).
+     */
+    public synchronized int removeOrphanNodes() {
+        if (!WayfarerConfig.getInstance().autoDeleteOrphanNodes) {
+            return 0;
+        }
+        java.util.Set<UUID> referenced = new java.util.HashSet<>();
+        for (Segment seg : segments.values()) {
+            List<UUID> ids = seg.getNodeIds();
+            if (ids != null) {
+                referenced.addAll(ids);
+            }
+        }
+        int removed = 0;
+        java.util.Iterator<java.util.Map.Entry<UUID, Node>> it = nodes.entrySet().iterator();
+        while (it.hasNext()) {
+            java.util.Map.Entry<UUID, Node> e = it.next();
+            if (!referenced.contains(e.getKey())) {
+                it.remove();
+                removed++;
+            }
+        }
+        if (removed > 0) {
+            markDirty();
+            LOGGER.log(Level.INFO, "Auto-removed {0} orphan node(s)", removed);
+        }
+        return removed;
+    }
+
+    /**
+     * Runs {@link #removeOrphanNodes()} only when the auto-delete toggle is enabled. Convenience no-op wrapper for use
+     * at the end of CRUD operations.
+     */
+    private void maybeCleanupOrphans() {
+        if (WayfarerConfig.getInstance().autoDeleteOrphanNodes) {
+            removeOrphanNodes();
+        }
     }
 
     // ---------- Road CRUD ----------
@@ -401,6 +445,7 @@ public class RoadNetworkDatabase {
         }
 
         markDirty();
+        maybeCleanupOrphans();
         return merged;
     }
 
@@ -437,6 +482,7 @@ public class RoadNetworkDatabase {
 
         segments.remove(segId);
         markDirty();
+        maybeCleanupOrphans();
         return Arrays.asList(left, right);
     }
 
@@ -484,6 +530,7 @@ public class RoadNetworkDatabase {
 
         segments.remove(segId);
         markDirty();
+        maybeCleanupOrphans();
         return newNode;
     }
 

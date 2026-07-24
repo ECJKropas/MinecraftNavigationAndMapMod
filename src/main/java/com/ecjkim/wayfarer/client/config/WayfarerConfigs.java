@@ -41,8 +41,11 @@ public class WayfarerConfigs {
         public static final ConfigDouble RDP_EPSILON =
             new ConfigDouble("rdpEpsilon", 1.0, 0.1, 100.0, "RDP 简化容差（格数），值越大简化越激进");
 
-        public static final ImmutableList<IConfigBase> OPTIONS =
-            ImmutableList.of(DEFAULT_CLASSIFICATION, AUTO_INTEGRAL, AUTO_SNAP_ENDPOINTS, RDP_EPSILON);
+        public static final ConfigBoolean AUTO_DELETE_ORPHAN_NODES =
+            new ConfigBoolean("autoDeleteOrphanNodes", true, "开启后每次增删改节点后自动删除没有路段连接的孤立节点");
+
+        public static final ImmutableList<IConfigBase> OPTIONS = ImmutableList.of(DEFAULT_CLASSIFICATION, AUTO_INTEGRAL,
+            AUTO_SNAP_ENDPOINTS, RDP_EPSILON, AUTO_DELETE_ORPHAN_NODES);
     }
 
     public static List<IConfigBase> getAllConfigs() {
