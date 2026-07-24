@@ -687,7 +687,12 @@ public class WayfarerHttpServer implements Runnable {
                 existing.setColor(body.get("color").getAsString());
             }
             if (body.has("classification")) {
-                existing.setClassification(body.get("classification").getAsString());
+                String cls = body.get("classification").getAsString();
+                // 归一化：旧数据可能存的是 "G国道" 这种多字符格式
+                if (cls.length() > 1 && cls.matches("^[GSXYC].*")) {
+                    cls = cls.substring(0, 1);
+                }
+                existing.setClassification(cls);
             }
             if (body.has("number")) {
                 existing.setNumber(body.get("number").getAsString());

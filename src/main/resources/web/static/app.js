@@ -298,7 +298,8 @@ function renderAll() {
   // Render road groups + labels
   for (const [rid, group] of Object.entries(roadGroups)) {
     const road = group.road;
-    const cls = road.classification || '';
+    const raw = road.classification || '';
+    const cls = raw.length > 1 && /^[GSXYC]/.test(raw) ? raw.charAt(0) : raw;
     const num = road.number || '';
     const styl = ROAD_STYLES[cls] || null;
     const isGorS = styl != null;
