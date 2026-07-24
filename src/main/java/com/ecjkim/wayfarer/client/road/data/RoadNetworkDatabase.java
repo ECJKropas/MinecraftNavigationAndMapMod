@@ -649,6 +649,38 @@ public class RoadNetworkDatabase {
     }
 
     /**
+     * Replaces all in-memory data with the given JSON snapshot and persists to disk. JSON format: {"nodes": [...],
+     * "segments": [...], "roads": [...]}
+     */
+    public synchronized void restoreFromJson(JsonObject root) {
+        nodes.clear();
+        segments.clear();
+        roads.clear();
+
+        if (root.has("nodes")) {
+            Type nodeListType = new TypeToken<List<Node>>() {}.getType();
+            List<Node> nodeList = GSON.fromJson(root.get("nodes"), nodeListType);
+            for (Node n : nodeList)
+                nodes.put(n.getId(), n);
+        }
+        if (root.has("segments")) {
+            Type segListType = new TypeToken<List<Segment>>() {}.getType();
+            List<Segment> segList = GSON.fromJson(root.get("segments"), segListType);
+            for (Segment s : segList)
+                segments.put(s.getId(), s);
+        }
+        if (root.has("roads")) {
+            Type roadListType = new TypeToken<List<Road>>() {}.getType();
+            List<Road> roadList = GSON.fromJson(root.get("roads"), roadListType);
+            for (Road r : roadList)
+                roads.put(r.getId(), r);
+        }
+
+        markDirty();
+        asyncSave();
+    }
+
+    /**
      * Loads the network from disk, replacing in-memory data.
      */
     public synchronized void loadFromDisk() {

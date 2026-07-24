@@ -10,6 +10,66 @@ let mergeFirstNodeId = null;   // first node selected in merge tool
 const TOOL_TOLERANCE_PX = 12;  // pixel tolerance for point tool segment detection
 const INTERSECTION_SNAP_PX = 15;  // pixel tolerance for intersection snapping in point tool
 
+// ——— Undo / Redo ———
+let undoStack = [];
+let redoStack = [];
+const MAX_UNDO = 50;
+
+function snapshotStore() {
+  return JSON.stringify({
+    nodes: Object.values(roadStore.nodes),
+    segments: Object.values(roadStore.segments),
+    roads: Object.values(roadStore.roads)
+  });
+}
+
+function pushUndo() {
+  const snap = snapshotStore();
+  // Avoid consecutive identical snapshots
+  if (undoStack.length > 0 && undoStack[undoStack.length - 1] === snap) return;
+  undoStack.push(snap);
+  if (undoStack.length > MAX_UNDO) undoStack.shift();
+  redoStack = [];  // new action clears redo history
+  undoButtonStyle();
+}
+
+async function undo() {
+  if (undoStack.length === 0) return;
+  redoStack.push(snapshotStore());
+  const snap = undoStack.pop();
+  await fetch('/api/roads/restore', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: snap
+  });
+  clearSelection();
+  mergeFirstNodeId = null;
+  await loadData();
+  undoButtonStyle();
+}
+
+async function redo() {
+  if (redoStack.length === 0) return;
+  undoStack.push(snapshotStore());
+  const snap = redoStack.pop();
+  await fetch('/api/roads/restore', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: snap
+  });
+  clearSelection();
+  mergeFirstNodeId = null;
+  await loadData();
+  undoButtonStyle();
+}
+
+function undoButtonStyle() {
+  const ub = document.getElementById('tool-undo');
+  const rb = document.getElementById('tool-redo');
+  if (ub) ub.style.opacity = undoStack.length === 0 ? '0.35' : '';
+  if (rb) rb.style.opacity = redoStack.length === 0 ? '0.35' : '';
+}
+
 // ——— Toast ———
 function showToast(msg, type) {
   const t = document.createElement('div');
@@ -437,6 +497,7 @@ function onNodeDragEnd(nid, marker) {
   const z = latlng.lat * SCALE;
   const node = roadStore.nodes[nid];
   if (!node) return;
+  pushUndo();
   fetch('/api/nodes/' + nid, {
     method: 'PUT',
     headers: { 'Content-Type': 'application/json' },
@@ -505,6 +566,7 @@ async function saveNode() {
   const x = parseFloat(document.getElementById('node-x').value);
   const z = parseFloat(document.getElementById('node-z').value);
   try {
+    pushUndo();
     const res = await fetch('/api/nodes/' + nid, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
@@ -525,6 +587,7 @@ async function deleteNode() {
   showSheet('删除节点', '此操作将级联删除关联路段，确定要删除吗？', [
     { label: '取消', role: 'cancel' },
     { label: '删除', role: 'destructive', action: async () => {
+        pushUndo();
         const res = await fetch('/api/nodes/' + nid, { method: 'DELETE' });
         if (res.ok) { clearSelection(); loadData(); showToast('节点已删除'); }
         else showToast('删除失败', 'error');
@@ -539,6 +602,7 @@ async function deleteSegment() {
   showSheet('删除路段', '确定要删除此路段吗？', [
     { label: '取消', role: 'cancel' },
     { label: '删除', role: 'destructive', action: async () => {
+        pushUndo();
         const res = await fetch('/api/segments/' + sid, { method: 'DELETE' });
         if (res.ok) { clearSelection(); loadData(); showToast('路段已删除'); }
         else showToast('删除失败', 'error');
@@ -557,6 +621,7 @@ async function saveRoad() {
   const roadId = seg.roadId;
   if (roadId) {
     const road = roadStore.roads[roadId];
+    pushUndo();
     const res = await fetch('/api/roads/' + roadId, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
@@ -576,6 +641,7 @@ async function saveRoad() {
 
 async function mergeSegments() {
   if (selectedSegments.size < 2) return;
+  pushUndo();
   const res = await fetch('/api/merge', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -595,6 +661,7 @@ async function splitSegment() {
     if (idx >= 1 && idx < seg.nodeIds.length - 1) { targetSeg = seg; nodeIdx = idx; break; }
   }
   if (!targetSeg) { showToast('未找到可拆分的路段（节点需位于路段中间）', 'error'); return; }
+  pushUndo();
   const res = await fetch('/api/split/' + targetSeg.id, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -609,7 +676,10 @@ function initToolbar() {
   document.getElementById('tool-move').addEventListener('click', () => toggleTool('move'));
   document.getElementById('tool-point').addEventListener('click', () => toggleTool('point'));
   document.getElementById('tool-merge').addEventListener('click', () => toggleTool('merge'));
+  document.getElementById('tool-undo').addEventListener('click', undo);
+  document.getElementById('tool-redo').addEventListener('click', redo);
   document.getElementById('tool-mode-toggle').addEventListener('click', toggleToolbarMode);
+  undoButtonStyle();
 }
 
 function toggleTool(tool) {
@@ -759,6 +829,7 @@ async function insertNodeOnSegment(segId, insertIndex, latlng) {
   const x = latlng.lng * SCALE;
   const z = latlng.lat * SCALE;
   try {
+    pushUndo();
     const res = await fetch('/api/segments/' + segId + '/insert', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -786,6 +857,7 @@ async function insertNodeAtIntersection(data) {
   const segB = roadStore.segments[data.segmentIdB];
   if (!segA || !segB) return;
   try {
+    pushUndo();
     const res = await fetch('/api/segments/intersection', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -833,6 +905,7 @@ async function handleMergeTool(nid) {
   }
 
   try {
+    pushUndo();
     const res = await fetch('/api/nodes/merge', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -856,3 +929,14 @@ async function handleMergeTool(nid) {
 }
 
 window.addEventListener('load', () => { initToolbar(); initMap(); });
+
+document.addEventListener('keydown', e => {
+  if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
+  if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key.toLowerCase() === 'z') {
+    e.preventDefault();
+    redo();
+  } else if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'z') {
+    e.preventDefault();
+    undo();
+  }
+});

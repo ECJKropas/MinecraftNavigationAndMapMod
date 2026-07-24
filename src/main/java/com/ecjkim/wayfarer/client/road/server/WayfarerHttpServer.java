@@ -94,6 +94,7 @@ public class WayfarerHttpServer implements Runnable {
         routes.add(new Route("POST", Pattern.compile("/api/segments/([0-9a-f-]+)/insert"), this::handleInsertNode));
         routes.add(new Route("PATCH", Pattern.compile("/api/roads/([0-9a-f-]+)"), this::handleUpdateRoad));
         routes.add(new Route("DELETE", Pattern.compile("/api/roads/([0-9a-f-]+)"), this::handleDeleteRoad));
+        routes.add(new Route("POST", "/api/roads/restore", this::handleRestoreRoads));
     }
 
     // -------- Server lifecycle --------
@@ -725,6 +726,21 @@ public class WayfarerHttpServer implements Runnable {
         database.removeRoad(id);
         database.saveToDisk();
         sendJson(req.exchange, 200, okJson("Road deleted"));
+    }
+
+    /**
+     * POST /api/roads/restore Replaces the entire in-memory road network with the given JSON snapshot.
+     */
+    private void handleRestoreRoads(Request req) {
+        try {
+            String raw = new String(req.exchange.getRequestBody().readAllBytes(), StandardCharsets.UTF_8);
+            JsonObject body = JsonParser.parseString(raw).getAsJsonObject();
+            database.restoreFromJson(body);
+            sendJson(req.exchange, 200, okJson("Restored"));
+        } catch (Exception e) {
+            LOGGER.log(Level.WARNING, "Restore failed: {0}", e.getMessage());
+            sendJson(req.exchange, 400, errorJson("Invalid snapshot: " + e.getMessage()));
+        }
     }
 
     // -------- Response helpers --------
