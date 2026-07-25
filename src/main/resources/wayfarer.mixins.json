@@ -4,9 +4,7 @@
   "package": "com.ecjkim.wayfarer.client.mixin",
   "compatibilityLevel": "JAVA_17",
   "refmap": "wayfarer.refmap.json",
-  "client": [
-    "MixinGuiTextFieldGeneric"
-  ],
+  "client": [],
   "injectors": {
     "defaultRequire": 1
   }
