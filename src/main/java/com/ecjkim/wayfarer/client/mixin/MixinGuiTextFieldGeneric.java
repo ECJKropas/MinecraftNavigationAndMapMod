@@ -38,7 +38,7 @@ public abstract class MixinGuiTextFieldGeneric extends EditBox {
         super(null, 0, 0, 0, 0, message);
     }
 
-    @Inject(method = "setCursorPosition", at = @At("HEAD"), cancellable = true)
+    @Inject(method = "setCursorPosition", at = @At("HEAD"), cancellable = true, remap = false)
     private void wayfarer$fixSetCursorPosition(int pos, CallbackInfo ci) {
         // Bypass malilib's moveCursorTo, call vanilla EditBox.setCursorPosition directly.
         // super.setCursorPosition does NOT use virtual dispatch, so it hits EditBox directly.
