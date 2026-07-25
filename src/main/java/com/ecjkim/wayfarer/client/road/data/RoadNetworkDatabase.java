@@ -441,7 +441,7 @@ public class RoadNetworkDatabase {
         Road road1 = findRoadForSegment(s1.getId());
         Road road2 = findRoadForSegment(s2.getId());
 
-        Segment merged = new Segment(UUID.randomUUID(), mergedIds, null, null, null, 1);
+        Segment merged = new Segment(UUID.randomUUID(), mergedIds, null, s1.getSource(), s1.getStatus(), 1);
         segments.put(merged.getId(), merged);
 
         if (road1 != null && road2 != null && road1.getId().equals(road2.getId())) {
@@ -1299,8 +1299,8 @@ public class RoadNetworkDatabase {
 
             JsonObject props = new JsonObject();
             props.addProperty("id", segment.getId().toString());
-            props.addProperty("source", segment.getSource().name());
-            props.addProperty("status", segment.getStatus().name());
+            props.addProperty("source", segment.getSource() != null ? segment.getSource().name() : null);
+            props.addProperty("status", segment.getStatus() != null ? segment.getStatus().name() : null);
             props.addProperty("version", segment.getVersion());
             if (segment.getRoadId() != null) {
                 props.addProperty("roadId", segment.getRoadId().toString());
