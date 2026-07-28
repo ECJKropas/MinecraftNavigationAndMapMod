@@ -28,6 +28,7 @@ import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.client.resources.language.I18n;
 import net.minecraft.network.chat.Component;
 
+import com.ecjkim.wayfarer.client.WayfarerConfig;
 import com.ecjkim.wayfarer.client.road.data.RoadNetworkDatabase;
 import com.ecjkim.wayfarer.client.road.model.Road;
 import com.ecjkim.wayfarer.client.road.model.Segment;
@@ -58,6 +59,15 @@ public class RoadMetadataScreen extends Screen {
 
     @Override
     protected void init() {
+        // Initialize classification from config default
+        String defaultCls = WayfarerConfig.getInstance().defaultClassification;
+        if (defaultCls != null && !defaultCls.isEmpty()) {
+            int idx = CLASSIFICATIONS.indexOf(defaultCls);
+            if (idx >= 0) {
+                classificationIndex = idx;
+            }
+        }
+
         int centerX = this.width / 2;
         int left = centerX - PANEL_WIDTH / 2;
         int top = this.height / 2 - PANEL_HEIGHT / 2;

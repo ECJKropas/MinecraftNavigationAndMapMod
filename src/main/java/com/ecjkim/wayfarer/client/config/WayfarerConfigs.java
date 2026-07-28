@@ -24,14 +24,15 @@ import fi.dy.masa.malilib.config.IConfigBase;
 import fi.dy.masa.malilib.config.options.ConfigBoolean;
 import fi.dy.masa.malilib.config.options.ConfigDouble;
 import fi.dy.masa.malilib.config.options.ConfigInteger;
+import fi.dy.masa.malilib.config.options.ConfigOptionList;
 import fi.dy.masa.malilib.config.options.ConfigString;
 
 public class WayfarerConfigs {
     public static final int CURRENT_VERSION = 1;
 
     public static class Generic {
-        public static final ConfigString DEFAULT_CLASSIFICATION =
-            new ConfigString("defaultClassification", "", "新建道路时默认使用的分级代码，如 G国道、S省道");
+        public static final ConfigOptionList DEFAULT_CLASSIFICATION =
+            new ConfigOptionList("defaultClassification", ClassificationEntry.NONE, "新建道路时默认使用的分级代码");
 
         public static final ConfigBoolean AUTO_INTEGRAL =
             new ConfigBoolean("autoIntegral", true, "录制道路时是否自动将节点坐标取整（三轴均舍入到整数），默认开启");

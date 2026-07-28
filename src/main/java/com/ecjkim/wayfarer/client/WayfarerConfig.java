@@ -42,7 +42,8 @@ public class WayfarerConfig {
     public final double nodeIndicatorBeamAlpha;
 
     private WayfarerConfig() {
-        this.defaultClassification = WayfarerConfigs.Generic.DEFAULT_CLASSIFICATION.getStringValue();
+        this.defaultClassification =
+            WayfarerConfigs.Generic.DEFAULT_CLASSIFICATION.getOptionListValue().getStringValue();
         this.autoIntegral = WayfarerConfigs.Generic.AUTO_INTEGRAL.getBooleanValue();
         this.autoSnapEndpoints = WayfarerConfigs.Generic.AUTO_SNAP_ENDPOINTS.getBooleanValue();
         this.rdpEpsilon = WayfarerConfigs.Generic.RDP_EPSILON.getDoubleValue();
