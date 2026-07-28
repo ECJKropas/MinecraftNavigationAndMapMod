@@ -20,8 +20,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
- * 26.x stub: fabric-rendering-v1 25.x removed WorldRenderEvents.
- * 3D node indicator rendering is not available for 26.x.
+ * 26.x stub: fabric-rendering-v1 25.x removed WorldRenderEvents. 3D node indicator rendering is not available for 26.x.
  */
 public final class NodeIndicatorRenderer {
     private static final Logger LOGGER = LoggerFactory.getLogger("Wayfarer|NodeIndicator");

@@ -24,6 +24,8 @@ import net.fabricmc.api.ClientModInitializer;
 import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientLifecycleEvents;
 import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientTickEvents;
 
+import com.ecjkim.wayfarer.client.render.NodeIndicatorRenderer;
+import com.ecjkim.wayfarer.client.render.SurveyHud;
 import com.ecjkim.wayfarer.client.road.RoadMetadataScreen;
 import com.ecjkim.wayfarer.client.road.RoadRecordingManager;
 import com.ecjkim.wayfarer.client.road.XaeroMapOverlay;
@@ -31,8 +33,6 @@ import com.ecjkim.wayfarer.client.road.data.RoadNetworkDatabase;
 import com.ecjkim.wayfarer.client.road.model.Segment;
 import com.ecjkim.wayfarer.client.road.record.SurveySession;
 import com.ecjkim.wayfarer.client.road.server.WayfarerHttpServer;
-import com.ecjkim.wayfarer.client.render.NodeIndicatorRenderer;
-import com.ecjkim.wayfarer.client.render.SurveyHud;
 
 import org.lwjgl.glfw.GLFW;
 
@@ -48,6 +48,7 @@ public class WayfarerClient implements ClientModInitializer {
     private final IntSet keysDownLastTick = new IntOpenHashSet();
     private boolean hadToolLastTick = false;
     private volatile double pendingScrollDelta;
+    private boolean worldInitialized = false;
 
     public static SurveySession getSurveySession() {
         return SURVEY_SESSION;
@@ -55,7 +56,6 @@ public class WayfarerClient implements ClientModInitializer {
 
     @Override
     public void onInitializeClient() {
-        RoadNetworkDatabase.getInstance().loadFromDisk();
         startHttpServer();
 
         XaeroMapOverlay.register();
@@ -92,7 +92,31 @@ public class WayfarerClient implements ClientModInitializer {
 
     public static void reloadHotkeys() {}
 
+    /**
+     * Determines the world key for the current context and switches the road network database to the corresponding
+     * per-world storage file.
+     */
+    private void initForWorld(Minecraft client) {
+        String worldKey;
+        if (client.getSingleplayerServer() != null) {
+            worldKey = client.getSingleplayerServer().getWorldData().getLevelName();
+        } else if (client.getCurrentServer() != null) {
+            worldKey = client.getCurrentServer().ip;
+        } else {
+            worldKey = "default";
+        }
+        RoadNetworkDatabase.getInstance().setWorldKey(worldKey);
+    }
+
     private void handleClientTick(Minecraft client) {
+        // Detect world join to switch storage to the per-world file
+        if (client.level != null && !worldInitialized) {
+            initForWorld(client);
+            worldInitialized = true;
+        } else if (client.level == null) {
+            worldInitialized = false;
+        }
+
         if (client.gui.screen() != null) {
             keysDownLastTick.clear();
             ROAD_MANAGER.tick(client);

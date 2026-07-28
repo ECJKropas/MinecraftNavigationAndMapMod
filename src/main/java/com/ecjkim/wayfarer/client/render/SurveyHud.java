@@ -16,6 +16,8 @@
  */
 package com.ecjkim.wayfarer.client.render;
 
+import java.util.UUID;
+
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphics;
 
@@ -29,16 +31,18 @@ import com.ecjkim.wayfarer.client.road.model.Node;
 import com.ecjkim.wayfarer.client.road.record.SurveySession;
 import com.ecjkim.wayfarer.client.road.record.SurveySession.State;
 
-import java.util.UUID;
-
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
  * Renders a Survey-mode HUD overlay at the bottom-left of the screen.
  *
- * <p>IDLE: "Survey Ready | [SHARP]"</p>
- * <p>RECORDING: "REC Survey  |  ⌂ 5 nodes |  132.4 m  |  [SHARP]"</p>
+ * <p>
+ * IDLE: "Survey Ready | [SHARP]"
+ * </p>
+ * <p>
+ * RECORDING: "REC Survey | ⌂ 5 nodes | 132.4 m | [SHARP]"
+ * </p>
  */
 public final class SurveyHud {
     private static final Logger LOGGER = LoggerFactory.getLogger("Wayfarer|SurveyHUD");
@@ -77,17 +81,15 @@ public final class SurveyHud {
         int y = client.getWindow().getGuiScaledHeight() - 15;
 
         if (state == State.IDLE) {
-            String text = "Survey Ready | ["
-                + session.getCurrentCornerType().name() + "]";
+            String text = "Survey Ready | [" + session.getCurrentCornerType().name() + "]";
             graphics.drawString(client.font, text, HUD_X, y, GRAY);
         } else if (state == State.RECORDING) {
             int nodeCount = session.getNodeCount();
             double totalDist = computeTotalDistance(client, session);
 
             String cornerName = session.getCurrentCornerType().name();
-            String text = "REC Survey  |  " + "⌂ " + nodeCount + " nodes  |  "
-                + String.format("%.1f", totalDist) + " m  |  ["
-                + cornerName + "]";
+            String text = "REC Survey  |  " + "⌂ " + nodeCount + " nodes  |  " + String.format("%.1f", totalDist)
+                + " m  |  [" + cornerName + "]";
 
             int segLen = text.length() - cornerName.length() - 2; // -2 for []
             int cornerStart = text.indexOf('[');

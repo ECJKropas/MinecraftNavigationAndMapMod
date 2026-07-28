@@ -23,6 +23,13 @@ import net.minecraft.client.Minecraft;
 import net.minecraft.client.renderer.GameRenderer;
 import net.minecraft.core.BlockPos;
 
+import com.mojang.blaze3d.systems.RenderSystem;
+import com.mojang.blaze3d.vertex.BufferBuilder;
+import com.mojang.blaze3d.vertex.BufferUploader;
+import com.mojang.blaze3d.vertex.DefaultVertexFormat;
+import com.mojang.blaze3d.vertex.Tesselator;
+import com.mojang.blaze3d.vertex.VertexFormat;
+
 import net.fabricmc.fabric.api.client.rendering.v1.WorldRenderContext;
 import net.fabricmc.fabric.api.client.rendering.v1.WorldRenderEvents;
 
@@ -31,20 +38,12 @@ import com.ecjkim.wayfarer.client.WayfarerConfig;
 import com.ecjkim.wayfarer.client.road.data.RoadNetworkDatabase;
 import com.ecjkim.wayfarer.client.road.model.Node;
 
-import com.mojang.blaze3d.systems.RenderSystem;
-import com.mojang.blaze3d.vertex.BufferBuilder;
-import com.mojang.blaze3d.vertex.BufferUploader;
-import com.mojang.blaze3d.vertex.DefaultVertexFormat;
-import com.mojang.blaze3d.vertex.Tesselator;
-import com.mojang.blaze3d.vertex.VertexFormat;
-
 import org.joml.Matrix4f;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
- * Renders translucent beams above road network nodes when the player
- * holds the Survey tool item.
+ * Renders translucent beams above road network nodes when the player holds the Survey tool item.
  */
 public final class NodeIndicatorRenderer {
     private static final Logger LOGGER = LoggerFactory.getLogger("Wayfarer|NodeIndicator");
@@ -78,8 +77,8 @@ public final class NodeIndicatorRenderer {
         double camY = ctx.camera().getPosition().y;
         double camZ = ctx.camera().getPosition().z;
 
-        float beamHeight = (float) config.nodeIndicatorBeamHeight;
-        float beamAlpha = (float) config.nodeIndicatorBeamAlpha;
+        float beamHeight = (float)config.nodeIndicatorBeamHeight;
+        float beamAlpha = (float)config.nodeIndicatorBeamAlpha;
 
         RenderSystem.enableBlend();
         RenderSystem.defaultBlendFunc();
@@ -87,9 +86,9 @@ public final class NodeIndicatorRenderer {
         RenderSystem.setShader(GameRenderer::getPositionColorShader);
 
         for (Node node : allNodes) {
-            int bx = (int) Math.floor(node.getX());
-            int by = (int) Math.floor(node.getY());
-            int bz = (int) Math.floor(node.getZ());
+            int bx = (int)Math.floor(node.getX());
+            int by = (int)Math.floor(node.getY());
+            int bz = (int)Math.floor(node.getZ());
             BlockPos pos = new BlockPos(bx, by, bz);
 
             if (!seen.add(pos))
@@ -110,13 +109,13 @@ public final class NodeIndicatorRenderer {
         RenderSystem.disableBlend();
     }
 
-    private static void renderBeam(double cx, double cy, double cz, float height, float alpha,
-        float r, float g, float b, double camX, double camY, double camZ) {
+    private static void renderBeam(double cx, double cy, double cz, float height, float alpha, float r, float g,
+        float b, double camX, double camY, double camZ) {
 
         float hw = 0.15f;
 
         Matrix4f matrix = new Matrix4f();
-        matrix.translate((float) (cx - camX), (float) (cy - camY), (float) (cz - camZ));
+        matrix.translate((float)(cx - camX), (float)(cy - camY), (float)(cz - camZ));
 
         Tesselator tess = Tesselator.getInstance();
         BufferBuilder builder = tess.getBuilder();

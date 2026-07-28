@@ -17,8 +17,7 @@
 package com.ecjkim.wayfarer.client.mixin;
 
 /**
- * In 26.x, MouseHandler.onScroll() no longer exists. Ctrl+scroll corner type
- * switching is handled via GLFW scroll callback in WayfarerClient instead.
+ * In 26.x, MouseHandler.onScroll() no longer exists. Ctrl+scroll corner type switching is handled via GLFW scroll
+ * callback in WayfarerClient instead.
  */
-public abstract class MouseScrollMixin {
-}
+public abstract class MouseScrollMixin {}

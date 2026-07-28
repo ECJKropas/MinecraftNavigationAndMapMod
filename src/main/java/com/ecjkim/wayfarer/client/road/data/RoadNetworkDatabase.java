@@ -66,11 +66,13 @@ public class RoadNetworkDatabase {
     private final ConcurrentHashMap<UUID, Segment> segments = new ConcurrentHashMap<>();
     private final ConcurrentHashMap<UUID, Road> roads = new ConcurrentHashMap<>();
 
-    private final Path savePath;
+    private Path savePath;
+    private String worldKey;
     private volatile boolean dirty;
 
     private RoadNetworkDatabase() {
         savePath = FabricLoader.getInstance().getConfigDir().resolve("wayfarer/roads.json");
+        worldKey = null;
     }
 
     /**
@@ -88,6 +90,70 @@ public class RoadNetworkDatabase {
             }
         }
         return result;
+    }
+
+    /**
+     * Switches the backing file to {@code config/wayfarer/{worldKey}/roads.json}. Migrates legacy data from
+     * {@code config/wayfarer/roads.json} (once), creates the target directory, and calls {@link #loadFromDisk()}.
+     */
+    public synchronized void setWorldKey(String worldKey) {
+        if (worldKey == null || worldKey.isEmpty()) {
+            worldKey = "default";
+        }
+        if (worldKey.equals(this.worldKey)) {
+            return;
+        }
+        this.worldKey = worldKey;
+
+        Path legacyPath = FabricLoader.getInstance().getConfigDir().resolve("wayfarer/roads.json");
+        Path newDir = FabricLoader.getInstance().getConfigDir().resolve("wayfarer").resolve(worldKey);
+        this.savePath = newDir.resolve("roads.json");
+
+        try {
+            Files.createDirectories(newDir);
+        } catch (IOException e) {
+            LOGGER.log(Level.SEVERE, "Failed to create directory for world key {0}: {1}",
+                new Object[] {worldKey, e.getMessage()});
+            return;
+        }
+
+        migrateFromLegacy(legacyPath);
+        loadFromDisk();
+    }
+
+    /** Returns the current world key, or null if not yet set. */
+    public String getWorldKey() {
+        return worldKey;
+    }
+
+    /**
+     * If legacy {@code config/wayfarer/roads.json} exists and contains data, copies its content to the current
+     * {@code savePath}. Does not delete the legacy file.
+     */
+    private void migrateFromLegacy(Path legacyPath) {
+        if (!Files.exists(legacyPath)) {
+            return;
+        }
+        if (legacyPath.toAbsolutePath().normalize().equals(this.savePath.toAbsolutePath().normalize())) {
+            return; // already at legacy path — nothing to migrate
+        }
+        try {
+            String json = Files.readString(legacyPath, StandardCharsets.UTF_8);
+            JsonObject root = GSON.fromJson(json, JsonObject.class);
+            if (root == null) {
+                return;
+            }
+            boolean hasData = (root.has("nodes") && root.get("nodes").getAsJsonArray().size() > 0)
+                || (root.has("segments") && root.get("segments").getAsJsonArray().size() > 0)
+                || (root.has("roads") && root.get("roads").getAsJsonArray().size() > 0);
+            if (hasData && !Files.exists(this.savePath)) {
+                Files.writeString(this.savePath, json, StandardCharsets.UTF_8);
+                LOGGER.log(Level.INFO, "Migrated legacy road data from {0} to {1}",
+                    new Object[] {legacyPath, this.savePath});
+            }
+        } catch (IOException e) {
+            LOGGER.log(Level.WARNING, "Failed to migrate legacy road data: {0}", e.getMessage());
+        }
     }
 
     // ---------- Node CRUD ----------

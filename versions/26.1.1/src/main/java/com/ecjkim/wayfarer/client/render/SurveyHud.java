@@ -16,15 +16,6 @@
  */
 package com.ecjkim.wayfarer.client.render;
 
-import net.minecraft.client.Minecraft;
-import net.minecraft.client.gui.GuiGraphicsExtractor;
-
-import com.ecjkim.wayfarer.client.ToolItemManager;
-import com.ecjkim.wayfarer.client.WayfarerClient;
-import com.ecjkim.wayfarer.client.WayfarerConfig;
-import com.ecjkim.wayfarer.client.road.record.SurveySession;
-import com.ecjkim.wayfarer.client.road.record.SurveySession.State;
-
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 

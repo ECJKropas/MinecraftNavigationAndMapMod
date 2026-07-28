@@ -320,9 +320,8 @@ public class SurveySession {
             double py = ay + (by - ay) * t;
             double pz = az + (bz - az) * t;
 
-            client.particleEngine.createParticle(
-                net.minecraft.core.particles.ParticleTypes.END_ROD,
-                px, py, pz, 0, 0.01, 0);
+            client.particleEngine.createParticle(net.minecraft.core.particles.ParticleTypes.END_ROD, px, py, pz, 0,
+                0.01, 0);
         }
     }
 
