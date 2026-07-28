@@ -60,6 +60,7 @@ public class SurveySession {
     private CornerType currentCornerType = CornerType.SHARP;
     private Vec3 lastNodePos;
     private Segment pendingSegment;
+    private int particleTickCounter;
 
     private final IntSet mouseButtonDownLastTick = new IntOpenHashSet();
 
@@ -77,6 +78,10 @@ public class SurveySession {
 
     public int getNodeCount() {
         return nodeIds.size();
+    }
+
+    public List<UUID> getNodeIds() {
+        return nodeIds;
     }
 
     // ---- Corner type cycling ----
@@ -109,6 +114,7 @@ public class SurveySession {
                 client.player.displayClientMessage(Component.literal("工具已离手，Survey 录制暂停。"), false);
                 return;
             }
+            spawnPathParticles(client);
             processMouseClicks(client, window);
         }
     }
@@ -313,10 +319,15 @@ public class SurveySession {
     // ---- Tool detection (called from WayfarerClient tick) ----
 
     /**
-     * Called when the player picks up the tool while not recording. Resumes a paused session.
+     * Called when the player picks up the tool. Resumes a paused session if applicable.
      */
     public void onToolPickedUp(LocalPlayer player) {
-        if (state == State.IDLE) {
+        particleTickCounter = 0;
+        if (!nodeIds.isEmpty()) {
+            // Resume paused recording
+            state = State.RECORDING;
+            player.displayClientMessage(Component.literal("工具已切回，Survey 录制继续 (" + nodeIds.size() + " 个节点)"), false);
+        } else if (state == State.IDLE) {
             player.displayClientMessage(Component.literal("Survey 工具就绪，左键点击空地开始录制。"), false);
         }
     }
@@ -330,5 +341,39 @@ public class SurveySession {
         currentCornerType = CornerType.SHARP;
         pendingSegment = null;
         mouseButtonDownLastTick.clear();
+        particleTickCounter = 0;
+    }
+
+    // ---- Particle path ----
+
+    private void spawnPathParticles(Minecraft client) {
+        if (nodeIds.size() < 2)
+            return;
+        particleTickCounter++;
+        if (particleTickCounter % 5 != 0)
+            return;
+
+        RoadNetworkDatabase db = RoadNetworkDatabase.getInstance();
+        // Pick a random adjacent pair from nodeIds and spawn particles along the line
+        int segIndex = (particleTickCounter / 5) % (nodeIds.size() - 1);
+        Node a = db.getNode(nodeIds.get(segIndex));
+        Node b = db.getNode(nodeIds.get(segIndex + 1));
+        if (a == null || b == null)
+            return;
+
+        double ax = a.getX(), ay = a.getY(), az = a.getZ();
+        double bx = b.getX(), by = b.getY(), bz = b.getZ();
+
+        // Spawn 2-3 particles per pulse, at random positions along the line
+        int count = 2 + client.level.random.nextInt(2);
+        for (int i = 0; i < count; i++) {
+            double t = client.level.random.nextDouble();
+            double px = ax + (bx - ax) * t;
+            double py = ay + (by - ay) * t + 1.2;
+            double pz = az + (bz - az) * t;
+            client.particleEngine.createParticle(
+                net.minecraft.core.particles.ParticleTypes.END_ROD,
+                px, py, pz, 0, 0.01, 0);
+        }
     }
 }

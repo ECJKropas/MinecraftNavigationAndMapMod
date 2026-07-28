@@ -31,6 +31,8 @@ import com.ecjkim.wayfarer.client.road.data.RoadNetworkDatabase;
 import com.ecjkim.wayfarer.client.road.model.Segment;
 import com.ecjkim.wayfarer.client.road.record.SurveySession;
 import com.ecjkim.wayfarer.client.road.server.WayfarerHttpServer;
+import com.ecjkim.wayfarer.client.render.NodeIndicatorRenderer;
+import com.ecjkim.wayfarer.client.render.SurveyHud;
 
 import org.lwjgl.glfw.GLFW;
 
@@ -59,6 +61,8 @@ public class WayfarerClient implements ClientModInitializer {
         startHttpServer();
 
         XaeroMapOverlay.register();
+        NodeIndicatorRenderer.register();
+        SurveyHud.register();
         ClientLifecycleEvents.CLIENT_STOPPING.register(client -> {
             stopHttpServer();
             RoadNetworkDatabase.getInstance().saveToDisk();

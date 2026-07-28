@@ -52,6 +52,7 @@ public class SurveySession {
     private CornerType currentCornerType = CornerType.SHARP;
     private Vec3 lastNodePos;
     private Segment pendingSegment;
+    private int particleTickCounter;
 
     private final IntSet mouseButtonDownLastTick = new IntOpenHashSet();
 
@@ -69,6 +70,10 @@ public class SurveySession {
 
     public int getNodeCount() {
         return nodeIds.size();
+    }
+
+    public List<UUID> getNodeIds() {
+        return nodeIds;
     }
 
     public void cycleCornerTypeNext() {
@@ -96,6 +101,7 @@ public class SurveySession {
                 return;
             }
             processMouseClicks(client, window);
+            spawnPathParticles(client);
         }
     }
 
@@ -285,6 +291,38 @@ public class SurveySession {
     public void onToolPickedUp(LocalPlayer player) {
         if (state == State.IDLE) {
             player.sendSystemMessage(Component.literal("Survey 工具就绪，左键点击空地开始录制。"));
+        } else {
+            state = State.RECORDING;
+            player.sendSystemMessage(Component.literal("工具已切回，Survey 录制继续。"));
+        }
+        particleTickCounter = 0;
+    }
+
+    private void spawnPathParticles(Minecraft client) {
+        if (nodeIds.size() < 2)
+            return;
+        particleTickCounter++;
+        if (particleTickCounter % 5 != 0)
+            return;
+
+        RoadNetworkDatabase db = RoadNetworkDatabase.getInstance();
+        for (int i = 0; i < nodeIds.size() - 1; i++) {
+            Node a = db.getNode(nodeIds.get(i));
+            Node b = db.getNode(nodeIds.get(i + 1));
+            if (a == null || b == null)
+                continue;
+
+            double ax = a.getX(), ay = a.getY() + 1.0, az = a.getZ();
+            double bx = b.getX(), by = b.getY() + 1.0, bz = b.getZ();
+
+            double t = client.player.getRandom().nextDouble();
+            double px = ax + (bx - ax) * t;
+            double py = ay + (by - ay) * t;
+            double pz = az + (bz - az) * t;
+
+            client.particleEngine.createParticle(
+                net.minecraft.core.particles.ParticleTypes.END_ROD,
+                px, py, pz, 0, 0.01, 0);
         }
     }
 
@@ -296,5 +334,6 @@ public class SurveySession {
         currentCornerType = CornerType.SHARP;
         pendingSegment = null;
         mouseButtonDownLastTick.clear();
+        particleTickCounter = 0;
     }
 }

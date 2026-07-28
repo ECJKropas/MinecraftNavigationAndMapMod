@@ -773,6 +773,19 @@ public class RoadNetworkDatabase {
     }
 
     /**
+     * Returns how many segments reference the given node.
+     */
+    public int getSegmentCountForNode(UUID nodeId) {
+        int count = 0;
+        for (Segment seg : segments.values()) {
+            if (seg.getNodeIds() != null && seg.getNodeIds().contains(nodeId)) {
+                count++;
+            }
+        }
+        return count;
+    }
+
+    /**
      * Returns an unmodifiable collection of all Roads (snapshot).
      */
     public java.util.Collection<Road> getRoads() {

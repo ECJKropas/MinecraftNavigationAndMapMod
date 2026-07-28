@@ -37,6 +37,9 @@ public class WayfarerConfig {
     // Non-final — mutable at runtime via setToolItem / setHeldItemAsTool
     public String toolItem;
     public boolean toolItemEnabled;
+    public final boolean nodeIndicatorEnabled;
+    public final double nodeIndicatorBeamHeight;
+    public final double nodeIndicatorBeamAlpha;
 
     private WayfarerConfig() {
         this.defaultClassification = WayfarerConfigs.Generic.DEFAULT_CLASSIFICATION.getStringValue();
@@ -47,6 +50,9 @@ public class WayfarerConfig {
         this.autoGraphify = WayfarerConfigs.Generic.AUTO_GRAPHIFY.getBooleanValue();
         this.toolItem = WayfarerConfigs.Generic.TOOL_ITEM.getStringValue();
         this.toolItemEnabled = WayfarerConfigs.Generic.TOOL_ITEM_ENABLED.getBooleanValue();
+        this.nodeIndicatorEnabled = WayfarerConfigs.Generic.NODE_INDICATOR_ENABLED.getBooleanValue();
+        this.nodeIndicatorBeamHeight = WayfarerConfigs.Generic.NODE_INDICATOR_BEAM_HEIGHT.getDoubleValue();
+        this.nodeIndicatorBeamAlpha = WayfarerConfigs.Generic.NODE_INDICATOR_BEAM_ALPHA.getDoubleValue();
     }
 
     public static WayfarerConfig getInstance() {

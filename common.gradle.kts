@@ -106,6 +106,12 @@ dependencies {
     autoImplementation(fabricApiDependency("fabric-screen-api-v1"))
     autoImplementation(fabricApiDependency(if (unobfuscated) "fabric-key-mapping-api-v1" else "fabric-key-binding-api-v1"))
 
+    // Fabric Rendering API for WorldRenderEvents, HudRenderCallback
+    // Only available in older (remapped) Fabric API (<=1.20.x)
+    if (!unobfuscated) {
+        autoImplementation(fabricApiDependency("fabric-rendering-v1"))
+    }
+
     // malilib (local jar from docs/other_mods)
     autoImplementation(":${gradleProperty("malilibDep")}")
 }
