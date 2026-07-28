@@ -5,6 +5,7 @@
   "compatibilityLevel": "JAVA_17",
   "refmap": "wayfarer.refmap.json",
   "client": [
+    "BlockInteractionMixin",
     "MouseScrollMixin"
   ],
   "injectors": {
