@@ -48,6 +48,8 @@ public class WayfarerConfig {
     public int webMaxZoom = 10;
     public String defaultClassification = "";
     public Map<String, List<HotkeyBind>> hotkeys = defaultHotkeys();
+    public String toolItem = "minecraft:stick";
+    public boolean toolItemEnabled = true;
 
     private WayfarerConfig() {}
 
@@ -92,6 +94,11 @@ public class WayfarerConfig {
         }
     }
 
+    public void setToolItem(String value) {
+        this.toolItem = value;
+        save();
+    }
+
     public Map<String, List<HotkeyBind>> getHotkeys() {
         return hotkeys;
     }
@@ -102,6 +109,9 @@ public class WayfarerConfig {
         }
         if ("open_menu".equals(action)) {
             return List.of(new HotkeyBind(WayfarerHotkeys.OPEN_MENU));
+        }
+        if ("set_held_item_as_tool".equals(action)) {
+            return List.of(new HotkeyBind(WayfarerHotkeys.SET_HELD_ITEM_AS_TOOL));
         }
         return Collections.emptyList();
     }

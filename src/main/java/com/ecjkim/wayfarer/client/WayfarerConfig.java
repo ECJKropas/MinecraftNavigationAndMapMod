@@ -34,6 +34,9 @@ public class WayfarerConfig {
     public final double rdpEpsilon;
     public final boolean autoDeleteOrphanNodes;
     public final boolean autoGraphify;
+    // Non-final — mutable at runtime via setToolItem / setHeldItemAsTool
+    public String toolItem;
+    public boolean toolItemEnabled;
 
     private WayfarerConfig() {
         this.defaultClassification = WayfarerConfigs.Generic.DEFAULT_CLASSIFICATION.getStringValue();
@@ -42,6 +45,8 @@ public class WayfarerConfig {
         this.rdpEpsilon = WayfarerConfigs.Generic.RDP_EPSILON.getDoubleValue();
         this.autoDeleteOrphanNodes = WayfarerConfigs.Generic.AUTO_DELETE_ORPHAN_NODES.getBooleanValue();
         this.autoGraphify = WayfarerConfigs.Generic.AUTO_GRAPHIFY.getBooleanValue();
+        this.toolItem = WayfarerConfigs.Generic.TOOL_ITEM.getStringValue();
+        this.toolItemEnabled = WayfarerConfigs.Generic.TOOL_ITEM_ENABLED.getBooleanValue();
     }
 
     public static WayfarerConfig getInstance() {
@@ -55,12 +60,20 @@ public class WayfarerConfig {
         ((fi.dy.masa.malilib.config.ConfigManager)ConfigManager.getInstance()).saveAllConfigs();
     }
 
+    public void setToolItem(String value) {
+        this.toolItem = value;
+        WayfarerConfigs.Generic.TOOL_ITEM.setValueFromString(value);
+    }
+
     public List<HotkeyBind> getHotkeysForAction(String action) {
         if ("toggle_recording".equals(action)) {
             return List.of(new HotkeyBind(WayfarerHotkeys.TOGGLE_RECORDING));
         }
         if ("open_menu".equals(action)) {
             return List.of(new HotkeyBind(WayfarerHotkeys.OPEN_MENU));
+        }
+        if ("set_held_item_as_tool".equals(action)) {
+            return List.of(new HotkeyBind(WayfarerHotkeys.SET_HELD_ITEM_AS_TOOL));
         }
         return List.of();
     }

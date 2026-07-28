@@ -27,6 +27,7 @@ import com.ecjkim.wayfarer.client.road.RoadRecordingManager;
 import com.ecjkim.wayfarer.client.road.XaeroMapOverlay;
 import com.ecjkim.wayfarer.client.road.data.RoadNetworkDatabase;
 import com.ecjkim.wayfarer.client.road.model.Segment;
+import com.ecjkim.wayfarer.client.road.record.SurveySession;
 import com.ecjkim.wayfarer.client.road.server.WayfarerHttpServer;
 
 import org.lwjgl.glfw.GLFW;
@@ -36,10 +37,17 @@ import it.unimi.dsi.fastutil.ints.IntSet;
 
 public class WayfarerClient implements ClientModInitializer {
     private static final RoadRecordingManager ROAD_MANAGER = new RoadRecordingManager();
+    private static final SurveySession SURVEY_SESSION = new SurveySession();
     private static volatile WayfarerHttpServer httpServer;
     private static volatile Thread httpThread;
 
     private final IntSet keysDownLastTick = new IntOpenHashSet();
+    private boolean hadToolLastTick = false;
+    private volatile double pendingScrollDelta;
+
+    public static SurveySession getSurveySession() {
+        return SURVEY_SESSION;
+    }
 
     @Override
     public void onInitializeClient() {
@@ -54,6 +62,11 @@ public class WayfarerClient implements ClientModInitializer {
         });
         var ticks = net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientTickEvents.END_CLIENT_TICK;
         ticks.register(this::handleClientTick);
+
+        // Register scroll callback for Ctrl-scroll corner type switching
+        GLFW.glfwSetScrollCallback(Minecraft.getInstance().getWindow().handle(), (win, dx, dy) -> {
+            pendingScrollDelta = dy;
+        });
     }
 
     private static void startHttpServer() {
@@ -102,7 +115,64 @@ public class WayfarerClient implements ClientModInitializer {
             }
         }
 
+        for (WayfarerConfig.HotkeyBind bind : config.getHotkeysForAction("set_held_item_as_tool")) {
+            if (consumeHotkey(window, bind)) {
+                handleSetHeldItemAsTool(client);
+                break;
+            }
+        }
+
+        tickSurvey(client, window);
         ROAD_MANAGER.tick(client);
+    }
+
+    private void tickSurvey(Minecraft client, long window) {
+        LocalPlayer player = client.player;
+        if (player == null) {
+            hadToolLastTick = false;
+            return;
+        }
+        if (!WayfarerConfig.getInstance().toolItemEnabled) {
+            hadToolLastTick = false;
+            return;
+        }
+
+        boolean hasTool = ToolItemManager.hasToolItem(player);
+        if (hasTool && !hadToolLastTick) {
+            SURVEY_SESSION.onToolPickedUp(player);
+        }
+        hadToolLastTick = hasTool;
+
+        // Handle Ctrl-scroll for corner type switching
+        double scroll = pendingScrollDelta;
+        if (scroll != 0) {
+            pendingScrollDelta = 0;
+            boolean ctrlDown = GLFW.glfwGetKey(window, GLFW.GLFW_KEY_LEFT_CONTROL) == GLFW.GLFW_PRESS
+                || GLFW.glfwGetKey(window, GLFW.GLFW_KEY_RIGHT_CONTROL) == GLFW.GLFW_PRESS;
+            if (ctrlDown && hasTool) {
+                if (scroll > 0) {
+                    SURVEY_SESSION.cycleCornerTypeNext();
+                } else {
+                    SURVEY_SESSION.cycleCornerTypePrev();
+                }
+                player.sendSystemMessage(Component.literal("拐角类型: " + SURVEY_SESSION.getCurrentCornerType().name()));
+            }
+        }
+
+        SURVEY_SESSION.tick(client, window);
+    }
+
+    private void handleSetHeldItemAsTool(Minecraft client) {
+        LocalPlayer player = client.player;
+        if (player == null)
+            return;
+        ToolItemManager.setHeldItemAsTool(player);
+        if (ToolItemManager.getToolItem().isEmpty()) {
+            player.sendSystemMessage(Component.literal("手持物品为空，已清除 Survey 工具设置。"));
+        } else {
+            player.sendSystemMessage(
+                Component.literal("已将手持物品设为 Survey 工具: " + ToolItemManager.getToolItem().getHoverName().getString()));
+        }
     }
 
     private boolean consumeHotkey(long window, WayfarerConfig.HotkeyBind bind) {
@@ -129,6 +199,14 @@ public class WayfarerClient implements ClientModInitializer {
         LocalPlayer player = client.player;
         if (player == null)
             return;
+
+        // Auto / Survey mutual exclusion
+        if (ToolItemManager.hasToolItem(player) && WayfarerConfig.getInstance().toolItemEnabled) {
+            if (!ROAD_MANAGER.isRecording()) {
+                player.sendSystemMessage(Component.literal("正在 Survey 模式，请切换手中物品后重试"));
+            }
+            return;
+        }
 
         if (ROAD_MANAGER.isRecording()) {
             ROAD_MANAGER.stopRecording();

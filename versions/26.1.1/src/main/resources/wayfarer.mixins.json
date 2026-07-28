@@ -2,11 +2,9 @@
   "required": true,
   "minVersion": "0.8",
   "package": "com.ecjkim.wayfarer.client.mixin",
-  "compatibilityLevel": "JAVA_17",
+  "compatibilityLevel": "JAVA_21",
   "refmap": "wayfarer.refmap.json",
-  "client": [
-    "MouseScrollMixin"
-  ],
+  "client": [],
   "injectors": {
     "defaultRequire": 1
   }

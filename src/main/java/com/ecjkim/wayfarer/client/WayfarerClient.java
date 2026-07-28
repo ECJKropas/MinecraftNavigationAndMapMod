@@ -29,6 +29,7 @@ import com.ecjkim.wayfarer.client.road.RoadRecordingManager;
 import com.ecjkim.wayfarer.client.road.XaeroMapOverlay;
 import com.ecjkim.wayfarer.client.road.data.RoadNetworkDatabase;
 import com.ecjkim.wayfarer.client.road.model.Segment;
+import com.ecjkim.wayfarer.client.road.record.SurveySession;
 import com.ecjkim.wayfarer.client.road.server.WayfarerHttpServer;
 
 import org.lwjgl.glfw.GLFW;
@@ -39,10 +40,16 @@ import it.unimi.dsi.fastutil.ints.IntSet;
 
 public class WayfarerClient implements ClientModInitializer {
     private static final RoadRecordingManager ROAD_MANAGER = new RoadRecordingManager();
+    private static final SurveySession SURVEY_SESSION = new SurveySession();
     private static volatile WayfarerHttpServer httpServer;
     private static volatile Thread httpThread;
 
     private final IntSet keysDownLastTick = new IntOpenHashSet();
+    private boolean hadToolLastTick = false;
+
+    public static SurveySession getSurveySession() {
+        return SURVEY_SESSION;
+    }
 
     @Override
     public void onInitializeClient() {
@@ -102,7 +109,50 @@ public class WayfarerClient implements ClientModInitializer {
             }
         }
 
+        for (WayfarerConfig.HotkeyBind bind : config.getHotkeysForAction("set_held_item_as_tool")) {
+            if (consumeHotkey(window, bind)) {
+                handleSetHeldItemAsTool(client);
+                break;
+            }
+        }
+
+        tickSurvey(client, window);
         ROAD_MANAGER.tick(client);
+    }
+
+    private void tickSurvey(Minecraft client, long window) {
+        LocalPlayer player = client.player;
+        if (player == null) {
+            hadToolLastTick = false;
+            return;
+        }
+        if (!WayfarerConfig.getInstance().toolItemEnabled) {
+            hadToolLastTick = false;
+            return;
+        }
+
+        boolean hasTool = ToolItemManager.hasToolItem(player);
+        if (hasTool && !hadToolLastTick) {
+            // Tool picked up: resume paused session or announce readiness
+            SURVEY_SESSION.onToolPickedUp(player);
+        }
+        hadToolLastTick = hasTool;
+
+        SURVEY_SESSION.tick(client, window);
+    }
+
+    private void handleSetHeldItemAsTool(Minecraft client) {
+        LocalPlayer player = client.player;
+        if (player == null)
+            return;
+        ToolItemManager.setHeldItemAsTool(player);
+        if (ToolItemManager.getToolItem().isEmpty()) {
+            player.displayClientMessage(Component.literal("手持物品为空，已清除 Survey 工具设置。"), false);
+        } else {
+            player.displayClientMessage(
+                Component.literal("已将手持物品设为 Survey 工具: " + ToolItemManager.getToolItem().getHoverName().getString()),
+                false);
+        }
     }
 
     private boolean consumeHotkey(long window, WayfarerConfig.HotkeyBind bind) {
@@ -129,6 +179,14 @@ public class WayfarerClient implements ClientModInitializer {
         LocalPlayer player = client.player;
         if (player == null)
             return;
+
+        // Auto / Survey mutual exclusion
+        if (ToolItemManager.hasToolItem(player) && WayfarerConfig.getInstance().toolItemEnabled) {
+            if (!ROAD_MANAGER.isRecording()) {
+                player.displayClientMessage(Component.literal("正在 Survey 模式，请切换手中物品后重试"), false);
+            }
+            return;
+        }
 
         if (ROAD_MANAGER.isRecording()) {
             ROAD_MANAGER.stopRecording();
