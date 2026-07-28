@@ -35,6 +35,7 @@ public class WayfarerInitHandler implements IInitializationHandler {
     @Override
     public void registerModHandlers() {
         ConfigManager.getInstance().registerConfigHandler(Reference.MOD_ID, new WayfarerConfigHandler());
+        ToolItemManager.reload();
     }
 
     public static class WayfarerConfigHandler implements IConfigHandler {
