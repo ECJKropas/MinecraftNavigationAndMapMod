@@ -52,8 +52,8 @@ public class WayfarerConfigs {
         public static final ConfigBoolean AUTO_GRAPHIFY = new ConfigBoolean("autoGraphify", true,
             "自动图化：自动将道路网转化为信息学意义上的图（所有度数>2的节点均为端点），消除被穿越的非端节点，确保 Dijkstra / A* 等算法可直接基于端点运行。默认开启");
 
-        public static final ConfigString TOOL_ITEM = new ConfigString("toolItem", "minecraft:stick",
-            "Survey 模式工具物品，格式: minecraft:stick 或 minecraft:stick@0 或 minecraft:stick@0{NBT}");
+        public static final ConfigString TOOL_ITEM = new ConfigString("toolItem", "minecraft:wheat_seeds",
+            "Survey 模式工具物品，格式: minecraft:wheat_seeds 或 minecraft:wheat_seeds@0 或 minecraft:wheat_seeds@0{NBT}");
 
         public static final ConfigBoolean TOOL_ITEM_ENABLED =
             new ConfigBoolean("toolItemEnabled", true, "是否启用 Survey 工具物品检测。关闭后手持工具也不会触发 Survey 模式");

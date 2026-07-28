@@ -48,7 +48,7 @@ public class WayfarerConfig {
     public int webMaxZoom = 10;
     public String defaultClassification = "";
     public Map<String, List<HotkeyBind>> hotkeys = defaultHotkeys();
-    public String toolItem = "minecraft:stick";
+    public String toolItem = "minecraft:wheat_seeds";
     public boolean toolItemEnabled = true;
 
     private WayfarerConfig() {}
