@@ -5,6 +5,7 @@
   "name": "${name}",
   "description": "${description}",
   "authors": ["ECJKim"],
+  "icon": "assets/wayfarer/icon.png",
   "environment": "client",
   "entrypoints": {
     "client": ["com.ecjkim.wayfarer.client.WayfarerClient"]

@@ -24,7 +24,9 @@ AIGC:
 ```bash
 # 1. 构建（不要跳过 spotless）
 ./gradlew spotlessApply
-./gradlew build
+# ./gradlew build #此条已弃用
+./gradlew clean buildAndGather
+
 
 # 2. 修复编译错误后提交
 git add -A && git commit -m "type(scope): description" && git push
