@@ -38,9 +38,9 @@ import com.ecjkim.wayfarer.client.ToolItemManager;
 public abstract class BlockInteractionMixin {
 
     @Inject(method = "startDestroyBlock", at = @At("HEAD"), cancellable = true)
-    private void wayfarer$onStartDestroyBlock(BlockPos pos, Direction face, CallbackInfo ci) {
+    private void wayfarer$onStartDestroyBlock(BlockPos pos, Direction face, CallbackInfoReturnable<Boolean> cir) {
         if (shouldCancelInteraction()) {
-            ci.cancel();
+            cir.setReturnValue(false);
         }
     }
 
