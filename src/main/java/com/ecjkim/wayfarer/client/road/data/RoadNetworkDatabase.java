@@ -681,7 +681,7 @@ public class RoadNetworkDatabase {
                     containingSegments.add(seg);
                 }
             }
-            if (containingSegments.size() <= 2)
+            if (containingSegments.size() < 2)
                 continue;
 
             // Compute degree: count unique neighbour nodes
