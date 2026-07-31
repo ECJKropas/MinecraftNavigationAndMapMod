@@ -22,8 +22,11 @@ import java.util.UUID;
 
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.player.LocalPlayer;
+import net.minecraft.core.BlockPos;
 import net.minecraft.network.chat.Component;
 import net.minecraft.world.entity.player.Player;
+import net.minecraft.world.phys.BlockHitResult;
+import net.minecraft.world.phys.HitResult;
 import net.minecraft.world.phys.Vec3;
 
 import com.ecjkim.wayfarer.client.ToolItemManager;
@@ -181,23 +184,32 @@ public class SurveySession {
 
     // ---- Left-click handlers ----
 
+    /**
+     * Handle left-click: create a node at the block the player is looking at.
+     *
+     * <p>
+     * IDLE + click air = start recording with first node at block position RECORDING + click air = end recording with
+     * final node at block position
+     * </p>
+     */
     private void handleLeftClickOnAir(LocalPlayer player) {
+        Vec3 blockPos = getLookedAtBlockPos(player);
+        if (blockPos == null) {
+            return;
+        }
+
         if (state == State.IDLE) {
-            // Create start node and enter RECORDING
-            Vec3 pos = player.position();
-            Node startNode = createNode(pos.x, pos.y, pos.z);
+            Node startNode = createNode(blockPos.x, blockPos.y, blockPos.z);
             RoadNetworkDatabase db = RoadNetworkDatabase.getInstance();
             synchronized (db) {
                 db.addNode(startNode);
                 nodeIds.add(startNode.getId());
-                lastNodePos = new Vec3(pos.x, pos.y, pos.z);
+                lastNodePos = blockPos;
                 state = State.RECORDING;
             }
-            player.displayClientMessage(Component.literal("Survey 录制已开始，右键放置路径点，左键结束录制。"), false);
+            player.displayClientMessage(Component.literal("Survey 录制已开始（节点 " + formatCoord(blockPos) + "）"), false);
         } else if (state == State.RECORDING) {
-            // Create end node and finish
-            Vec3 pos = player.position();
-            Node endNode = createNode(pos.x, pos.y, pos.z);
+            Node endNode = createNode(blockPos.x, blockPos.y, blockPos.z);
             RoadNetworkDatabase db = RoadNetworkDatabase.getInstance();
             synchronized (db) {
                 db.addNode(endNode);
@@ -209,7 +221,19 @@ public class SurveySession {
 
     private void handleLeftClickOnNode(LocalPlayer player, UUID hitNodeId) {
         if (state == State.IDLE) {
-            player.displayClientMessage(Component.literal("点击空地开始录制"), false);
+            // Start recording by clicking on an existing node
+            RoadNetworkDatabase db = RoadNetworkDatabase.getInstance();
+            synchronized (db) {
+                if (!nodeIds.contains(hitNodeId)) {
+                    nodeIds.add(hitNodeId);
+                }
+                Node hitNode = db.getNode(hitNodeId);
+                if (hitNode != null) {
+                    lastNodePos = new Vec3(hitNode.getX(), hitNode.getY(), hitNode.getZ());
+                }
+                state = State.RECORDING;
+            }
+            player.displayClientMessage(Component.literal("Survey 录制已开始（吸附到现有节点）"), false);
         } else if (state == State.RECORDING) {
             // Ad-snap: connect to existing node, then end
             RoadNetworkDatabase db = RoadNetworkDatabase.getInstance();
@@ -228,23 +252,34 @@ public class SurveySession {
 
     // ---- Right-click handlers ----
 
+    /**
+     * Handle right-click: create a waypoint at the block the player is looking at.
+     */
     private void handleRightClickOnAir(LocalPlayer player) {
-        if (state != State.RECORDING)
+        if (state != State.RECORDING) {
             return;
-        Vec3 pos = player.position();
-        Node waypoint = createNode(pos.x, pos.y, pos.z);
+        }
+
+        Vec3 blockPos = getLookedAtBlockPos(player);
+        if (blockPos == null) {
+            return;
+        }
+
+        Node waypoint = createNode(blockPos.x, blockPos.y, blockPos.z);
         RoadNetworkDatabase db = RoadNetworkDatabase.getInstance();
         synchronized (db) {
             db.addNode(waypoint);
             nodeIds.add(waypoint.getId());
-            lastNodePos = new Vec3(pos.x, pos.y, pos.z);
+            lastNodePos = blockPos;
         }
-        player.displayClientMessage(Component.literal("已放置路径点 (" + nodeIds.size() + ")"), false);
+        player.displayClientMessage(Component.literal("已放置路径点 #" + nodeIds.size() + " @ " + formatCoord(blockPos)),
+            false);
     }
 
     private void handleRightClickOnNode(LocalPlayer player, UUID hitNodeId) {
-        if (state != State.RECORDING)
+        if (state != State.RECORDING) {
             return;
+        }
         RoadNetworkDatabase db = RoadNetworkDatabase.getInstance();
         synchronized (db) {
             if (!nodeIds.contains(hitNodeId)) {
@@ -255,7 +290,8 @@ public class SurveySession {
                 lastNodePos = new Vec3(hitNode.getX(), hitNode.getY(), hitNode.getZ());
             }
         }
-        player.displayClientMessage(Component.literal("已吸附到现有节点 (" + nodeIds.size() + ")"), false);
+        player.displayClientMessage(Component.literal("已吸附到现有节点 #" + nodeIds.size() + " @ " + formatCoord(lastNodePos)),
+            false);
     }
 
     // ---- Recording lifecycle ----
@@ -346,6 +382,32 @@ public class SurveySession {
             }
         }
         return closest;
+    }
+
+    /**
+     * Get the block position the player is currently looking at. Uses Minecraft's built-in raycast to find the targeted
+     * block.
+     *
+     * @return the block position as Vec3, or null if not looking at a block
+     */
+    private Vec3 getLookedAtBlockPos(LocalPlayer player) {
+        // Use the player's pick() method which returns the block the player is looking at
+        // This is the standard Minecraft API for this purpose
+        // pick(double maxDistance, float partialTick, boolean includeFluids)
+        HitResult hitResult = player.pick(5.0, 1.0F, false);
+        if (hitResult == null || hitResult.getType() != HitResult.Type.BLOCK) {
+            return null;
+        }
+
+        // Get the block position from the BlockHitResult
+        BlockHitResult blockHit = (BlockHitResult)hitResult;
+        BlockPos blockPos = blockHit.getBlockPos();
+        return new Vec3(blockPos.getX() + 0.5, blockPos.getY() + 0.5, blockPos.getZ() + 0.5);
+    }
+
+    /** Format a coordinate vector for display. */
+    private static String formatCoord(Vec3 pos) {
+        return String.format("(%.1f, %.1f, %.1f)", pos.x, pos.y, pos.z);
     }
 
     // ---- Tool detection (called from WayfarerClient tick) ----

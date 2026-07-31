@@ -154,43 +154,9 @@ public class WayfarerClient implements ClientModInitializer {
     }
 
     private void handleSurveyHotkeys(Minecraft client, long window) {
-        LocalPlayer player = client.player;
-        if (player == null) {
-            return;
-        }
-        if (!WayfarerConfig.getInstance().isToolItemEnabled() || !ToolItemManager.hasToolItem(player)) {
-            return;
-        }
-
-        WayfarerConfig config = WayfarerConfig.getInstance();
-
-        for (WayfarerConfig.HotkeyBind bind : config.getHotkeysForAction("survey_start_recording")) {
-            if (consumeHotkey(window, bind)) {
-                SURVEY_SESSION.forceStartRecording(player);
-                break;
-            }
-        }
-
-        for (WayfarerConfig.HotkeyBind bind : config.getHotkeysForAction("survey_stop_recording")) {
-            if (consumeHotkey(window, bind)) {
-                SURVEY_SESSION.forceStopRecording(player);
-                break;
-            }
-        }
-
-        for (WayfarerConfig.HotkeyBind bind : config.getHotkeysForAction("survey_cancel_recording")) {
-            if (consumeHotkey(window, bind)) {
-                SURVEY_SESSION.cancelRecording(player);
-                break;
-            }
-        }
-
-        for (WayfarerConfig.HotkeyBind bind : config.getHotkeysForAction("survey_cycle_corner_type")) {
-            if (consumeHotkey(window, bind)) {
-                SURVEY_SESSION.cycleCornerType(player);
-                break;
-            }
-        }
+        // Ctrl+Wheel corner type switching is handled by MouseScrollMixin
+        // Left-click and Right-click for node creation are handled by SurveySession.processMouseClicks()
+        // No additional hotkeys needed - survey mode uses mouse clicks for node placement
     }
 
     private void tickSurvey(Minecraft client, long window) {
