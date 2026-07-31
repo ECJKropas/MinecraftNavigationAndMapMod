@@ -124,9 +124,12 @@ public final class SurveyHud {
         if (state == State.IDLE) {
             statePrefix = "▶ Survey IDLE";
             stateColor = GRAY;
-        } else {
+        } else if (state == State.RECORDING) {
             statePrefix = "● RECORDING";
             stateColor = RED;
+        } else { // PAUSED
+            statePrefix = "⏸ PAUSED";
+            stateColor = YELLOW;
         }
 
         String cornerPart = cornerIcon + " " + cornerName;
@@ -135,19 +138,20 @@ public final class SurveyHud {
         int firstLineWidth = client.font.width(firstLine);
         contentWidth = Math.max(contentWidth, firstLineWidth + 4);
 
-        // Second line: node count & distance (only during recording)
+        // Second line: node count & distance (during recording or paused)
         int secondLineWidth = 0;
         String secondLine = "";
-        if (state == State.RECORDING) {
+        if (state == State.RECORDING || state == State.PAUSED) {
             int nodeCount = session.getNodeCount();
             double totalDist = computeTotalDistance(session);
-            secondLine = String.format("  ⌂ %d nodes  |  %.1f m", nodeCount, totalDist);
+            secondLine =
+                String.format("  ⌂ %d nodes  |  %.1f m%s", nodeCount, totalDist, state == State.PAUSED ? " (暂停中)" : "");
             secondLineWidth = client.font.width(secondLine);
             contentWidth = Math.max(contentWidth, secondLineWidth + 4);
         }
 
         // Draw background
-        int panelHeight = (state == State.RECORDING) ? LINE_HEIGHT * 2 + 4 : LINE_HEIGHT + 4;
+        int panelHeight = (state == State.RECORDING || state == State.PAUSED) ? LINE_HEIGHT * 2 + 4 : LINE_HEIGHT + 4;
         int bgY = y - panelHeight;
         graphics.fill(HUD_X - 1, bgY, HUD_X + contentWidth + 1, y, BG_COLOR);
         graphics.fill(HUD_X - 1, bgY, HUD_X + contentWidth + 1, bgY + 1, BG_BORDER);
@@ -166,10 +170,10 @@ public final class SurveyHud {
         int iconWidth = client.font.width(cornerIcon);
         graphics.drawString(client.font, " " + cornerName, HUD_X + stateWidth + sepWidth + iconWidth, textY, GOLD);
 
-        // Draw second line (recording stats)
-        if (state == State.RECORDING) {
+        // Draw second line (recording stats, also shown when paused)
+        if (state == State.RECORDING || state == State.PAUSED) {
             textY += LINE_HEIGHT;
-            graphics.drawString(client.font, secondLine, HUD_X + 4, textY, WHITE);
+            graphics.drawString(client.font, secondLine, HUD_X + 4, textY, state == State.PAUSED ? GRAY : WHITE);
         }
     }
 
@@ -243,9 +247,11 @@ public final class SurveyHud {
 
         String hints;
         if (state == State.IDLE) {
-            hints = "  [LMB+Air] Start  |  [Ctrl+Scroll] Switch Corner  |  [Q] Tool  |  [ESC] Cancel";
-        } else {
-            hints = "  [LMB+Air] End  |  [RMB+Air] Waypoint  |  [Ctrl+Scroll] Switch Corner  |  [ESC] Cancel";
+            hints = "  [LMB+Block] Start  |  [Ctrl+Scroll] Corner  |  [ESC] Cancel";
+        } else if (state == State.RECORDING) {
+            hints = "  [LMB+Block] End  |  [RMB+Block] Waypoint  |  [Ctrl+Scroll] Corner  |  [ESC] Cancel";
+        } else { // PAUSED
+            hints = "  [Pick up tool] Resume  |  [ESC] Cancel Recording";
         }
 
         int hintWidth = client.font.width(hints);
@@ -253,7 +259,7 @@ public final class SurveyHud {
 
         // Semi-transparent background for readability
         graphics.fill(x - 2, hintY - 2, windowWidth - 2, hintY + LINE_HEIGHT + 2, 0x80000000);
-        graphics.drawString(client.font, hints, x, hintY, GRAY);
+        graphics.drawString(client.font, hints, x, hintY, state == State.PAUSED ? YELLOW : GRAY);
     }
 
     private static String getCornerIcon(CornerType type) {

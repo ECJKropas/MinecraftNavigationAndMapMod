@@ -51,7 +51,7 @@ import it.unimi.dsi.fastutil.ints.IntSet;
  */
 public class SurveySession {
     public enum State {
-        IDLE, RECORDING
+        IDLE, RECORDING, PAUSED
     }
 
     private static final double NODE_HIT_RADIUS = 2.0;
@@ -117,8 +117,8 @@ public class SurveySession {
 
         boolean hasTool = ToolItemManager.hasToolItem(client.player);
 
-        // ESC key to cancel recording
-        if (state == State.RECORDING) {
+        // ESC key to cancel recording (works in both RECORDING and PAUSED states)
+        if (state == State.RECORDING || state == State.PAUSED) {
             if (org.lwjgl.glfw.GLFW.glfwGetKey(window,
                 org.lwjgl.glfw.GLFW.GLFW_KEY_ESCAPE) == org.lwjgl.glfw.GLFW.GLFW_PRESS) {
                 cancelRecording(client.player);
@@ -131,13 +131,47 @@ public class SurveySession {
 
         if (state == State.RECORDING) {
             if (!hasTool) {
-                state = State.IDLE;
-                client.player.displayClientMessage(Component.literal("工具已离手，Survey 录制暂停。"), false);
+                // Tool removed: transition to PAUSED (preserve all data)
+                state = State.PAUSED;
+                client.player.displayClientMessage(Component.literal("工具已离手，Survey 录制暂停（数据保留）。"), false);
                 return;
             }
             spawnPathParticles(client);
             processMouseClicks(client, window);
+        } else if (state == State.PAUSED) {
+            if (hasTool) {
+                // Tool picked up: resume recording
+                // Validate that all nodes in nodeIds still exist in the database
+                if (validateNodeIntegrity()) {
+                    state = State.RECORDING;
+                    particleTickCounter = 0;
+                    client.player.displayClientMessage(
+                        Component.literal("工具已切回，Survey 录制继续 (" + nodeIds.size() + " 个节点)"), false);
+                } else {
+                    // Data integrity check failed, cancel the recording
+                    client.player.displayClientMessage(Component.literal("数据校验失败，Survey 录制已取消。"), false);
+                    cancelRecording(client.player);
+                }
+            }
+            // In PAUSED state: do NOT process mouse clicks or spawn particles
         }
+    }
+
+    /**
+     * Validate that all nodes in nodeIds still exist in the database. Returns false if any node is missing (data
+     * corruption detected).
+     */
+    private boolean validateNodeIntegrity() {
+        if (nodeIds.isEmpty()) {
+            return false;
+        }
+        RoadNetworkDatabase db = RoadNetworkDatabase.getInstance();
+        for (UUID nodeId : nodeIds) {
+            if (db.getNode(nodeId) == null) {
+                return false;
+            }
+        }
+        return true;
     }
 
     // ---- Mouse handling ----
@@ -316,18 +350,26 @@ public class SurveySession {
 
         RoadNetworkDatabase db = RoadNetworkDatabase.getInstance();
         synchronized (db) {
+            // Store a copy of node IDs for rollback if needed
+            List<UUID> nodesToRollback = new ArrayList<>(nodeIds);
+
             Segment segment =
                 new Segment(UUID.randomUUID(), new ArrayList<>(nodeIds), null, Source.USER, Status.DRAFT, 1);
             db.addSegment(segment);
 
             if (!db.saveToDisk()) {
-                // Save failed: roll back the in-memory segment so we don't leak it.
+                // Save failed: roll back BOTH segment and nodes
                 db.removeSegment(segment.getId());
+                for (UUID nodeId : nodesToRollback) {
+                    db.removeNode(nodeId);
+                }
                 player.displayClientMessage(Component.literal("保存失败，Survey 录制未结束。"), false);
                 return;
             }
 
             pendingSegment = segment;
+            // Store node IDs in segment for later cleanup if user cancels metadata screen
+            segment.setNodeIds(new ArrayList<>(nodeIds));
             state = State.IDLE;
             nodeIds.clear();
             lastNodePos = null;
@@ -336,8 +378,11 @@ public class SurveySession {
             client.setScreen(new RoadMetadataScreen(segment, savedRoad -> {
                 player.displayClientMessage(Component.literal("道路已保存: " + savedRoad.getName()), false);
                 pendingSegment = null;
+                // Save was successful, mark segment as committed (no cleanup needed)
+                segment.setStatus(Status.CONFIRMED);
             }, () -> {
-                cleanupOrphanData();
+                // User cancelled metadata screen - clean up ALL data (nodes + segment)
+                cleanupPendingSegmentAndNodes(segment);
                 pendingSegment = null;
             }));
             player.displayClientMessage(Component.literal("道路记录已停止，选择或创建道路后保存。"), false);
@@ -360,6 +405,30 @@ public class SurveySession {
                 db.removeSegment(pendingSegment.getId());
                 pendingSegment = null;
             }
+            db.saveToDisk();
+        }
+    }
+
+    /**
+     * Clean up a segment and all its nodes when the user cancels metadata editing. This is called when
+     * RoadMetadataScreen is dismissed without saving.
+     */
+    private void cleanupPendingSegmentAndNodes(Segment segment) {
+        if (segment == null) {
+            return;
+        }
+        RoadNetworkDatabase db = RoadNetworkDatabase.getInstance();
+        synchronized (db) {
+            // Remove all nodes associated with this segment
+            List<UUID> nodeIdsToClean = segment.getNodeIds();
+            if (nodeIdsToClean != null) {
+                for (UUID nodeId : nodeIdsToClean) {
+                    db.removeNode(nodeId);
+                }
+            }
+            // Remove the segment itself
+            db.removeSegment(segment.getId());
+            // Save to disk to persist the cleanup
             db.saveToDisk();
         }
     }
@@ -427,13 +496,10 @@ public class SurveySession {
      */
     public void onToolPickedUp(LocalPlayer player) {
         particleTickCounter = 0;
-        if (!nodeIds.isEmpty()) {
-            // Resume paused recording
-            state = State.RECORDING;
-            player.displayClientMessage(Component.literal("工具已切回，Survey 录制继续 (" + nodeIds.size() + " 个节点)"), false);
-        } else if (state == State.IDLE) {
-            player.displayClientMessage(Component.literal("Survey 工具就绪，左键点击空地开始录制。"), false);
+        if (state == State.IDLE) {
+            player.displayClientMessage(Component.literal("Survey 工具就绪，左键点击方块开始录制。"), false);
         }
+        // PAUSED → RECORDING transition is handled in tick() with integrity validation
     }
 
     /** Reset the session completely. */
