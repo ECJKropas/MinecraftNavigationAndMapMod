@@ -125,7 +125,6 @@ public class RoadMetadataScreen extends Screen {
 
         this.addRenderableWidget(
             Button.builder(Component.literal(I18n.get("wayfarer.road.gui.metadata.button_cancel")), button -> {
-                cleanupOrphanData();
                 this.onCancel.run();
                 this.minecraft.setScreen(null);
             }).bounds(centerX + 4, buttonY, 112, 20).build());
@@ -135,30 +134,44 @@ public class RoadMetadataScreen extends Screen {
 
     private void saveRoad() {
         RoadNetworkDatabase db = RoadNetworkDatabase.getInstance();
+        synchronized (db) {
+            if (selectedRoad != null) {
+                db.addSegmentToRoad(selectedRoad.getId(), segment.getId());
+                if (!db.saveToDisk()) {
+                    if (this.minecraft.player != null) {
+                        this.minecraft.player.displayClientMessage(Component.literal("保存失败，道路未关联。"), false);
+                    }
+                    return;
+                }
+                onSave.accept(selectedRoad);
+            } else {
+                String roadName = this.nameBox.getValue().trim();
+                String classification = CLASSIFICATIONS.get(classificationIndex);
+                String number = this.numberBox.getValue().trim();
 
-        if (selectedRoad != null) {
-            db.addSegmentToRoad(selectedRoad.getId(), segment.getId());
-            db.saveToDisk();
-            onSave.accept(selectedRoad);
-        } else {
-            String roadName = this.nameBox.getValue().trim();
-            String classification = CLASSIFICATIONS.get(classificationIndex);
-            String number = this.numberBox.getValue().trim();
+                if (roadName.isEmpty() && !classification.isEmpty() && !number.isEmpty()) {
+                    roadName = classification.substring(0, 1) + number;
+                }
+                if (roadName.isEmpty()) {
+                    roadName = "未命名道路";
+                }
 
-            if (roadName.isEmpty() && !classification.isEmpty() && !number.isEmpty()) {
-                roadName = classification.substring(0, 1) + number;
+                Road road = new Road(UUID.randomUUID(), roadName, "#FFFFFF", classification, number,
+                    new ArrayList<>(List.of(segment.getId())), 1);
+                segment.setRoadId(road.getId());
+                db.addRoad(road);
+                db.updateSegment(segment.getId(), segment);
+                if (!db.saveToDisk()) {
+                    // Roll back: undo the in-memory references so the user can retry.
+                    db.removeRoad(road.getId());
+                    segment.setRoadId(null);
+                    if (this.minecraft.player != null) {
+                        this.minecraft.player.displayClientMessage(Component.literal("保存失败，道路未创建。"), false);
+                    }
+                    return;
+                }
+                onSave.accept(road);
             }
-            if (roadName.isEmpty()) {
-                roadName = "未命名道路";
-            }
-
-            Road road = new Road(UUID.randomUUID(), roadName, "#FFFFFF", classification, number,
-                new ArrayList<>(List.of(segment.getId())), 1);
-            segment.setRoadId(road.getId());
-            db.addRoad(road);
-            db.updateSegment(segment.getId(), segment);
-            db.saveToDisk();
-            onSave.accept(road);
         }
 
         this.minecraft.setScreen(null);
@@ -216,7 +229,6 @@ public class RoadMetadataScreen extends Screen {
     @Override
     public boolean keyPressed(int keyCode, int scanCode, int modifiers) {
         if (keyCode == GLFW.GLFW_KEY_ESCAPE) {
-            cleanupOrphanData();
             this.onCancel.run();
             this.minecraft.setScreen(null);
             return true;
@@ -226,13 +238,15 @@ public class RoadMetadataScreen extends Screen {
 
     private void cleanupOrphanData() {
         RoadNetworkDatabase db = RoadNetworkDatabase.getInstance();
-        if (segment.getNodeIds() != null) {
-            for (UUID nodeId : segment.getNodeIds()) {
-                db.removeNode(nodeId);
+        synchronized (db) {
+            if (segment.getNodeIds() != null) {
+                for (UUID nodeId : segment.getNodeIds()) {
+                    db.removeNode(nodeId);
+                }
             }
+            db.removeSegment(segment.getId());
+            db.saveToDisk();
         }
-        db.removeSegment(segment.getId());
-        db.saveToDisk();
     }
 
     private String classificationLabel() {
