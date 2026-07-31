@@ -26,6 +26,7 @@ import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientTickEvents;
 
 import com.ecjkim.wayfarer.client.render.NodeIndicatorRenderer;
 import com.ecjkim.wayfarer.client.render.SurveyHud;
+import com.ecjkim.wayfarer.client.render.SurveyRenderer;
 import com.ecjkim.wayfarer.client.road.RoadMetadataScreen;
 import com.ecjkim.wayfarer.client.road.RoadRecordingManager;
 import com.ecjkim.wayfarer.client.road.XaeroMapOverlay;
@@ -62,6 +63,7 @@ public class WayfarerClient implements ClientModInitializer {
 
         XaeroMapOverlay.register();
         NodeIndicatorRenderer.register();
+        SurveyRenderer.register();
         SurveyHud.register();
         ClientLifecycleEvents.CLIENT_STOPPING.register(client -> {
             stopHttpServer();
