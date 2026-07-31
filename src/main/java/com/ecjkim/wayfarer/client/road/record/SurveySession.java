@@ -116,6 +116,16 @@ public class SurveySession {
             return;
 
         boolean hasTool = ToolItemManager.hasToolItem(client.player);
+
+        // ESC key to cancel recording
+        if (state == State.RECORDING) {
+            if (org.lwjgl.glfw.GLFW.glfwGetKey(window,
+                org.lwjgl.glfw.GLFW.GLFW_KEY_ESCAPE) == org.lwjgl.glfw.GLFW.GLFW_PRESS) {
+                cancelRecording(client.player);
+                return;
+            }
+        }
+
         if (state == State.IDLE)
             return;
 
