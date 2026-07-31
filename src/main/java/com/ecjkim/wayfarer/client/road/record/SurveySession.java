@@ -178,18 +178,24 @@ public class SurveySession {
             // Create start node and enter RECORDING
             Vec3 pos = player.position();
             Node startNode = createNode(pos.x, pos.y, pos.z);
-            RoadNetworkDatabase.getInstance().addNode(startNode);
-            nodeIds.add(startNode.getId());
-            lastNodePos = new Vec3(pos.x, pos.y, pos.z);
-            state = State.RECORDING;
+            RoadNetworkDatabase db = RoadNetworkDatabase.getInstance();
+            synchronized (db) {
+                db.addNode(startNode);
+                nodeIds.add(startNode.getId());
+                lastNodePos = new Vec3(pos.x, pos.y, pos.z);
+                state = State.RECORDING;
+            }
             player.displayClientMessage(Component.literal("Survey 录制已开始，右键放置路径点，左键结束录制。"), false);
         } else if (state == State.RECORDING) {
             // Create end node and finish
             Vec3 pos = player.position();
             Node endNode = createNode(pos.x, pos.y, pos.z);
-            RoadNetworkDatabase.getInstance().addNode(endNode);
-            nodeIds.add(endNode.getId());
-            finishRecording(player);
+            RoadNetworkDatabase db = RoadNetworkDatabase.getInstance();
+            synchronized (db) {
+                db.addNode(endNode);
+                nodeIds.add(endNode.getId());
+                finishRecording(player);
+            }
         }
     }
 
@@ -198,15 +204,17 @@ public class SurveySession {
             player.displayClientMessage(Component.literal("点击空地开始录制"), false);
         } else if (state == State.RECORDING) {
             // Ad-snap: connect to existing node, then end
-            if (!nodeIds.contains(hitNodeId)) {
-                nodeIds.add(hitNodeId);
-            }
             RoadNetworkDatabase db = RoadNetworkDatabase.getInstance();
-            Node hitNode = db.getNode(hitNodeId);
-            if (hitNode != null) {
-                lastNodePos = new Vec3(hitNode.getX(), hitNode.getY(), hitNode.getZ());
+            synchronized (db) {
+                if (!nodeIds.contains(hitNodeId)) {
+                    nodeIds.add(hitNodeId);
+                }
+                Node hitNode = db.getNode(hitNodeId);
+                if (hitNode != null) {
+                    lastNodePos = new Vec3(hitNode.getX(), hitNode.getY(), hitNode.getZ());
+                }
+                finishRecording(player);
             }
-            finishRecording(player);
         }
     }
 
@@ -217,22 +225,27 @@ public class SurveySession {
             return;
         Vec3 pos = player.position();
         Node waypoint = createNode(pos.x, pos.y, pos.z);
-        RoadNetworkDatabase.getInstance().addNode(waypoint);
-        nodeIds.add(waypoint.getId());
-        lastNodePos = new Vec3(pos.x, pos.y, pos.z);
+        RoadNetworkDatabase db = RoadNetworkDatabase.getInstance();
+        synchronized (db) {
+            db.addNode(waypoint);
+            nodeIds.add(waypoint.getId());
+            lastNodePos = new Vec3(pos.x, pos.y, pos.z);
+        }
         player.displayClientMessage(Component.literal("已放置路径点 (" + nodeIds.size() + ")"), false);
     }
 
     private void handleRightClickOnNode(LocalPlayer player, UUID hitNodeId) {
         if (state != State.RECORDING)
             return;
-        if (!nodeIds.contains(hitNodeId)) {
-            nodeIds.add(hitNodeId);
-        }
         RoadNetworkDatabase db = RoadNetworkDatabase.getInstance();
-        Node hitNode = db.getNode(hitNodeId);
-        if (hitNode != null) {
-            lastNodePos = new Vec3(hitNode.getX(), hitNode.getY(), hitNode.getZ());
+        synchronized (db) {
+            if (!nodeIds.contains(hitNodeId)) {
+                nodeIds.add(hitNodeId);
+            }
+            Node hitNode = db.getNode(hitNodeId);
+            if (hitNode != null) {
+                lastNodePos = new Vec3(hitNode.getX(), hitNode.getY(), hitNode.getZ());
+            }
         }
         player.displayClientMessage(Component.literal("已吸附到现有节点 (" + nodeIds.size() + ")"), false);
     }
@@ -285,14 +298,16 @@ public class SurveySession {
 
     private void cleanupOrphanData() {
         RoadNetworkDatabase db = RoadNetworkDatabase.getInstance();
-        for (UUID nodeId : nodeIds) {
-            db.removeNode(nodeId);
+        synchronized (db) {
+            for (UUID nodeId : nodeIds) {
+                db.removeNode(nodeId);
+            }
+            if (pendingSegment != null) {
+                db.removeSegment(pendingSegment.getId());
+                pendingSegment = null;
+            }
+            db.saveToDisk();
         }
-        if (pendingSegment != null) {
-            db.removeSegment(pendingSegment.getId());
-            pendingSegment = null;
-        }
-        db.saveToDisk();
     }
 
     /** Raycast from player's eyes to find the nearest node within hit radius. */
