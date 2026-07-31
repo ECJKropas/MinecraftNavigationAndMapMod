@@ -14,6 +14,9 @@ const INTERSECTION_SNAP_PX = 15;  // pixel tolerance for intersection snapping i
 let dragState = null;  // { nid, marker, axisDx, axisDz, startMcX, startMcZ }
 let dragJustEnded = false;
 let constrainDrag = true;  // toggled by popup button
+let lastSyncServerTime = 0;  // timestamp from last successful delta sync
+let editingEntityId = null;  // entity currently being edited (dragging/saving)
+let pendingConflicts = new Map();  // id -> { entity, newData } for conflict resolution
 
 function getNodeDragAxes(nid) {
   const axes = [];
@@ -114,31 +117,55 @@ function pushUndo() {
 async function undo() {
   if (undoStack.length === 0) return;
   redoStack.push(snapshotStore());
-  const snap = undoStack.pop();
-  await fetch('/api/roads/restore', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: snap
-  });
-  clearSelection();
-  mergeFirstNodeId = null;
-  await loadData();
-  undoButtonStyle();
+  editingEntityId = '__undo__';  // Block delta during restore
+  try {
+    const snap = undoStack.pop();
+    const res = await fetch('/api/roads/restore', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: snap
+    });
+    if (!res.ok) {
+      showToast('撤销失败', 'error');
+      return;
+    }
+    lastSyncServerTime = 0;  // Force full reload after restore
+    clearSelection();
+    mergeFirstNodeId = null;
+    await loadData();
+    undoButtonStyle();
+    showToast('已撤销', 'info');
+  } catch (e) { showToast('网络错误', 'error'); }
+  finally {
+    editingEntityId = null;
+  }
 }
 
 async function redo() {
   if (redoStack.length === 0) return;
   undoStack.push(snapshotStore());
-  const snap = redoStack.pop();
-  await fetch('/api/roads/restore', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: snap
-  });
-  clearSelection();
-  mergeFirstNodeId = null;
-  await loadData();
-  undoButtonStyle();
+  editingEntityId = '__redo__';  // Block delta during restore
+  try {
+    const snap = redoStack.pop();
+    const res = await fetch('/api/roads/restore', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: snap
+    });
+    if (!res.ok) {
+      showToast('重做失败', 'error');
+      return;
+    }
+    lastSyncServerTime = 0;  // Force full reload after restore
+    clearSelection();
+    mergeFirstNodeId = null;
+    await loadData();
+    undoButtonStyle();
+    showToast('已重做', 'info');
+  } catch (e) { showToast('网络错误', 'error'); }
+  finally {
+    editingEntityId = null;
+  }
 }
 
 function undoButtonStyle() {
@@ -293,7 +320,7 @@ function initMap() {
   map.on('click', onMapClick);
   loadConfig();
   loadData();
-  setInterval(loadDelta, 2000);
+  setInterval(loadDelta, 1000);
 
   // Global drag handlers (document-level to catch mouse outside map)
   document.addEventListener('mousemove', onGlobalMouseMove);
@@ -382,30 +409,131 @@ async function loadData() {
 
 async function loadDelta() {
   try {
-    const since = Math.floor(Date.now() - 5000);
+    const since = lastSyncServerTime > 0 ? lastSyncServerTime : Math.floor(Date.now() - 5000);
     const res = await fetch('/api/roads/delta?since=' + since);
+    if (!res.ok) return;
     const data = await res.json();
+
+    // Update server time for next poll
+    if (data.serverTime) {
+      lastSyncServerTime = data.serverTime;
+    }
+
     let changed = false;
+
+    // Apply node deltas — skip entities being actively edited
     if (data.nodes && data.nodes.length > 0) {
-      for (const n of data.nodes) { roadStore.nodes[n.id] = n; }
-      changed = true;
+      for (const n of data.nodes) {
+        // Don't overwrite if user is currently editing this node
+        if (editingEntityId === n.id) continue;
+        roadStore.nodes[n.id] = n;
+        changed = true;
+      }
     }
+
+    // Apply segment deltas — skip segments being edited
     if (data.segments && data.segments.length > 0) {
-      // Always updates but skip renderAll unless node count changed
-      // (segment/road metadata changes don't affect polyline geometry)
-      const oldSegCount = Object.keys(roadStore.segments).length;
-      for (const s of data.segments) { roadStore.segments[s.id] = s; }
-      const newSegCount = Object.keys(roadStore.segments).length;
-      if (newSegCount !== oldSegCount) changed = true;
+      for (const s of data.segments) {
+        if (editingEntityId === s.id) continue;
+        // Also skip if any node in this segment is being edited
+        if (editingEntityId && s.nodeIds && s.nodeIds.includes(editingEntityId)) continue;
+        roadStore.segments[s.id] = s;
+        changed = true;
+      }
     }
+
+    // Apply road deltas
     if (data.roads) {
-      const oldRoadCount = Object.keys(roadStore.roads).length;
-      for (const r of data.roads) { roadStore.roads[r.id] = r; }
-      const newRoadCount = Object.keys(roadStore.roads).length;
-      if (newRoadCount !== oldRoadCount) changed = true;
+      for (const [id, r] of Object.entries(data.roads)) {
+        if (editingEntityId === id) continue;
+        roadStore.roads[id] = r;
+        changed = true;
+      }
     }
+
     if (changed) renderAll();
   } catch (e) { /* silent */ }
+}
+
+// ——— Conflict resolution ———
+async function handleConflict(entityId, entityType, serverData, clientData) {
+  // Show a native-style dialog asking user how to resolve
+  const message = `此${entityType}在游戏中已被修改 (版本 ${serverData.version})。\n` +
+                  `你的编辑版本为 ${clientData.expectedVersion}。\n\n` +
+                  `选择如何处理：`;
+
+  const choice = prompt(message + '\n\n输入 [A] 接受游戏版本 (按 A)\n输入 [R] 重试你的编辑 (按 R)');
+
+  if (choice === null) {
+    // User cancelled — accept server version by default
+    if (entityType === '节点') {
+      roadStore.nodes[entityId] = serverData;
+    } else if (entityType === '路段') {
+      roadStore.segments[entityId] = serverData;
+    } else if (entityType === '道路') {
+      roadStore.roads[entityId] = serverData;
+    }
+    renderAll();
+    showToast('已接受游戏版本', 'info');
+    return 'accepted';
+  }
+
+  const choiceLower = choice.toLowerCase();
+  if (choiceLower === 'a' || choiceLower === 'accept') {
+    if (entityType === '节点') {
+      roadStore.nodes[entityId] = serverData;
+    } else if (entityType === '路段') {
+      roadStore.segments[entityId] = serverData;
+    } else if (entityType === '道路') {
+      roadStore.roads[entityId] = serverData;
+    }
+    renderAll();
+    showToast('已接受游戏版本', 'info');
+    return 'accepted';
+  } else if (choiceLower === 'r' || choiceLower === 'retry') {
+    // Retry — will likely fail again but the server state is now current
+    showToast('重试中...', 'info');
+    return 'retry';
+  }
+  return 'accepted';  // default
+}
+
+async function saveNode() {
+  const nid = selectedNodeId;
+  if (!nid) return;
+  const node = roadStore.nodes[nid];
+  const x = parseFloat(document.getElementById('node-x').value);
+  const z = parseFloat(document.getElementById('node-z').value);
+
+  // Mark as editing to prevent delta overwrite
+  editingEntityId = nid;
+
+  try {
+    pushUndo();
+    const res = await fetch('/api/nodes/' + nid, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ x, z, expectedVersion: node.version })
+    });
+    if (res.status === 409) {
+      // Version conflict — the server version won
+      const errData = await res.json();
+      showToast(`版本冲突: ${errData.error || '游戏内已修改'}`, 'error');
+      // Re-fetch the server version and ask user
+      await loadData();
+      editingEntityId = null;
+      showToast('已从游戏同步最新数据', 'info');
+      return;
+    }
+    if (!res.ok) { showToast('保存失败', 'error'); return; }
+    const updated = await res.json();
+    roadStore.nodes[nid] = updated;
+    renderAll();
+    showToast('节点已保存');
+  } catch (e) { showToast('网络错误', 'error'); }
+  finally {
+    editingEntityId = null;
+  }
 }
 
 // ——— Road styling ———
@@ -701,27 +829,6 @@ function updateMergeButton() {
 }
 
 // ——— Actions ———
-async function saveNode() {
-  const nid = selectedNodeId;
-  if (!nid) return;
-  const node = roadStore.nodes[nid];
-  const x = parseFloat(document.getElementById('node-x').value);
-  const z = parseFloat(document.getElementById('node-z').value);
-  try {
-    pushUndo();
-    const res = await fetch('/api/nodes/' + nid, {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ x, z, expectedVersion: node.version })
-    });
-    if (res.status === 409) { showToast('版本冲突, 正在刷新...', 'error'); loadData(); return; }
-    if (!res.ok) { showToast('保存失败', 'error'); return; }
-    const updated = await res.json();
-    roadStore.nodes[nid] = updated;
-    renderAll();
-    showToast('节点已保存');
-  } catch (e) { showToast('网络错误', 'error'); }
-}
 
 async function deleteNode() {
   const nid = selectedNodeId;
@@ -763,18 +870,29 @@ async function saveRoad() {
   const roadId = seg.roadId;
   if (roadId) {
     const road = roadStore.roads[roadId];
-    pushUndo();
-    const res = await fetch('/api/roads/' + roadId, {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ name, classification, number, expectedVersion: road ? road.version : 0 })
-    });
-    if (res.status === 409) { showToast('版本冲突, 正在刷新...', 'error'); loadData(); return; }
-    if (res.ok) {
-      const updated = await res.json();
-      roadStore.roads[roadId] = updated;
-      renderAll();
-      showToast('道路已保存');
+    editingEntityId = roadId;
+    try {
+      pushUndo();
+      const res = await fetch('/api/roads/' + roadId, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name, classification, number, expectedVersion: road ? road.version : 0 })
+      });
+      if (res.status === 409) {
+        const errData = await res.json();
+        showToast(`版本冲突: ${errData.error || '游戏内已修改'}`, 'error');
+        await loadData();
+        return;
+      }
+      if (res.ok) {
+        const updated = await res.json();
+        roadStore.roads[roadId] = updated;
+        renderAll();
+        showToast('道路已保存');
+      }
+    } catch (e) { showToast('网络错误', 'error'); }
+    finally {
+      editingEntityId = null;
     }
   } else {
     showToast('该路段未关联道路', 'error');

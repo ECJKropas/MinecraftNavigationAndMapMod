@@ -302,12 +302,6 @@ public class WayfarerHttpServer implements Runnable {
             return;
         }
 
-        Node existing = database.getNode(id);
-        if (existing == null) {
-            sendJson(req.exchange, 404, errorJson("Node not found"));
-            return;
-        }
-
         if (req.body == null) {
             sendJson(req.exchange, 400, errorJson("Missing request body"));
             return;
@@ -316,24 +310,42 @@ public class WayfarerHttpServer implements Runnable {
         try {
             JsonObject body = JsonParser.parseString(req.body).getAsJsonObject();
             int expectedVersion = body.has("expectedVersion") ? body.get("expectedVersion").getAsInt() : -1;
-            if (expectedVersion >= 0 && !database.checkVersion(id, expectedVersion)) {
-                JsonObject err = errorJson("Version conflict. Current: " + existing.getVersion());
-                sendJson(req.exchange, 409, err);
-                return;
-            }
 
-            if (body.has("x")) {
-                existing.setX(body.get("x").getAsDouble());
-            }
-            if (body.has("z")) {
-                existing.setZ(body.get("z").getAsDouble());
-            }
+            // Atomic version check + mutation
+            synchronized (database) {
+                Node existing = database.getNode(id);
+                if (existing == null) {
+                    sendJson(req.exchange, 404, errorJson("Node not found"));
+                    return;
+                }
 
-            existing.setModifiedAt(System.currentTimeMillis());
-            int nextVer = existing.getVersion() + 1;
-            existing.setVersion(nextVer);
-            database.saveToDisk();
-            sendJson(req.exchange, 200, GSON.toJsonTree(existing));
+                if (expectedVersion >= 0 && existing.getVersion() != expectedVersion) {
+                    JsonObject err = new JsonObject();
+                    err.addProperty("error", "Version conflict. Entity was modified in-game.");
+                    err.addProperty("currentVersion", existing.getVersion());
+                    sendJson(req.exchange, 409, err);
+                    return;
+                }
+
+                boolean positionChanged = false;
+                if (body.has("x")) {
+                    existing.setX(body.get("x").getAsDouble());
+                    positionChanged = true;
+                }
+                if (body.has("z")) {
+                    existing.setZ(body.get("z").getAsDouble());
+                    positionChanged = true;
+                }
+
+                if (positionChanged) {
+                    existing.setModifiedAt(System.currentTimeMillis());
+                    int nextVer = existing.getVersion() + 1;
+                    existing.setVersion(nextVer);
+                }
+
+                database.saveToDisk();
+                sendJson(req.exchange, 200, GSON.toJsonTree(existing));
+            }
         } catch (Exception e) {
             sendJson(req.exchange, 400, errorJson("Invalid JSON: " + e.getMessage()));
         }
@@ -564,38 +576,43 @@ public class WayfarerHttpServer implements Runnable {
                 return;
             }
 
-            // Version check
-            if (body.has("expectedVersions")) {
-                JsonObject expectedVersions = body.getAsJsonObject("expectedVersions");
-                for (int i = 0; i < segIdsArr.size(); i++) {
-                    String segIdStr = segIdsArr.get(i).getAsString();
-                    UUID segId = UUID.fromString(segIdStr);
-                    if (expectedVersions.has(segIdStr)) {
-                        int expected = expectedVersions.get(segIdStr).getAsInt();
-                        if (!database.checkVersion(segId, expected)) {
+            // Atomic version check + mutation
+            synchronized (database) {
+                if (body.has("expectedVersions")) {
+                    JsonObject expectedVersions = body.getAsJsonObject("expectedVersions");
+                    for (int i = 0; i < segIdsArr.size(); i++) {
+                        String segIdStr = segIdsArr.get(i).getAsString();
+                        UUID segId = UUID.fromString(segIdStr);
+                        if (expectedVersions.has(segIdStr)) {
+                            int expected = expectedVersions.get(segIdStr).getAsInt();
                             Segment seg = database.getSegment(segId);
-                            int cur = seg != null ? seg.getVersion() : -1;
-                            sendJson(req.exchange, 409,
-                                errorJson("Version conflict on " + segIdStr + ". Current: " + cur));
-                            return;
+                            if (seg == null || seg.getVersion() != expected) {
+                                int cur = seg != null ? seg.getVersion() : -1;
+                                JsonObject err = new JsonObject();
+                                err.addProperty("error",
+                                    "Version conflict on " + segIdStr + ". Entity was modified in-game.");
+                                err.addProperty("currentVersion", cur);
+                                sendJson(req.exchange, 409, err);
+                                return;
+                            }
                         }
                     }
                 }
-            }
 
-            List<UUID> segmentIds = new ArrayList<>();
-            for (int i = 0; i < segIdsArr.size(); i++) {
-                segmentIds.add(UUID.fromString(segIdsArr.get(i).getAsString()));
-            }
+                List<UUID> segmentIds = new ArrayList<>();
+                for (int i = 0; i < segIdsArr.size(); i++) {
+                    segmentIds.add(UUID.fromString(segIdsArr.get(i).getAsString()));
+                }
 
-            Segment merged = database.mergeSegments(segmentIds);
-            if (merged == null) {
-                sendJson(req.exchange, 400, errorJson("Merge failed: segments may not be connected"));
-                return;
-            }
+                Segment merged = database.mergeSegments(segmentIds);
+                if (merged == null) {
+                    sendJson(req.exchange, 400, errorJson("Merge failed: segments may not be connected"));
+                    return;
+                }
 
-            database.saveToDisk();
-            sendJson(req.exchange, 200, GSON.toJsonTree(merged));
+                database.saveToDisk();
+                sendJson(req.exchange, 200, GSON.toJsonTree(merged));
+            }
         } catch (Exception e) {
             sendJson(req.exchange, 400, errorJson("Invalid JSON: " + e.getMessage()));
         }
@@ -620,28 +637,34 @@ public class WayfarerHttpServer implements Runnable {
             JsonObject body = JsonParser.parseString(req.body).getAsJsonObject();
             int nodeIndex = body.get("nodeIndex").getAsInt();
 
-            if (body.has("expectedVersion")) {
-                int expectedVersion = body.get("expectedVersion").getAsInt();
-                if (!database.checkVersion(segId, expectedVersion)) {
+            // Atomic version check + mutation
+            synchronized (database) {
+                if (body.has("expectedVersion")) {
+                    int expectedVersion = body.get("expectedVersion").getAsInt();
                     Segment seg = database.getSegment(segId);
                     int cur = seg != null ? seg.getVersion() : -1;
-                    sendJson(req.exchange, 409, errorJson("Version conflict. Current: " + cur));
+                    if (seg == null || cur != expectedVersion) {
+                        JsonObject err = new JsonObject();
+                        err.addProperty("error", "Version conflict. Entity was modified in-game.");
+                        err.addProperty("currentVersion", cur);
+                        sendJson(req.exchange, 409, err);
+                        return;
+                    }
+                }
+
+                List<Segment> result = database.splitSegment(segId, nodeIndex);
+                if (result == null) {
+                    sendJson(req.exchange, 400, errorJson("Split failed: invalid nodeIndex"));
                     return;
                 }
-            }
 
-            List<Segment> result = database.splitSegment(segId, nodeIndex);
-            if (result == null) {
-                sendJson(req.exchange, 400, errorJson("Split failed: invalid nodeIndex"));
-                return;
+                database.saveToDisk();
+                JsonArray arr = new JsonArray();
+                for (Segment s : result) {
+                    arr.add(GSON.toJsonTree(s));
+                }
+                sendJson(req.exchange, 200, arr);
             }
-
-            database.saveToDisk();
-            JsonArray arr = new JsonArray();
-            for (Segment s : result) {
-                arr.add(GSON.toJsonTree(s));
-            }
-            sendJson(req.exchange, 200, arr);
         } catch (Exception e) {
             sendJson(req.exchange, 400, errorJson("Invalid JSON: " + e.getMessage()));
         }
@@ -668,27 +691,33 @@ public class WayfarerHttpServer implements Runnable {
             double z = body.get("z").getAsDouble();
             int insertIndex = body.get("insertIndex").getAsInt();
 
-            if (body.has("expectedVersion")) {
-                int expectedVersion = body.get("expectedVersion").getAsInt();
-                if (!database.checkVersion(segId, expectedVersion)) {
+            // Atomic version check + mutation
+            synchronized (database) {
+                if (body.has("expectedVersion")) {
+                    int expectedVersion = body.get("expectedVersion").getAsInt();
                     Segment seg = database.getSegment(segId);
                     int cur = seg != null ? seg.getVersion() : -1;
-                    sendJson(req.exchange, 409, errorJson("Version conflict. Current: " + cur));
+                    if (seg == null || cur != expectedVersion) {
+                        JsonObject err = new JsonObject();
+                        err.addProperty("error", "Version conflict. Entity was modified in-game.");
+                        err.addProperty("currentVersion", cur);
+                        sendJson(req.exchange, 409, err);
+                        return;
+                    }
+                }
+
+                Node newNode = database.insertNodeIntoSegment(segId, insertIndex, x, z);
+                if (newNode == null) {
+                    sendJson(req.exchange, 400, errorJson("Insert failed: invalid segment or insertIndex"));
                     return;
                 }
+
+                database.saveToDisk();
+
+                JsonObject result = new JsonObject();
+                result.add("node", GSON.toJsonTree(newNode));
+                sendJson(req.exchange, 201, result);
             }
-
-            Node newNode = database.insertNodeIntoSegment(segId, insertIndex, x, z);
-            if (newNode == null) {
-                sendJson(req.exchange, 400, errorJson("Insert failed: invalid segment or insertIndex"));
-                return;
-            }
-
-            database.saveToDisk();
-
-            JsonObject result = new JsonObject();
-            result.add("node", GSON.toJsonTree(newNode));
-            sendJson(req.exchange, 201, result);
         } catch (Exception e) {
             sendJson(req.exchange, 400, errorJson("Invalid JSON: " + e.getMessage()));
         }
@@ -709,41 +738,50 @@ public class WayfarerHttpServer implements Runnable {
             UUID segIdB = UUID.fromString(body.get("segmentIdB").getAsString());
             int indexB = body.get("insertIndexB").getAsInt();
 
-            // Version checks
-            if (body.has("expectedVersionA")) {
-                int va = body.get("expectedVersionA").getAsInt();
-                if (!database.checkVersion(segIdA, va)) {
+            // Atomic version check + mutation
+            synchronized (database) {
+                // Version checks
+                if (body.has("expectedVersionA")) {
+                    int va = body.get("expectedVersionA").getAsInt();
                     Segment s = database.getSegment(segIdA);
                     int cur = s != null ? s.getVersion() : -1;
-                    sendJson(req.exchange, 409, errorJson("Version conflict on A. Current: " + cur));
-                    return;
+                    if (s == null || cur != va) {
+                        JsonObject err = new JsonObject();
+                        err.addProperty("error", "Version conflict on A. Entity was modified in-game.");
+                        err.addProperty("currentVersion", cur);
+                        sendJson(req.exchange, 409, err);
+                        return;
+                    }
                 }
-            }
-            if (body.has("expectedVersionB")) {
-                int vb = body.get("expectedVersionB").getAsInt();
-                if (!database.checkVersion(segIdB, vb)) {
+                if (body.has("expectedVersionB")) {
+                    int vb = body.get("expectedVersionB").getAsInt();
                     Segment s = database.getSegment(segIdB);
                     int cur = s != null ? s.getVersion() : -1;
-                    sendJson(req.exchange, 409, errorJson("Version conflict on B. Current: " + cur));
+                    if (s == null || cur != vb) {
+                        JsonObject err = new JsonObject();
+                        err.addProperty("error", "Version conflict on B. Entity was modified in-game.");
+                        err.addProperty("currentVersion", cur);
+                        sendJson(req.exchange, 409, err);
+                        return;
+                    }
+                }
+
+                if (database.getSegment(segIdA) == null || database.getSegment(segIdB) == null) {
+                    sendJson(req.exchange, 404, errorJson("Segment not found"));
                     return;
                 }
-            }
 
-            if (database.getSegment(segIdA) == null || database.getSegment(segIdB) == null) {
-                sendJson(req.exchange, 404, errorJson("Segment not found"));
-                return;
-            }
+                Node newNode = database.insertNodeAtIntersection(segIdA, indexA, segIdB, indexB, x, z);
+                if (newNode == null) {
+                    sendJson(req.exchange, 400, errorJson("Insertion failed (invalid indices or same segment)"));
+                    return;
+                }
 
-            Node newNode = database.insertNodeAtIntersection(segIdA, indexA, segIdB, indexB, x, z);
-            if (newNode == null) {
-                sendJson(req.exchange, 400, errorJson("Insertion failed (invalid indices or same segment)"));
-                return;
+                database.saveToDisk();
+                JsonObject result = new JsonObject();
+                result.add("node", GSON.toJsonTree(newNode));
+                sendJson(req.exchange, 201, result);
             }
-
-            database.saveToDisk();
-            JsonObject result = new JsonObject();
-            result.add("node", GSON.toJsonTree(newNode));
-            sendJson(req.exchange, 201, result);
         } catch (Exception e) {
             sendJson(req.exchange, 400, errorJson("Invalid JSON: " + e.getMessage()));
         }
@@ -759,12 +797,6 @@ public class WayfarerHttpServer implements Runnable {
             return;
         }
 
-        Road existing = database.getRoad(id);
-        if (existing == null) {
-            sendJson(req.exchange, 404, errorJson("Road not found"));
-            return;
-        }
-
         if (req.body == null) {
             sendJson(req.exchange, 400, errorJson("Missing request body"));
             return;
@@ -773,34 +805,54 @@ public class WayfarerHttpServer implements Runnable {
         try {
             JsonObject body = JsonParser.parseString(req.body).getAsJsonObject();
             int expectedVersion = body.has("expectedVersion") ? body.get("expectedVersion").getAsInt() : -1;
-            if (expectedVersion >= 0 && !database.checkVersion(id, expectedVersion)) {
-                JsonObject err = errorJson("Version conflict. Current: " + existing.getVersion());
-                sendJson(req.exchange, 409, err);
-                return;
-            }
 
-            if (body.has("name")) {
-                existing.setName(body.get("name").getAsString());
-            }
-            if (body.has("color")) {
-                existing.setColor(body.get("color").getAsString());
-            }
-            if (body.has("classification")) {
-                String cls = body.get("classification").getAsString();
-                // 归一化：旧数据可能存的是 "G国道" 这种多字符格式
-                if (cls.length() > 1 && cls.matches("^[GSXYC].*")) {
-                    cls = cls.substring(0, 1);
+            // Atomic version check + mutation
+            synchronized (database) {
+                Road existing = database.getRoad(id);
+                if (existing == null) {
+                    sendJson(req.exchange, 404, errorJson("Road not found"));
+                    return;
                 }
-                existing.setClassification(cls);
-            }
-            if (body.has("number")) {
-                existing.setNumber(body.get("number").getAsString());
-            }
 
-            int nextVer = existing.getVersion() + 1;
-            existing.setVersion(nextVer);
-            database.saveToDisk();
-            sendJson(req.exchange, 200, GSON.toJsonTree(existing));
+                if (expectedVersion >= 0 && existing.getVersion() != expectedVersion) {
+                    JsonObject err = new JsonObject();
+                    err.addProperty("error", "Version conflict. Entity was modified in-game.");
+                    err.addProperty("currentVersion", existing.getVersion());
+                    sendJson(req.exchange, 409, err);
+                    return;
+                }
+
+                boolean changed = false;
+                if (body.has("name")) {
+                    existing.setName(body.get("name").getAsString());
+                    changed = true;
+                }
+                if (body.has("color")) {
+                    existing.setColor(body.get("color").getAsString());
+                    changed = true;
+                }
+                if (body.has("classification")) {
+                    String cls = body.get("classification").getAsString();
+                    if (cls.length() > 1 && cls.matches("^[GSXYC].*")) {
+                        cls = cls.substring(0, 1);
+                    }
+                    existing.setClassification(cls);
+                    changed = true;
+                }
+                if (body.has("number")) {
+                    existing.setNumber(body.get("number").getAsString());
+                    changed = true;
+                }
+
+                if (changed) {
+                    int nextVer = existing.getVersion() + 1;
+                    existing.setVersion(nextVer);
+                    existing.setModifiedAt(System.currentTimeMillis());
+                }
+
+                database.saveToDisk();
+                sendJson(req.exchange, 200, GSON.toJsonTree(existing));
+            }
         } catch (Exception e) {
             sendJson(req.exchange, 400, errorJson("Invalid JSON: " + e.getMessage()));
         }

@@ -29,6 +29,7 @@ public class Segment {
     private Source source;
     private Status status;
     private int version;
+    private long modifiedAt;
 
     public Segment() {}
 
@@ -39,6 +40,7 @@ public class Segment {
         this.source = source;
         this.status = status;
         this.version = version;
+        this.modifiedAt = System.currentTimeMillis();
     }
 
     public UUID getId() {
@@ -87,5 +89,13 @@ public class Segment {
 
     public void setVersion(int version) {
         this.version = version;
+    }
+
+    public long getModifiedAt() {
+        return modifiedAt;
+    }
+
+    public void setModifiedAt(long modifiedAt) {
+        this.modifiedAt = modifiedAt;
     }
 }

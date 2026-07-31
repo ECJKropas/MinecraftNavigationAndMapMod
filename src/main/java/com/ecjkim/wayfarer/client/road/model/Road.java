@@ -35,6 +35,7 @@ public class Road {
     private String number = "";
     private List<UUID> segmentIds;
     private int version;
+    private long modifiedAt;
 
     public Road() {}
 
@@ -44,6 +45,7 @@ public class Road {
         this.color = color != null ? color : "#FFFFFF";
         this.segmentIds = segmentIds;
         this.version = version;
+        this.modifiedAt = System.currentTimeMillis();
     }
 
     public Road(UUID id, String name, String color, String classification, String number, List<UUID> segmentIds,
@@ -55,6 +57,7 @@ public class Road {
         this.number = number != null ? number : "";
         this.segmentIds = segmentIds;
         this.version = version;
+        this.modifiedAt = System.currentTimeMillis();
     }
 
     public UUID getId() {
@@ -111,5 +114,13 @@ public class Road {
 
     public void setVersion(int version) {
         this.version = version;
+    }
+
+    public long getModifiedAt() {
+        return modifiedAt;
+    }
+
+    public void setModifiedAt(long modifiedAt) {
+        this.modifiedAt = modifiedAt;
     }
 }

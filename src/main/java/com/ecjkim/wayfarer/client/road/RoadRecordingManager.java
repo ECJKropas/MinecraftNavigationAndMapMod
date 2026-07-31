@@ -235,6 +235,8 @@ public class RoadRecordingManager {
             List<UUID> newIds = new ArrayList<>(bestSeg.getNodeIds());
             newIds.add(bestInsertAfter + 1, newNode.getId());
             bestSeg.setNodeIds(newIds);
+            bestSeg.setVersion(bestSeg.getVersion() + 1);
+            bestSeg.setModifiedAt(now);
             return newNode.getId();
         }
 

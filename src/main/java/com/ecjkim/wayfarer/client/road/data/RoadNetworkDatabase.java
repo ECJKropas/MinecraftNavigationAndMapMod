@@ -568,6 +568,7 @@ public class RoadNetworkDatabase {
     // ---------- Segment CRUD ----------
 
     public synchronized void addSegment(Segment segment) {
+        segment.setModifiedAt(System.currentTimeMillis());
         segments.put(segment.getId(), segment);
         markDirty();
     }
@@ -584,6 +585,8 @@ public class RoadNetworkDatabase {
             if (updated.getNodeIds() != null) {
                 existing.setNodeIds(updated.getNodeIds());
             }
+            existing.setVersion(existing.getVersion() + 1);
+            existing.setModifiedAt(System.currentTimeMillis());
             maybeCleanupOrphans();
         }
     }
@@ -735,6 +738,7 @@ public class RoadNetworkDatabase {
     // ---------- Road CRUD ----------
 
     public synchronized void addRoad(Road road) {
+        road.setModifiedAt(System.currentTimeMillis());
         roads.put(road.getId(), road);
         markDirty();
     }
@@ -755,6 +759,8 @@ public class RoadNetworkDatabase {
             if (updated.getColor() != null) {
                 existing.setColor(updated.getColor());
             }
+            existing.setVersion(existing.getVersion() + 1);
+            existing.setModifiedAt(System.currentTimeMillis());
             markDirty();
         }
     }
@@ -796,6 +802,7 @@ public class RoadNetworkDatabase {
         if (segment != null) {
             int next = segment.getVersion() + 1;
             segment.setVersion(next);
+            segment.setModifiedAt(System.currentTimeMillis());
             markDirty();
             return next;
         }
@@ -803,6 +810,7 @@ public class RoadNetworkDatabase {
         if (road != null) {
             int next = road.getVersion() + 1;
             road.setVersion(next);
+            road.setModifiedAt(System.currentTimeMillis());
             markDirty();
             return next;
         }
@@ -1100,7 +1108,8 @@ public class RoadNetworkDatabase {
             return null;
 
         long now = System.currentTimeMillis();
-        Node newNode = new Node(UUID.randomUUID(), x, 0, z, CornerType.AUTO, Source.USER, 1, now);
+        double y = interpolateY(ids, insertIndex, x, z);
+        Node newNode = new Node(UUID.randomUUID(), x, y, z, CornerType.AUTO, Source.USER, 1, now);
         nodes.put(newNode.getId(), newNode);
 
         List<UUID> leftIds = new ArrayList<>(ids.subList(0, insertIndex));
@@ -1141,7 +1150,8 @@ public class RoadNetworkDatabase {
             return null;
         }
         long now = System.currentTimeMillis();
-        Node newNode = new Node(UUID.randomUUID(), x, 0, z, CornerType.AUTO, Source.USER, 1, now);
+        double y = interpolateYForIntersection(segIdA, insertIndexA, segIdB, insertIndexB);
+        Node newNode = new Node(UUID.randomUUID(), x, y, z, CornerType.AUTO, Source.USER, 1, now);
         nodes.put(newNode.getId(), newNode);
 
         splitSegmentWithNode(segIdA, insertIndexA, newNode.getId());
@@ -1187,7 +1197,13 @@ public class RoadNetworkDatabase {
 
     /**
      * Returns all entities modified since the given timestamp. The returned JsonObject contains "nodes", "segments",
-     * and "roads" arrays.
+     * and "roads" arrays, plus a "serverTime" field for the client to use in the next delta request.
+     *
+     * <p>
+     * Conflict resolution: non-conflicting edits (on different entities) are merged automatically by design — each
+     * entity has its own version counter, so modifying Node A and Node B concurrently never conflicts. Only
+     * modifications to the same entity produce a version conflict (409).
+     * </p>
      */
     public JsonObject getDeltaSince(long since) {
         JsonObject delta = new JsonObject();
@@ -1202,18 +1218,21 @@ public class RoadNetworkDatabase {
 
         JsonArray deltaSegs = new JsonArray();
         for (Segment seg : segments.values()) {
-            // Segments don't have modifiedAt, treat all as changed if any node has been modified
-            // For now, include all segments — delta is lightweight
-            deltaSegs.add(GSON.toJsonTree(seg));
+            if (seg.getModifiedAt() > since) {
+                deltaSegs.add(GSON.toJsonTree(seg));
+            }
         }
         delta.add("segments", deltaSegs);
 
         JsonArray deltaRoads = new JsonArray();
         for (Road road : roads.values()) {
-            deltaRoads.add(GSON.toJsonTree(road));
+            if (road.getModifiedAt() > since) {
+                deltaRoads.add(GSON.toJsonTree(road));
+            }
         }
         delta.add("roads", deltaRoads);
 
+        delta.addProperty("serverTime", System.currentTimeMillis());
         return delta;
     }
 
@@ -1224,10 +1243,10 @@ public class RoadNetworkDatabase {
     }
 
     /**
-     * Serializes the full network to disk synchronously.
+     * Serializes the full network to disk synchronously. Does NOT run graphify — callers must explicitly invoke
+     * {@link #maybeGraphify()} on the main thread before calling this method if needed.
      */
     public synchronized void saveToDisk() {
-        maybeGraphify();
         try {
             Files.createDirectories(savePath.getParent());
 
@@ -1331,6 +1350,97 @@ public class RoadNetworkDatabase {
      */
     public void asyncSave() {
         CompletableFuture.runAsync(this::saveToDisk);
+    }
+
+    // ---------- Y coordinate interpolation ----------
+
+    /**
+     * Interpolates a Y coordinate for a node being inserted into a segment. Uses linear interpolation between the two
+     * nearest neighbor nodes (before and after the insertion point).
+     */
+    private double interpolateY(List<UUID> ids, int insertIndex, double x, double z) {
+        int beforeIdx = insertIndex - 1;
+        int afterIdx = insertIndex;
+
+        if (beforeIdx >= 0 && afterIdx < ids.size()) {
+            Node before = nodes.get(ids.get(beforeIdx));
+            Node after = nodes.get(ids.get(afterIdx));
+            if (before != null && after != null) {
+                // Linear interpolation between before and after
+                double t = (double)beforeIdx / (beforeIdx + 1);
+                // Use the actual position along the segment for interpolation
+                // Find the actual position ratio based on distances
+                double segLen =
+                    Math.sqrt(Math.pow(after.getX() - before.getX(), 2) + Math.pow(after.getZ() - before.getZ(), 2));
+                if (segLen > 0.001) {
+                    double distFromBefore = Math.sqrt(Math.pow(x - before.getX(), 2) + Math.pow(z - before.getZ(), 2));
+                    t = Math.min(1.0, Math.max(0.0, distFromBefore / segLen));
+                }
+                return before.getY() + t * (after.getY() - before.getY());
+            }
+        }
+
+        // Fallback: use single neighbor's Y
+        if (beforeIdx >= 0) {
+            Node before = nodes.get(ids.get(beforeIdx));
+            if (before != null)
+                return before.getY();
+        }
+        if (afterIdx < ids.size()) {
+            Node after = nodes.get(ids.get(afterIdx));
+            if (after != null)
+                return after.getY();
+        }
+
+        return 64.0; // Default Minecraft sea level
+    }
+
+    /**
+     * Interpolates Y coordinate for an intersection insert by averaging Y from both segments.
+     */
+    private double interpolateYForIntersection(UUID segIdA, int idxA, UUID segIdB, int idxB) {
+        double yA = interpolateYForSegment(segIdA, idxA);
+        double yB = interpolateYForSegment(segIdB, idxB);
+        if (Double.isNaN(yA) && Double.isNaN(yB))
+            return 64.0;
+        if (Double.isNaN(yA))
+            return yB;
+        if (Double.isNaN(yB))
+            return yA;
+        return (yA + yB) / 2.0;
+    }
+
+    private double interpolateYForSegment(UUID segId, int insertIndex) {
+        Segment seg = segments.get(segId);
+        if (seg == null || seg.getNodeIds() == null)
+            return Double.NaN;
+        List<UUID> ids = seg.getNodeIds();
+        int beforeIdx = insertIndex - 1;
+        int afterIdx = insertIndex;
+
+        if (beforeIdx >= 0 && afterIdx < ids.size()) {
+            Node before = nodes.get(ids.get(beforeIdx));
+            Node after = nodes.get(ids.get(afterIdx));
+            if (before != null && after != null) {
+                return (before.getY() + after.getY()) / 2.0;
+            }
+            if (before != null)
+                return before.getY();
+            if (after != null)
+                return after.getY();
+        }
+
+        if (beforeIdx >= 0) {
+            Node before = nodes.get(ids.get(beforeIdx));
+            if (before != null)
+                return before.getY();
+        }
+        if (afterIdx < ids.size()) {
+            Node after = nodes.get(ids.get(afterIdx));
+            if (after != null)
+                return after.getY();
+        }
+        return Double.NaN;
     }
 
     // ---------- GeoJSON export ----------
