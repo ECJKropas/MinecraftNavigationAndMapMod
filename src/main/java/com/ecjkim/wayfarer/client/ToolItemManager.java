@@ -16,6 +16,9 @@
  */
 package com.ecjkim.wayfarer.client;
 
+import java.util.ArrayList;
+import java.util.List;
+import java.util.function.Consumer;
 import java.util.logging.Logger;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -47,15 +50,41 @@ public final class ToolItemManager {
     private static final Pattern TOOL_PATTERN =
         Pattern.compile("^([a-z0-9_.-]+:[a-z0-9_./-]+)(?:@(\\d+))?(?:\\{(.*)})?$");
     private static ItemStack toolItem = ItemStack.EMPTY;
+    private static final List<Consumer<ItemStack>> listeners = new ArrayList<>();
 
     private ToolItemManager() {}
+
+    /**
+     * Register a listener that will be called when the tool item changes.
+     * 
+     * @param listener callback receiving the new tool item stack
+     */
+    public static void addChangeListener(Consumer<ItemStack> listener) {
+        listeners.add(listener);
+    }
+
+    private static void notifyListeners(ItemStack newItem) {
+        for (Consumer<ItemStack> listener : listeners) {
+            try {
+                listener.accept(newItem);
+            } catch (Exception e) {
+                LOGGER.warning("Error in tool item change listener: " + e.getMessage());
+            }
+        }
+    }
 
     public static ItemStack getToolItem() {
         return toolItem;
     }
 
     public static void setToolItem(String configStr) {
-        toolItem = parseToolItem(configStr);
+        ItemStack newItem = parseToolItem(configStr);
+        if (!ItemStack.matches(toolItem, newItem)) {
+            toolItem = newItem;
+            notifyListeners(newItem);
+        } else {
+            toolItem = newItem;
+        }
     }
 
     public static void setHeldItemAsTool(Player player) {
