@@ -16,6 +16,7 @@
  */
 package com.ecjkim.wayfarer.client;
 
+import java.util.logging.Logger;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -42,6 +43,7 @@ import net.minecraft.world.item.ItemStack;
  * </p>
  */
 public final class ToolItemManager {
+    private static final Logger LOGGER = Logger.getLogger("Wayfarer|ToolItem");
     private static final Pattern TOOL_PATTERN =
         Pattern.compile("^([a-z0-9_.-]+:[a-z0-9_./-]+)(?:@(\\d+))?(?:\\{(.*)})?$");
     private static ItemStack toolItem = ItemStack.EMPTY;
@@ -132,7 +134,8 @@ public final class ToolItemManager {
         if (damageStr != null && !damageStr.isEmpty()) {
             try {
                 damage = Integer.parseInt(damageStr);
-            } catch (NumberFormatException ignored) {
+            } catch (NumberFormatException e) {
+                LOGGER.warning("Invalid damage value in tool config '" + configStr + "': " + e.getMessage());
             }
         }
         ItemStack stack = new ItemStack(BuiltInRegistries.ITEM.get(id));
@@ -143,7 +146,8 @@ public final class ToolItemManager {
             try {
                 CompoundTag tag = TagParser.parseTag(nbtStr);
                 stack.setTag(tag);
-            } catch (Exception ignored) {
+            } catch (Exception e) {
+                LOGGER.warning("Invalid NBT in tool config '" + configStr + "': " + e.getMessage());
             }
         }
         return stack;
