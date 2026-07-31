@@ -60,7 +60,7 @@ public class RoadMetadataScreen extends Screen {
     @Override
     protected void init() {
         // Initialize classification from config default
-        String defaultCls = WayfarerConfig.getInstance().defaultClassification;
+        String defaultCls = WayfarerConfig.getInstance().getDefaultClassification();
         if (defaultCls != null && !defaultCls.isEmpty()) {
             int idx = CLASSIFICATIONS.indexOf(defaultCls);
             if (idx >= 0) {
@@ -232,7 +232,7 @@ public class RoadMetadataScreen extends Screen {
             }
         }
         db.removeSegment(segment.getId());
-        db.asyncSave();
+        db.saveToDisk();
     }
 
     private String classificationLabel() {

@@ -53,6 +53,40 @@ public class WayfarerConfig {
 
     private WayfarerConfig() {}
 
+    // -- Live getters --
+
+    public String getDefaultClassification() {
+        return defaultClassification;
+    }
+
+    public boolean isAutoIntegral() {
+        return autoIntegral;
+    }
+
+    public boolean isAutoSnapEndpoints() {
+        return autoSnapEndpoints;
+    }
+
+    public double getRdpEpsilon() {
+        return rdpEpsilon;
+    }
+
+    public boolean isAutoDeleteOrphanNodes() {
+        return autoDeleteOrphanNodes;
+    }
+
+    public boolean isAutoGraphify() {
+        return autoGraphify;
+    }
+
+    public boolean isToolItemEnabled() {
+        return toolItemEnabled;
+    }
+
+    public String getToolItem() {
+        return toolItem;
+    }
+
     public static WayfarerConfig getInstance() {
         if (instance == null) {
             instance = load();

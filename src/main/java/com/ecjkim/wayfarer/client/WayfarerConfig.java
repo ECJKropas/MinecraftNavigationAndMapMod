@@ -28,32 +28,52 @@ import fi.dy.masa.malilib.hotkeys.IKeybind;
 public class WayfarerConfig {
     private static WayfarerConfig instance;
 
-    public final String defaultClassification;
-    public final boolean autoIntegral;
-    public final boolean autoSnapEndpoints;
-    public final double rdpEpsilon;
-    public final boolean autoDeleteOrphanNodes;
-    public final boolean autoGraphify;
-    // Non-final — mutable at runtime via setToolItem / setHeldItemAsTool
-    public String toolItem;
-    public boolean toolItemEnabled;
-    public final boolean nodeIndicatorEnabled;
-    public final double nodeIndicatorBeamHeight;
-    public final double nodeIndicatorBeamAlpha;
+    private WayfarerConfig() {}
 
-    private WayfarerConfig() {
-        this.defaultClassification =
-            WayfarerConfigs.Generic.DEFAULT_CLASSIFICATION.getOptionListValue().getStringValue();
-        this.autoIntegral = WayfarerConfigs.Generic.AUTO_INTEGRAL.getBooleanValue();
-        this.autoSnapEndpoints = WayfarerConfigs.Generic.AUTO_SNAP_ENDPOINTS.getBooleanValue();
-        this.rdpEpsilon = WayfarerConfigs.Generic.RDP_EPSILON.getDoubleValue();
-        this.autoDeleteOrphanNodes = WayfarerConfigs.Generic.AUTO_DELETE_ORPHAN_NODES.getBooleanValue();
-        this.autoGraphify = WayfarerConfigs.Generic.AUTO_GRAPHIFY.getBooleanValue();
-        this.toolItem = WayfarerConfigs.Generic.TOOL_ITEM.getStringValue();
-        this.toolItemEnabled = WayfarerConfigs.Generic.TOOL_ITEM_ENABLED.getBooleanValue();
-        this.nodeIndicatorEnabled = WayfarerConfigs.Generic.NODE_INDICATOR_ENABLED.getBooleanValue();
-        this.nodeIndicatorBeamHeight = WayfarerConfigs.Generic.NODE_INDICATOR_BEAM_HEIGHT.getDoubleValue();
-        this.nodeIndicatorBeamAlpha = WayfarerConfigs.Generic.NODE_INDICATOR_BEAM_ALPHA.getDoubleValue();
+    // -- Live getters (read from malilib config each call, never stale) --
+
+    public String getDefaultClassification() {
+        return WayfarerConfigs.Generic.DEFAULT_CLASSIFICATION.getOptionListValue().getStringValue();
+    }
+
+    public boolean isAutoIntegral() {
+        return WayfarerConfigs.Generic.AUTO_INTEGRAL.getBooleanValue();
+    }
+
+    public boolean isAutoSnapEndpoints() {
+        return WayfarerConfigs.Generic.AUTO_SNAP_ENDPOINTS.getBooleanValue();
+    }
+
+    public double getRdpEpsilon() {
+        return WayfarerConfigs.Generic.RDP_EPSILON.getDoubleValue();
+    }
+
+    public boolean isAutoDeleteOrphanNodes() {
+        return WayfarerConfigs.Generic.AUTO_DELETE_ORPHAN_NODES.getBooleanValue();
+    }
+
+    public boolean isAutoGraphify() {
+        return WayfarerConfigs.Generic.AUTO_GRAPHIFY.getBooleanValue();
+    }
+
+    public boolean isToolItemEnabled() {
+        return WayfarerConfigs.Generic.TOOL_ITEM_ENABLED.getBooleanValue();
+    }
+
+    public String getToolItem() {
+        return WayfarerConfigs.Generic.TOOL_ITEM.getStringValue();
+    }
+
+    public boolean isNodeIndicatorEnabled() {
+        return WayfarerConfigs.Generic.NODE_INDICATOR_ENABLED.getBooleanValue();
+    }
+
+    public double getNodeIndicatorBeamHeight() {
+        return WayfarerConfigs.Generic.NODE_INDICATOR_BEAM_HEIGHT.getDoubleValue();
+    }
+
+    public double getNodeIndicatorBeamAlpha() {
+        return WayfarerConfigs.Generic.NODE_INDICATOR_BEAM_ALPHA.getDoubleValue();
     }
 
     public static WayfarerConfig getInstance() {
@@ -68,7 +88,6 @@ public class WayfarerConfig {
     }
 
     public void setToolItem(String value) {
-        this.toolItem = value;
         WayfarerConfigs.Generic.TOOL_ITEM.setValueFromString(value);
     }
 

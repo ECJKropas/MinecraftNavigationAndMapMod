@@ -154,7 +154,7 @@ public class WayfarerClient implements ClientModInitializer {
             hadToolLastTick = false;
             return;
         }
-        if (!WayfarerConfig.getInstance().toolItemEnabled) {
+        if (!WayfarerConfig.getInstance().isToolItemEnabled()) {
             hadToolLastTick = false;
             return;
         }
@@ -209,7 +209,7 @@ public class WayfarerClient implements ClientModInitializer {
             return;
 
         // Auto / Survey mutual exclusion
-        if (ToolItemManager.hasToolItem(player) && WayfarerConfig.getInstance().toolItemEnabled) {
+        if (ToolItemManager.hasToolItem(player) && WayfarerConfig.getInstance().isToolItemEnabled()) {
             if (!ROAD_MANAGER.isRecording()) {
                 player.displayClientMessage(Component.literal("正在 Survey 模式，请切换手中物品后重试"), false);
             }

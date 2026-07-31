@@ -309,7 +309,13 @@ public class WayfarerHttpServer implements Runnable {
 
         try {
             JsonObject body = JsonParser.parseString(req.body).getAsJsonObject();
-            int expectedVersion = body.has("expectedVersion") ? body.get("expectedVersion").getAsInt() : -1;
+
+            // Require expectedVersion
+            if (!body.has("expectedVersion")) {
+                sendJson(req.exchange, 400, errorJson("Missing expectedVersion"));
+                return;
+            }
+            int expectedVersion = body.get("expectedVersion").getAsInt();
 
             // Atomic version check + mutation
             synchronized (database) {
@@ -319,7 +325,7 @@ public class WayfarerHttpServer implements Runnable {
                     return;
                 }
 
-                if (expectedVersion >= 0 && existing.getVersion() != expectedVersion) {
+                if (existing.getVersion() != expectedVersion) {
                     JsonObject err = new JsonObject();
                     err.addProperty("error", "Version conflict. Entity was modified in-game.");
                     err.addProperty("currentVersion", existing.getVersion());
@@ -327,12 +333,20 @@ public class WayfarerHttpServer implements Runnable {
                     return;
                 }
 
+                // Validate x/z must be provided together
+                boolean hasX = body.has("x");
+                boolean hasZ = body.has("z");
+                if (hasX != hasZ) {
+                    sendJson(req.exchange, 400, errorJson("x and z must be provided together"));
+                    return;
+                }
+
                 boolean positionChanged = false;
-                if (body.has("x")) {
+                if (hasX) {
                     existing.setX(body.get("x").getAsDouble());
                     positionChanged = true;
                 }
-                if (body.has("z")) {
+                if (hasZ) {
                     existing.setZ(body.get("z").getAsDouble());
                     positionChanged = true;
                 }
@@ -804,7 +818,13 @@ public class WayfarerHttpServer implements Runnable {
 
         try {
             JsonObject body = JsonParser.parseString(req.body).getAsJsonObject();
-            int expectedVersion = body.has("expectedVersion") ? body.get("expectedVersion").getAsInt() : -1;
+
+            // Require expectedVersion
+            if (!body.has("expectedVersion")) {
+                sendJson(req.exchange, 400, errorJson("Missing expectedVersion"));
+                return;
+            }
+            int expectedVersion = body.get("expectedVersion").getAsInt();
 
             // Atomic version check + mutation
             synchronized (database) {
@@ -814,7 +834,7 @@ public class WayfarerHttpServer implements Runnable {
                     return;
                 }
 
-                if (expectedVersion >= 0 && existing.getVersion() != expectedVersion) {
+                if (existing.getVersion() != expectedVersion) {
                     JsonObject err = new JsonObject();
                     err.addProperty("error", "Version conflict. Entity was modified in-game.");
                     err.addProperty("currentVersion", existing.getVersion());
@@ -879,14 +899,15 @@ public class WayfarerHttpServer implements Runnable {
     }
 
     /**
-     * POST /api/roads/restore Replaces the entire in-memory road network with the given JSON snapshot.
+     * POST /api/roads/restore Merges the snapshot with the current state: only reverts entities that were modified
+     * exactly once since the snapshot. Concurrent in-game edits are preserved.
      */
     private void handleRestoreRoads(Request req) {
         try {
             String raw = new String(req.exchange.getRequestBody().readAllBytes(), StandardCharsets.UTF_8);
             JsonObject body = JsonParser.parseString(raw).getAsJsonObject();
-            database.restoreFromJson(body);
-            sendJson(req.exchange, 200, okJson("Restored"));
+            JsonObject result = database.restoreFromJson(body);
+            sendJson(req.exchange, 200, result);
         } catch (Exception e) {
             LOGGER.log(Level.WARNING, "Restore failed: {0}", e.getMessage());
             sendJson(req.exchange, 400, errorJson("Invalid snapshot: " + e.getMessage()));

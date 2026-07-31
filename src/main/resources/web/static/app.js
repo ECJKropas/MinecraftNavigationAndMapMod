@@ -117,7 +117,7 @@ function pushUndo() {
 async function undo() {
   if (undoStack.length === 0) return;
   redoStack.push(snapshotStore());
-  editingEntityId = '__undo__';  // Block delta during restore
+  editingEntityId = '__undo__';
   try {
     const snap = undoStack.pop();
     const res = await fetch('/api/roads/restore', {
@@ -129,12 +129,17 @@ async function undo() {
       showToast('撤销失败', 'error');
       return;
     }
-    lastSyncServerTime = 0;  // Force full reload after restore
+    const result = await res.json();
+    if (result.warning) {
+      showToast(result.warning, 'warn');
+    } else {
+      showToast('已撤销', 'info');
+    }
+    lastSyncServerTime = 0;
     clearSelection();
     mergeFirstNodeId = null;
     await loadData();
     undoButtonStyle();
-    showToast('已撤销', 'info');
   } catch (e) { showToast('网络错误', 'error'); }
   finally {
     editingEntityId = null;
@@ -144,7 +149,7 @@ async function undo() {
 async function redo() {
   if (redoStack.length === 0) return;
   undoStack.push(snapshotStore());
-  editingEntityId = '__redo__';  // Block delta during restore
+  editingEntityId = '__redo__';
   try {
     const snap = redoStack.pop();
     const res = await fetch('/api/roads/restore', {
@@ -156,12 +161,17 @@ async function redo() {
       showToast('重做失败', 'error');
       return;
     }
-    lastSyncServerTime = 0;  // Force full reload after restore
+    const result = await res.json();
+    if (result.warning) {
+      showToast(result.warning, 'warn');
+    } else {
+      showToast('已重做', 'info');
+    }
+    lastSyncServerTime = 0;
     clearSelection();
     mergeFirstNodeId = null;
     await loadData();
     undoButtonStyle();
-    showToast('已重做', 'info');
   } catch (e) { showToast('网络错误', 'error'); }
   finally {
     editingEntityId = null;

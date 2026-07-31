@@ -66,7 +66,7 @@ public final class SurveyHud {
             return;
 
         WayfarerConfig config = WayfarerConfig.getInstance();
-        if (!config.toolItemEnabled)
+        if (!config.isToolItemEnabled())
             return;
 
         boolean hasTool = ToolItemManager.hasToolItem(client.player);

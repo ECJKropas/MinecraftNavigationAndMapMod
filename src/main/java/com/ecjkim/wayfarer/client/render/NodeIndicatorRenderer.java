@@ -61,7 +61,7 @@ public final class NodeIndicatorRenderer {
             return;
 
         WayfarerConfig config = WayfarerConfig.getInstance();
-        if (!config.nodeIndicatorEnabled || !config.toolItemEnabled)
+        if (!config.isNodeIndicatorEnabled() || !config.isToolItemEnabled())
             return;
         if (!ToolItemManager.hasToolItem(client.player))
             return;
@@ -77,8 +77,8 @@ public final class NodeIndicatorRenderer {
         double camY = ctx.camera().getPosition().y;
         double camZ = ctx.camera().getPosition().z;
 
-        float beamHeight = (float)config.nodeIndicatorBeamHeight;
-        float beamAlpha = (float)config.nodeIndicatorBeamAlpha;
+        float beamHeight = (float)config.getNodeIndicatorBeamHeight();
+        float beamAlpha = (float)config.getNodeIndicatorBeamAlpha();
 
         RenderSystem.enableBlend();
         RenderSystem.defaultBlendFunc();

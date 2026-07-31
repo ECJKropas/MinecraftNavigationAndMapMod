@@ -171,11 +171,11 @@ public final class ToolItemManager {
 
     /** Returns true if the tool item config is enabled and a tool is set. */
     public static boolean isEnabled() {
-        return WayfarerConfig.getInstance().toolItemEnabled && !toolItem.isEmpty();
+        return WayfarerConfig.getInstance().isToolItemEnabled() && !toolItem.isEmpty();
     }
 
     public static void reload() {
         WayfarerConfig config = WayfarerConfig.getInstance();
-        setToolItem(config.toolItem);
+        setToolItem(config.getToolItem());
     }
 }

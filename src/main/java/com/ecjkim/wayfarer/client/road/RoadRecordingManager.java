@@ -79,7 +79,7 @@ public class RoadRecordingManager {
         double y = player.getY();
         double z = player.getZ();
 
-        if (WayfarerConfig.getInstance().autoIntegral) {
+        if (WayfarerConfig.getInstance().isAutoIntegral()) {
             x = Math.round(x);
             y = Math.round(y);
             z = Math.round(z);
@@ -110,12 +110,12 @@ public class RoadRecordingManager {
         List<double[]> copy = new ArrayList<>(sessionPoints);
         WayfarerConfig config = WayfarerConfig.getInstance();
         RoadNetworkDatabase db = RoadNetworkDatabase.getInstance();
-        double epsilon = config.rdpEpsilon;
+        double epsilon = config.getRdpEpsilon();
 
         // 1. Snap endpoints (before simplification)
         UUID snappedStartId = null;
         UUID snappedEndId = null;
-        if (config.autoSnapEndpoints) {
+        if (config.isAutoSnapEndpoints()) {
             snappedStartId = snapPoint(copy.get(0), epsilon, db);
             if (snappedStartId != null) {
                 Node sn = db.getNode(snappedStartId);

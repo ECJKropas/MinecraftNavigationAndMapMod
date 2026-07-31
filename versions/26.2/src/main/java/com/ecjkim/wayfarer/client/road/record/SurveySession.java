@@ -225,7 +225,7 @@ public class SurveySession {
         RoadNetworkDatabase db = RoadNetworkDatabase.getInstance();
         Segment segment = new Segment(UUID.randomUUID(), new ArrayList<>(nodeIds), null, Source.USER, Status.DRAFT, 1);
         db.addSegment(segment);
-        db.asyncSave();
+        db.saveToDisk();
 
         pendingSegment = segment;
         state = State.IDLE;
@@ -256,7 +256,7 @@ public class SurveySession {
             db.removeSegment(pendingSegment.getId());
             pendingSegment = null;
         }
-        db.asyncSave();
+        db.saveToDisk();
     }
 
     private static UUID findNearbyNode(Minecraft client) {

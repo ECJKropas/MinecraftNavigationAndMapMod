@@ -603,7 +603,7 @@ public class RoadNetworkDatabase {
      * feature is disabled).
      */
     public synchronized int removeOrphanNodes() {
-        if (!WayfarerConfig.getInstance().autoDeleteOrphanNodes) {
+        if (!WayfarerConfig.getInstance().isAutoDeleteOrphanNodes()) {
             return 0;
         }
         java.util.Set<UUID> referenced = new java.util.HashSet<>();
@@ -634,7 +634,7 @@ public class RoadNetworkDatabase {
      * at the end of CRUD operations.
      */
     private void maybeCleanupOrphans() {
-        if (WayfarerConfig.getInstance().autoDeleteOrphanNodes) {
+        if (WayfarerConfig.getInstance().isAutoDeleteOrphanNodes()) {
             removeOrphanNodes();
         }
     }
@@ -646,7 +646,7 @@ public class RoadNetworkDatabase {
      * Runs {@link #graphify()} when the auto-graphify toggle is enabled and we are not already inside a graphify call.
      */
     private void maybeGraphify() {
-        if (!graphifying && WayfarerConfig.getInstance().autoGraphify) {
+        if (!graphifying && WayfarerConfig.getInstance().isAutoGraphify()) {
             graphifying = true;
             try {
                 graphify();
@@ -1265,35 +1265,107 @@ public class RoadNetworkDatabase {
     }
 
     /**
-     * Replaces all in-memory data with the given JSON snapshot and persists to disk. JSON format: {"nodes": [...],
-     * "segments": [...], "roads": [...]}
+     * Restores entities from a JSON snapshot, but only reverts entities that were modified exactly once since the
+     * snapshot was taken (version == snapshotVersion + 1). Entities modified multiple times (concurrent in-game edits)
+     * are preserved. Entities not in the snapshot are kept (they were created after the snapshot).
+     *
+     * @return a JsonObject with "ok", "revertedNodes/Segments/Roads" counts, and "skipped*" counts for conflicts
      */
-    public synchronized void restoreFromJson(JsonObject root) {
-        nodes.clear();
-        segments.clear();
-        roads.clear();
+    public synchronized JsonObject restoreFromJson(JsonObject root) {
+        java.util.List<String> revertedNodes = new ArrayList<>();
+        java.util.List<String> revertedSegments = new ArrayList<>();
+        java.util.List<String> revertedRoads = new ArrayList<>();
+        java.util.List<String> skippedNodes = new ArrayList<>();
+        java.util.List<String> skippedSegments = new ArrayList<>();
+        java.util.List<String> skippedRoads = new ArrayList<>();
 
+        // Nodes
         if (root.has("nodes")) {
             Type nodeListType = new TypeToken<List<Node>>() {}.getType();
             List<Node> nodeList = GSON.fromJson(root.get("nodes"), nodeListType);
-            for (Node n : nodeList)
-                nodes.put(n.getId(), n);
+            if (nodeList != null) {
+                for (Node snapNode : nodeList) {
+                    Node serverNode = nodes.get(snapNode.getId());
+                    if (serverNode == null) {
+                        skippedNodes.add(snapNode.getId().toString());
+                        continue;
+                    }
+                    if (serverNode.getVersion() == snapNode.getVersion() + 1) {
+                        // Modified exactly once since snapshot — safe to revert
+                        snapNode.setVersion(snapNode.getVersion() + 1);
+                        snapNode.setModifiedAt(System.currentTimeMillis());
+                        nodes.put(snapNode.getId(), snapNode);
+                        revertedNodes.add(snapNode.getId().toString());
+                    } else {
+                        skippedNodes.add(snapNode.getId().toString());
+                    }
+                }
+            }
         }
+
+        // Segments
         if (root.has("segments")) {
             Type segListType = new TypeToken<List<Segment>>() {}.getType();
             List<Segment> segList = GSON.fromJson(root.get("segments"), segListType);
-            for (Segment s : segList)
-                segments.put(s.getId(), s);
+            if (segList != null) {
+                for (Segment snapSeg : segList) {
+                    Segment serverSeg = segments.get(snapSeg.getId());
+                    if (serverSeg == null) {
+                        skippedSegments.add(snapSeg.getId().toString());
+                        continue;
+                    }
+                    if (serverSeg.getVersion() == snapSeg.getVersion() + 1) {
+                        snapSeg.setVersion(snapSeg.getVersion() + 1);
+                        snapSeg.setModifiedAt(System.currentTimeMillis());
+                        segments.put(snapSeg.getId(), snapSeg);
+                        revertedSegments.add(snapSeg.getId().toString());
+                    } else {
+                        skippedSegments.add(snapSeg.getId().toString());
+                    }
+                }
+            }
         }
+
+        // Roads
         if (root.has("roads")) {
             Type roadListType = new TypeToken<List<Road>>() {}.getType();
             List<Road> roadList = GSON.fromJson(root.get("roads"), roadListType);
-            for (Road r : roadList)
-                roads.put(r.getId(), r);
+            if (roadList != null) {
+                for (Road snapRoad : roadList) {
+                    Road serverRoad = roads.get(snapRoad.getId());
+                    if (serverRoad == null) {
+                        skippedRoads.add(snapRoad.getId().toString());
+                        continue;
+                    }
+                    if (serverRoad.getVersion() == snapRoad.getVersion() + 1) {
+                        snapRoad.setVersion(snapRoad.getVersion() + 1);
+                        snapRoad.setModifiedAt(System.currentTimeMillis());
+                        roads.put(snapRoad.getId(), snapRoad);
+                        revertedRoads.add(snapRoad.getId().toString());
+                    } else {
+                        skippedRoads.add(snapRoad.getId().toString());
+                    }
+                }
+            }
         }
 
         markDirty();
-        asyncSave();
+        saveToDisk();
+
+        JsonObject result = new JsonObject();
+        result.addProperty("ok", true);
+        result.addProperty("revertedNodes", revertedNodes.size());
+        result.addProperty("skippedNodes", skippedNodes.size());
+        result.addProperty("revertedSegments", revertedSegments.size());
+        result.addProperty("skippedSegments", skippedSegments.size());
+        result.addProperty("revertedRoads", revertedRoads.size());
+        result.addProperty("skippedRoads", skippedRoads.size());
+        int totalSkipped = skippedNodes.size() + skippedSegments.size() + skippedRoads.size();
+        if (totalSkipped > 0) {
+            result.addProperty("warning",
+                totalSkipped + " entity(ies) were modified in-game and could not be reverted");
+        }
+        return result;
     }
 
     /**

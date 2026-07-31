@@ -471,7 +471,7 @@ public class RoadListScreen extends Screen {
             }
             selectedSegment.setRoadId(null);
             db.updateSegment(selectedSegment.getId(), selectedSegment);
-            db.asyncSave();
+            db.saveToDisk();
             selectedRoad = null;
             selectedSegment = null;
             return;
@@ -539,7 +539,7 @@ public class RoadListScreen extends Screen {
             CornerType next = vals[(selectedNode.getCornerType().ordinal() + 1) % vals.length];
             selectedNode.setCornerType(next);
             db.updateNode(selectedNode.getId(), selectedNode);
-            db.asyncSave();
+            db.saveToDisk();
         }
     }
 
@@ -553,7 +553,7 @@ public class RoadListScreen extends Screen {
             Status next = seg.getStatus() == Status.CONFIRMED ? Status.DRAFT : Status.CONFIRMED;
             seg.setStatus(next);
             db.updateSegment(seg.getId(), seg);
-            db.asyncSave();
+            db.saveToDisk();
         }
     }
 
@@ -562,7 +562,7 @@ public class RoadListScreen extends Screen {
     private void createNewRoad() {
         Road r = new Road(UUID.randomUUID(), "New Road", "#FFFFFF", new ArrayList<>(), 1);
         db.addRoad(r);
-        db.asyncSave();
+        db.saveToDisk();
         scrollLeft = 0;
         selectedRoad = r;
         selectedSegment = null;
@@ -580,7 +580,7 @@ public class RoadListScreen extends Screen {
         selectedRoad = null;
         selectedSegment = null;
         selectedNode = null;
-        db.asyncSave();
+        db.saveToDisk();
     }
 
     private void deleteSelectedSegment() {
@@ -596,7 +596,7 @@ public class RoadListScreen extends Screen {
         db.removeSegment(selectedSegment.getId());
         selectedSegment = null;
         selectedNode = null;
-        db.asyncSave();
+        db.saveToDisk();
     }
 
     private void deleteSelectedNode() {
@@ -606,7 +606,7 @@ public class RoadListScreen extends Screen {
         db.updateSegment(selectedSegment.getId(), selectedSegment);
         db.removeNode(selectedNode.getId());
         selectedNode = null;
-        db.asyncSave();
+        db.saveToDisk();
     }
 
     // ---- Drag ----
@@ -630,7 +630,7 @@ public class RoadListScreen extends Screen {
         }
         target.setSegmentIds(targetSegIds);
         db.updateRoad(target.getId(), target);
-        db.asyncSave();
+        db.saveToDisk();
     }
 
     // ---- Cache ----
