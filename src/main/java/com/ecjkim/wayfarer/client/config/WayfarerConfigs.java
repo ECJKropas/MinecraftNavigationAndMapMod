@@ -73,6 +73,7 @@ public class WayfarerConfigs {
     }
 
     public static List<IConfigBase> getAllConfigs() {
-        return ImmutableList.<IConfigBase>builder().addAll(Generic.OPTIONS).addAll(WayfarerHotkeys.HOTKEY_LIST).build();
+        return ImmutableList.<IConfigBase>builder().addAll(Generic.OPTIONS).addAll(WayfarerHotkeys.HOTKEY_LIST)
+            .addAll(SurveyHotkeys.SURVEY_HOTKEY_LIST).build();
     }
 }

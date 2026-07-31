@@ -98,6 +98,14 @@ public class SurveySession {
         currentCornerType = values[idx];
     }
 
+    /** Cycle corner type and notify the player. */
+    public void cycleCornerType(LocalPlayer player) {
+        cycleCornerTypeNext();
+        if (player != null) {
+            player.displayClientMessage(Component.literal("Survey 角落类型: " + currentCornerType.name()), false);
+        }
+    }
+
     // ---- Tick ----
 
     public void tick(Minecraft client, long window) {
@@ -366,6 +374,69 @@ public class SurveySession {
         pendingSegment = null;
         mouseButtonDownLastTick.clear();
         particleTickCounter = 0;
+    }
+
+    // ---- Programmatic control (for hotkey bindings) ----
+
+    /** Force start recording at player's current position (IDLE → RECORDING). */
+    public void forceStartRecording(LocalPlayer player) {
+        if (player == null) {
+            return;
+        }
+        if (state != State.IDLE) {
+            player.displayClientMessage(Component.literal("Survey 已在录制中"), false);
+            return;
+        }
+
+        Vec3 pos = player.position();
+        Node startNode = createNode(pos.x, pos.y, pos.z);
+        RoadNetworkDatabase db = RoadNetworkDatabase.getInstance();
+        synchronized (db) {
+            db.addNode(startNode);
+            nodeIds.add(startNode.getId());
+            lastNodePos = new Vec3(pos.x, pos.y, pos.z);
+            state = State.RECORDING;
+        }
+        player.displayClientMessage(Component.literal("Survey 录制已开始（快捷键）"), false);
+    }
+
+    /** Force stop recording at player's current position (RECORDING → IDLE, save flow). */
+    public void forceStopRecording(LocalPlayer player) {
+        if (player == null) {
+            return;
+        }
+        if (state != State.RECORDING) {
+            player.displayClientMessage(Component.literal("Survey 未在录制中"), false);
+            return;
+        }
+
+        Vec3 pos = player.position();
+        Node endNode = createNode(pos.x, pos.y, pos.z);
+        RoadNetworkDatabase db = RoadNetworkDatabase.getInstance();
+        synchronized (db) {
+            db.addNode(endNode);
+            nodeIds.add(endNode.getId());
+            finishRecording(player);
+        }
+    }
+
+    /** Cancel current recording and discard all data. */
+    public void cancelRecording(LocalPlayer player) {
+        if (player == null) {
+            return;
+        }
+        if (state == State.IDLE && nodeIds.isEmpty()) {
+            player.displayClientMessage(Component.literal("没有可取消的录制"), false);
+            return;
+        }
+
+        cleanupOrphanData();
+        state = State.IDLE;
+        nodeIds.clear();
+        lastNodePos = null;
+        pendingSegment = null;
+
+        player.displayClientMessage(Component.literal("Survey 录制已取消"), false);
     }
 
     // ---- Particle path ----

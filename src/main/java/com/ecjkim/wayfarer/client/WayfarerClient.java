@@ -146,8 +146,51 @@ public class WayfarerClient implements ClientModInitializer {
             }
         }
 
+        // Survey mode hotkeys
+        handleSurveyHotkeys(client, window);
+
         tickSurvey(client, window);
         ROAD_MANAGER.tick(client);
+    }
+
+    private void handleSurveyHotkeys(Minecraft client, long window) {
+        LocalPlayer player = client.player;
+        if (player == null) {
+            return;
+        }
+        if (!WayfarerConfig.getInstance().isToolItemEnabled() || !ToolItemManager.hasToolItem(player)) {
+            return;
+        }
+
+        WayfarerConfig config = WayfarerConfig.getInstance();
+
+        for (WayfarerConfig.HotkeyBind bind : config.getHotkeysForAction("survey_start_recording")) {
+            if (consumeHotkey(window, bind)) {
+                SURVEY_SESSION.forceStartRecording(player);
+                break;
+            }
+        }
+
+        for (WayfarerConfig.HotkeyBind bind : config.getHotkeysForAction("survey_stop_recording")) {
+            if (consumeHotkey(window, bind)) {
+                SURVEY_SESSION.forceStopRecording(player);
+                break;
+            }
+        }
+
+        for (WayfarerConfig.HotkeyBind bind : config.getHotkeysForAction("survey_cancel_recording")) {
+            if (consumeHotkey(window, bind)) {
+                SURVEY_SESSION.cancelRecording(player);
+                break;
+            }
+        }
+
+        for (WayfarerConfig.HotkeyBind bind : config.getHotkeysForAction("survey_cycle_corner_type")) {
+            if (consumeHotkey(window, bind)) {
+                SURVEY_SESSION.cycleCornerType(player);
+                break;
+            }
+        }
     }
 
     private void tickSurvey(Minecraft client, long window) {

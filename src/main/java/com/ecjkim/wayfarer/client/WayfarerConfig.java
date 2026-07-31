@@ -18,6 +18,7 @@ package com.ecjkim.wayfarer.client;
 
 import java.util.List;
 
+import com.ecjkim.wayfarer.client.config.SurveyHotkeys;
 import com.ecjkim.wayfarer.client.config.WayfarerConfigs;
 import com.ecjkim.wayfarer.client.config.WayfarerHotkeys;
 
@@ -100,6 +101,22 @@ public class WayfarerConfig {
         }
         if ("set_held_item_as_tool".equals(action)) {
             return List.of(new HotkeyBind(WayfarerHotkeys.SET_HELD_ITEM_AS_TOOL));
+        }
+        // Survey mode hotkeys
+        if ("survey_start_recording".equals(action)) {
+            return List.of(new HotkeyBind(SurveyHotkeys.START_RECORDING));
+        }
+        if ("survey_stop_recording".equals(action)) {
+            return List.of(new HotkeyBind(SurveyHotkeys.STOP_RECORDING));
+        }
+        if ("survey_cancel_recording".equals(action)) {
+            return List.of(new HotkeyBind(SurveyHotkeys.CANCEL_RECORDING));
+        }
+        if ("survey_cycle_corner_type".equals(action)) {
+            return List.of(new HotkeyBind(SurveyHotkeys.CYCLE_CORNER_TYPE));
+        }
+        if ("survey_toggle_rendering".equals(action)) {
+            return List.of(new HotkeyBind(SurveyHotkeys.TOGGLE_RENDERING));
         }
         return List.of();
     }
