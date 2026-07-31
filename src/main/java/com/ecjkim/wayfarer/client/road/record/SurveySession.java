@@ -248,24 +248,33 @@ public class SurveySession {
         }
 
         RoadNetworkDatabase db = RoadNetworkDatabase.getInstance();
-        Segment segment = new Segment(UUID.randomUUID(), new ArrayList<>(nodeIds), null, Source.USER, Status.DRAFT, 1);
-        db.addSegment(segment);
-        db.saveToDisk();
+        synchronized (db) {
+            Segment segment =
+                new Segment(UUID.randomUUID(), new ArrayList<>(nodeIds), null, Source.USER, Status.DRAFT, 1);
+            db.addSegment(segment);
 
-        pendingSegment = segment;
-        state = State.IDLE;
-        nodeIds.clear();
-        lastNodePos = null;
+            if (!db.saveToDisk()) {
+                // Save failed: roll back the in-memory segment so we don't leak it.
+                db.removeSegment(segment.getId());
+                player.displayClientMessage(Component.literal("保存失败，Survey 录制未结束。"), false);
+                return;
+            }
 
-        Minecraft client = Minecraft.getInstance();
-        client.setScreen(new RoadMetadataScreen(segment, savedRoad -> {
-            player.displayClientMessage(Component.literal("道路已保存: " + savedRoad.getName()), false);
-            pendingSegment = null;
-        }, () -> {
-            cleanupOrphanData();
-            pendingSegment = null;
-        }));
-        player.displayClientMessage(Component.literal("道路记录已停止，选择或创建道路后保存。"), false);
+            pendingSegment = segment;
+            state = State.IDLE;
+            nodeIds.clear();
+            lastNodePos = null;
+
+            Minecraft client = Minecraft.getInstance();
+            client.setScreen(new RoadMetadataScreen(segment, savedRoad -> {
+                player.displayClientMessage(Component.literal("道路已保存: " + savedRoad.getName()), false);
+                pendingSegment = null;
+            }, () -> {
+                cleanupOrphanData();
+                pendingSegment = null;
+            }));
+            player.displayClientMessage(Component.literal("道路记录已停止，选择或创建道路后保存。"), false);
+        }
     }
 
     // ---- Helper methods ----

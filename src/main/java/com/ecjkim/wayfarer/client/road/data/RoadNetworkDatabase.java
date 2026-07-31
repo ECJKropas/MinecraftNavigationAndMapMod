@@ -1245,8 +1245,10 @@ public class RoadNetworkDatabase {
     /**
      * Serializes the full network to disk synchronously. Does NOT run graphify — callers must explicitly invoke
      * {@link #maybeGraphify()} on the main thread before calling this method if needed.
+     *
+     * @return true if the save succeeded, false otherwise
      */
-    public synchronized void saveToDisk() {
+    public synchronized boolean saveToDisk() {
         try {
             Files.createDirectories(savePath.getParent());
 
@@ -1259,8 +1261,10 @@ public class RoadNetworkDatabase {
             dirty = false;
             LOGGER.log(Level.INFO, "Saved {0} nodes, {1} segments, {2} roads to {3}",
                 new Object[] {nodes.size(), segments.size(), roads.size(), savePath});
+            return true;
         } catch (IOException e) {
             LOGGER.log(Level.SEVERE, "Failed to save road network: {0}", e.getMessage());
+            return false;
         }
     }
 
