@@ -188,7 +188,8 @@ public class WayfarerHttpServer implements Runnable {
             body = new String(is.readAllBytes(), StandardCharsets.UTF_8);
             if (body.isEmpty())
                 body = null;
-        } catch (IOException ignored) {
+        } catch (IOException e) {
+            LOGGER.log(Level.WARNING, "Failed to read request body: {0}", e.getMessage());
         }
 
         Map<String, String> query = new HashMap<>();
