@@ -95,5 +95,7 @@ public final class NodeIndicatorRenderer {
 
             poseStack.popPose();
         }
+
+        bufferSource.endBatch();
     }
 }
