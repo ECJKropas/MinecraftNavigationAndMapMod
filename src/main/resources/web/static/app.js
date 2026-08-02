@@ -126,21 +126,21 @@ async function undo() {
       body: snap
     });
     if (!res.ok) {
-      showToast('撤销失败', 'error');
+      showToast(I18N.t('toast.undoFailed'), 'error');
       return;
     }
     const result = await res.json();
     if (result.warning) {
       showToast(result.warning, 'warn');
     } else {
-      showToast('已撤销', 'info');
+      showToast(I18N.t('toast.undoSuccess'), 'info');
     }
     lastSyncServerTime = 0;
     clearSelection();
     mergeFirstNodeId = null;
     await loadData();
     undoButtonStyle();
-  } catch (e) { showToast('网络错误', 'error'); }
+  } catch (e) { showToast(I18N.t('toast.networkError'), 'error'); }
   finally {
     editingEntityId = null;
   }
@@ -158,21 +158,21 @@ async function redo() {
       body: snap
     });
     if (!res.ok) {
-      showToast('重做失败', 'error');
+      showToast(I18N.t('toast.redoFailed'), 'error');
       return;
     }
     const result = await res.json();
     if (result.warning) {
       showToast(result.warning, 'warn');
     } else {
-      showToast('已重做', 'info');
+      showToast(I18N.t('toast.redoSuccess'), 'info');
     }
     lastSyncServerTime = 0;
     clearSelection();
     mergeFirstNodeId = null;
     await loadData();
     undoButtonStyle();
-  } catch (e) { showToast('网络错误', 'error'); }
+  } catch (e) { showToast(I18N.t('toast.networkError'), 'error'); }
   finally {
     editingEntityId = null;
   }
@@ -414,7 +414,7 @@ async function loadData() {
       }
     }
     renderAll();
-  } catch (e) { showToast('加载数据失败: ' + e.message, 'error'); }
+  } catch (e) { showToast(I18N.t('toast.loadFailed') + ': ' + e.message, 'error'); }
 }
 
 async function loadDelta() {
@@ -467,15 +467,20 @@ async function loadDelta() {
 
 // ——— Conflict resolution ———
 async function handleConflict(entityId, entityType, serverData, clientData) {
-  // Show a native-style dialog asking user how to resolve
-  const message = `此${entityType}在游戏中已被修改 (版本 ${serverData.version})。\n` +
-                  `你的编辑版本为 ${clientData.expectedVersion}。\n\n` +
-                  `选择如何处理：`;
+  const entityTypeKey = entityType === '节点' ? 'entity.node' : entityType === '路段' ? 'entity.segment' : 'entity.road';
+  const entityTypeStr = I18N.t(entityTypeKey);
+  
+  const message = I18N.t('sheet.conflict.message', {
+    entityType: entityTypeStr,
+    serverVersion: serverData.version,
+    clientVersion: clientData.expectedVersion
+  });
 
-  const choice = prompt(message + '\n\n输入 [A] 接受游戏版本 (按 A)\n输入 [R] 重试你的编辑 (按 R)');
+  const choice = prompt(message + '\n\n' + 
+    I18N.t('sheet.conflict.optionA') + '\n' + 
+    I18N.t('sheet.conflict.optionR'));
 
   if (choice === null) {
-    // User cancelled — accept server version by default
     if (entityType === '节点') {
       roadStore.nodes[entityId] = serverData;
     } else if (entityType === '路段') {
@@ -484,7 +489,7 @@ async function handleConflict(entityId, entityType, serverData, clientData) {
       roadStore.roads[entityId] = serverData;
     }
     renderAll();
-    showToast('已接受游戏版本', 'info');
+    showToast(I18N.t('toast.acceptedGameVersion'), 'info');
     return 'accepted';
   }
 
@@ -498,14 +503,13 @@ async function handleConflict(entityId, entityType, serverData, clientData) {
       roadStore.roads[entityId] = serverData;
     }
     renderAll();
-    showToast('已接受游戏版本', 'info');
+    showToast(I18N.t('toast.acceptedGameVersion'), 'info');
     return 'accepted';
   } else if (choiceLower === 'r' || choiceLower === 'retry') {
-    // Retry — will likely fail again but the server state is now current
-    showToast('重试中...', 'info');
+    showToast(I18N.t('toast.retrying'), 'info');
     return 'retry';
   }
-  return 'accepted';  // default
+  return 'accepted';
 }
 
 async function saveNode() {
@@ -526,21 +530,19 @@ async function saveNode() {
       body: JSON.stringify({ x, z, expectedVersion: node.version })
     });
     if (res.status === 409) {
-      // Version conflict — the server version won
       const errData = await res.json();
-      showToast(`版本冲突: ${errData.error || '游戏内已修改'}`, 'error');
-      // Re-fetch the server version and ask user
+      showToast(I18N.t('toast.versionConflict') + ': ' + (errData.error || I18N.t('toast.gameModified')), 'error');
       await loadData();
       editingEntityId = null;
-      showToast('已从游戏同步最新数据', 'info');
+      showToast(I18N.t('toast.syncedFromGame'), 'info');
       return;
     }
-    if (!res.ok) { showToast('保存失败', 'error'); return; }
+    if (!res.ok) { showToast(I18N.t('toast.saveFailed'), 'error'); return; }
     const updated = await res.json();
     roadStore.nodes[nid] = updated;
     renderAll();
-    showToast('节点已保存');
-  } catch (e) { showToast('网络错误', 'error'); }
+    showToast(I18N.t('toast.nodeSaved'));
+  } catch (e) { showToast(I18N.t('toast.networkError'), 'error'); }
   finally {
     editingEntityId = null;
   }
@@ -789,13 +791,13 @@ function onNodeDragEnd(nid, marker) {
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ x, z, expectedVersion: node.version })
   }).then(r => {
-    if (r.status === 409) { showToast('版本冲突，正在刷新...', 'error'); loadData(); }
+    if (r.status === 409) { showToast(I18N.t('toast.versionConflict') + ' ' + I18N.t('toast.refreshing'), 'error'); loadData(); }
     else if (r.ok) return r.json().then(updated => {
       roadStore.nodes[nid] = updated;
       renderAll();
     });
-    else showToast('保存失败', 'error');
-  }).catch(() => showToast('网络错误', 'error'));
+    else showToast(I18N.t('toast.saveFailed'), 'error');
+  }).catch(() => showToast(I18N.t('toast.networkError'), 'error'));
 }
 
 function selectNode(nid) {
@@ -843,13 +845,13 @@ function updateMergeButton() {
 async function deleteNode() {
   const nid = selectedNodeId;
   if (!nid) return;
-  showSheet('删除节点', '此操作将级联删除关联路段，确定要删除吗？', [
-    { label: '取消', role: 'cancel' },
-    { label: '删除', role: 'destructive', action: async () => {
+  showSheet(I18N.t('sheet.deleteNode.title'), I18N.t('sheet.deleteNode.message'), [
+    { label: I18N.t('sheet.deleteNode.cancel'), role: 'cancel' },
+    { label: I18N.t('sheet.deleteNode.confirm'), role: 'destructive', action: async () => {
         pushUndo();
         const res = await fetch('/api/nodes/' + nid, { method: 'DELETE' });
-        if (res.ok) { clearSelection(); loadData(); showToast('节点已删除'); }
-        else showToast('删除失败', 'error');
+        if (res.ok) { clearSelection(); loadData(); showToast(I18N.t('toast.nodeDeleted')); }
+        else showToast(I18N.t('toast.deleteFailed'), 'error');
       }
     }
   ]);
@@ -858,13 +860,13 @@ async function deleteNode() {
 async function deleteSegment() {
   const sid = selectedSegmentId;
   if (!sid) return;
-  showSheet('删除路段', '确定要删除此路段吗？', [
-    { label: '取消', role: 'cancel' },
-    { label: '删除', role: 'destructive', action: async () => {
+  showSheet(I18N.t('sheet.deleteSegment.title'), I18N.t('sheet.deleteSegment.message'), [
+    { label: I18N.t('sheet.deleteNode.cancel'), role: 'cancel' },
+    { label: I18N.t('sheet.deleteNode.confirm'), role: 'destructive', action: async () => {
         pushUndo();
         const res = await fetch('/api/segments/' + sid, { method: 'DELETE' });
-        if (res.ok) { clearSelection(); loadData(); showToast('路段已删除'); }
-        else showToast('删除失败', 'error');
+        if (res.ok) { clearSelection(); loadData(); showToast(I18N.t('toast.segmentDeleted')); }
+        else showToast(I18N.t('toast.deleteFailed'), 'error');
       }
     }
   ]);
@@ -890,7 +892,7 @@ async function saveRoad() {
       });
       if (res.status === 409) {
         const errData = await res.json();
-        showToast(`版本冲突: ${errData.error || '游戏内已修改'}`, 'error');
+        showToast(I18N.t('toast.versionConflict') + ': ' + (errData.error || I18N.t('toast.gameModified')), 'error');
         await loadData();
         return;
       }
@@ -898,14 +900,14 @@ async function saveRoad() {
         const updated = await res.json();
         roadStore.roads[roadId] = updated;
         renderAll();
-        showToast('道路已保存');
+        showToast(I18N.t('toast.roadSaved'));
       }
-    } catch (e) { showToast('网络错误', 'error'); }
+    } catch (e) { showToast(I18N.t('toast.networkError'), 'error'); }
     finally {
       editingEntityId = null;
     }
   } else {
-    showToast('该路段未关联道路', 'error');
+    showToast(I18N.t('toast.segmentNotLinked'), 'error');
   }
 }
 
@@ -917,8 +919,8 @@ async function mergeSegments() {
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ segmentIds: [...selectedSegments] })
   });
-  if (res.ok) { clearSelection(); loadData(); showToast('路段已合并'); }
-  else showToast('合并失败', 'error');
+  if (res.ok) { clearSelection(); loadData(); showToast(I18N.t('toast.segmentMerged')); }
+  else showToast(I18N.t('toast.mergeFailed'), 'error');
 }
 
 // ——— Toolbar ———
@@ -941,10 +943,10 @@ function initToolbar() {
     const btn = document.getElementById('constrain-btn');
     if (constrainDrag) {
       btn.classList.add('active');
-      btn.title = '延长';
+      btn.title = I18N.t('toolbar.constrain.extend');
     } else {
       btn.classList.remove('active');
-      btn.title = '自由拖动';
+      btn.title = I18N.t('toolbar.constrain.free');
     }
     document.getElementById('constrain-popup').classList.remove('visible');
   });
@@ -999,18 +1001,20 @@ function setActiveTool(tool) {
 function toggleToolbarMode() {
   const tb = document.getElementById('toolbar');
   const mapEl = document.getElementById('map');
+  const toggleLabel = document.querySelector('#tool-mode-toggle .tool-label');
   if (toolbarMode === 'compact') {
     toolbarMode = 'detailed';
     tb.classList.remove('toolbar-compact');
     tb.classList.add('toolbar-detailed');
     mapEl.style.left = '148px';
+    if (toggleLabel) toggleLabel.textContent = I18N.t('toolbar.contract.label');
   } else {
     toolbarMode = 'compact';
     tb.classList.remove('toolbar-detailed');
     tb.classList.add('toolbar-compact');
     mapEl.style.left = '44px';
+    if (toggleLabel) toggleLabel.textContent = I18N.t('toolbar.expand.label');
   }
-  // Propagate map resize to Leaflet so tiles/controls reposition
   if (map) { map.invalidateSize(); }
 }
 
@@ -1025,7 +1029,7 @@ function handlePointTool(latlng) {
   // 2. Fall back to segment snap
   const hit = findNearestSegment(latlng, TOOL_TOLERANCE_PX);
   if (!hit) {
-    showToolToast('附近没有路段，无法插入孤立节点');
+    showToolToast(I18N.t('toast.noSegmentNearby'));
     return;
   }
   insertNodeOnSegment(hit.segmentId, hit.insertIndex, latlng);
@@ -1126,19 +1130,19 @@ async function insertNodeOnSegment(segId, insertIndex, latlng) {
       body: JSON.stringify({ x, z, insertIndex, expectedVersion: seg.version })
     });
     if (res.status === 409) {
-      showToast('版本冲突，正在刷新...', 'error');
+      showToast(I18N.t('toast.versionConflict') + ' ' + I18N.t('toast.refreshing'), 'error');
       loadData();
       return;
     }
     if (!res.ok) {
-      showToast('插入失败', 'error');
+      showToast(I18N.t('toast.insertFailed'), 'error');
       return;
     }
     clearSelection();
     loadData();
-    showToast('节点已插入');
+    showToast(I18N.t('toast.nodeInserted'));
   } catch (e) {
-    showToast('网络错误', 'error');
+    showToast(I18N.t('toast.networkError'), 'error');
   }
 }
 
@@ -1163,19 +1167,19 @@ async function insertNodeAtIntersection(data) {
       })
     });
     if (res.status === 409) {
-      showToast('版本冲突，正在刷新...', 'error');
+      showToast(I18N.t('toast.versionConflict') + ' ' + I18N.t('toast.refreshing'), 'error');
       loadData();
       return;
     }
     if (!res.ok) {
-      showToast('交点插入失败', 'error');
+      showToast(I18N.t('toast.intersectionInsertFailed'), 'error');
       return;
     }
     clearSelection();
     loadData();
-    showToolToast('已在交点插入节点');
+    showToolToast(I18N.t('toast.nodeInsertedIntersection'));
   } catch (e) {
-    showToast('网络错误', 'error');
+    showToast(I18N.t('toast.networkError'), 'error');
   }
 }
 
@@ -1213,35 +1217,34 @@ function detectMergeSpecialCase(nid1, nid2) {
 async function handleMergeTool(nid) {
   if (!mergeFirstNodeId) {
     mergeFirstNodeId = nid;
-    renderAll(); // re-render to highlight the selected node
-    showToolToast('已选中节点 ' + nid.substring(nid.length - 4) + '，再点击目标节点完成合并');
+    renderAll();
+    showToolToast(I18N.t('toast.selectedNode', { id: nid.substring(nid.length - 4) }));
     return;
   }
 
   if (nid === mergeFirstNodeId) {
     mergeFirstNodeId = null;
     renderAll();
-    showToolToast('已取消选择');
+    showToolToast(I18N.t('toast.cancelledSelection'));
     return;
   }
 
   const specialCase = detectMergeSpecialCase(mergeFirstNodeId, nid);
 
-  // Case 2: separated nodes on same segment → check intermediate node degrees
   if (specialCase && specialCase.type === 'separated') {
     const allDegree2 = specialCase.intermediateNodes.every(mid => getDegree(mid) === 2);
     if (!allDegree2) {
-      showToolToast('这可不能合并啊！');
+      showToolToast(I18N.t('toast.cannotMerge'));
       mergeFirstNodeId = null;
       renderAll();
       return;
     }
-    showSheet('合并节点', '合并该节点会删除中间所有节点，是否继续？', [
+    showSheet(I18N.t('sheet.mergeNode.title'), I18N.t('sheet.mergeNode.message'), [
       {
-        label: '取消', role: 'cancel', action: () => { mergeFirstNodeId = null; renderAll(); }
+        label: I18N.t('sheet.mergeNode.cancel'), role: 'cancel', action: () => { mergeFirstNodeId = null; renderAll(); }
       },
       {
-        label: '合并', role: 'destructive', action: async () => {
+        label: I18N.t('sheet.mergeNode.confirm'), role: 'destructive', action: async () => {
           await doMergeClean(mergeFirstNodeId, nid, specialCase);
         }
       }
@@ -1249,7 +1252,6 @@ async function handleMergeTool(nid) {
     return;
   }
 
-  // Case 1: adjacent nodes, only 2-node segment → delete segment before merge
   if (specialCase && specialCase.type === 'adjacent' && specialCase.segmentOnlyTwoNodes) {
     pushUndo();
     await fetch(`/api/segments/${specialCase.segmentId}`, { method: 'DELETE' });
@@ -1269,15 +1271,15 @@ async function doMerge(nodeToDeleteId, targetNodeId) {
     });
     if (!res.ok) {
       const err = await res.json();
-      showToast('合并失败：' + (err.error || res.status), 'error');
+      showToast(I18N.t('toast.mergeFailed') + ': ' + (err.error || res.status), 'error');
       return;
     }
     clearSelection();
     mergeFirstNodeId = null;
     loadData();
-    showToolToast('节点已合并');
+    showToolToast(I18N.t('toast.nodeMerged'));
   } catch (e) {
-    showToast('网络错误', 'error');
+    showToast(I18N.t('toast.networkError'), 'error');
   }
 }
 
@@ -1296,15 +1298,15 @@ async function doMergeClean(nodeToDeleteId, targetNodeId, specialCase) {
     });
     if (!res.ok) {
       const err = await res.json();
-      showToast('合并失败：' + (err.error || res.status), 'error');
+      showToast(I18N.t('toast.mergeFailed') + ': ' + (err.error || res.status), 'error');
       return;
     }
     clearSelection();
     mergeFirstNodeId = null;
     loadData();
-    showToolToast('节点已合并');
+    showToolToast(I18N.t('toast.nodeMerged'));
   } catch (e) {
-    showToast('网络错误', 'error');
+    showToast(I18N.t('toast.networkError'), 'error');
   }
 }
 
@@ -1318,16 +1320,16 @@ async function handleSoftDeleteTool(nid) {
     });
     const data = await res.json();
     if (!res.ok || !data.ok) {
-      const msg = data.message || data.error || '未知错误';
+      const msg = data.message || data.error || I18N.t('toast.unknownError');
       showToolToast(msg);
       return;
     }
     clearSelection();
     loadData();
-    const label = data.action === 'endpoint_shortened' ? '端点已软删除' : '节点已软删除';
+    const label = data.action === 'endpoint_shortened' ? I18N.t('toast.endpointSoftDeleted') : I18N.t('toast.nodeSoftDeleted');
     showToolToast(label);
   } catch (e) {
-    showToast('网络错误', 'error');
+    showToast(I18N.t('toast.networkError'), 'error');
   }
 }
 
@@ -1354,17 +1356,16 @@ async function handleFenHeTool(nid) {
       if (res.ok) {
         clearSelection();
         await loadData();
-        showToolToast('拆分成功'); // red (default)
+        showToolToast(I18N.t('toast.splitSuccess'));
       } else {
-        showToolToast('拆分失败');
+        showToolToast(I18N.t('toast.splitFailed'));
       }
       return;
     }
   }
 
-  // 2. Try merge: node is degree-2 shared endpoint of two compatible segments
   if (getDegree(nid) !== 2) {
-    showToolToast('无法使用该工具');
+    showToolToast(I18N.t('toast.cannotUseTool'));
     return;
   }
 
@@ -1377,14 +1378,14 @@ async function handleFenHeTool(nid) {
   }
 
   if (endpointSegs.length !== 2) {
-    showToolToast('无法使用该工具');
+    showToolToast(I18N.t('toast.cannotUseTool'));
     return;
   }
 
   const road1 = findRoadForSegment(endpointSegs[0].id);
   const road2 = findRoadForSegment(endpointSegs[1].id);
   if (road1 && road2 && road1.id !== road2.id) {
-    showToolToast('路段属于不同道路，无法合并');
+    showToolToast(I18N.t('toast.differentRoads'));
     return;
   }
 
@@ -1398,16 +1399,50 @@ async function handleFenHeTool(nid) {
     if (res.ok) {
       clearSelection();
       await loadData();
-      showToolToast('合并成功', 'green');
+      showToolToast(I18N.t('toast.mergeSuccess'), 'green');
     } else {
       const err = await res.json();
-      showToolToast('合并失败：' + (err.error || ''));
+      showToolToast(I18N.t('toast.mergeFailed') + ': ' + (err.error || ''));
     }
   } catch (e) {
-    showToast('网络错误', 'error');
+    showToast(I18N.t('toast.networkError'), 'error');
   }
 }
-window.addEventListener('load', () => { initToolbar(); initMap(); });
+window.addEventListener('load', () => {
+  I18N.init();
+  initToolbar();
+  initMap();
+  
+  // Language change handler
+  document.getElementById('tool-language').addEventListener('click', () => {
+    I18N.toggleLanguage();
+  });
+  
+  document.addEventListener('languagechange', () => {
+    updateDynamicI18n();
+  });
+});
+
+function updateDynamicI18n() {
+  // Re-apply constraint button title
+  const constrainBtn = document.getElementById('constrain-btn');
+  if (constrainBtn) {
+    constrainBtn.title = constrainDrag ? 
+      I18N.t('toolbar.constrain.extend') : 
+      I18N.t('toolbar.constrain.free');
+  }
+  
+  // Re-apply toolbar toggle label based on current mode
+  const modeToggleLabel = document.querySelector('#tool-mode-toggle .tool-label');
+  if (modeToggleLabel) {
+    modeToggleLabel.textContent = toolbarMode === 'compact' ? 
+      I18N.t('toolbar.expand.label') : 
+      I18N.t('toolbar.contract.label');
+  }
+  
+  // Re-apply all data-i18n attributes
+  I18N.applyToDOM();
+}
 
 document.addEventListener('keydown', e => {
   if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;

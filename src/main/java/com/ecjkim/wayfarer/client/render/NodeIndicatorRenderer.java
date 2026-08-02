@@ -43,10 +43,17 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
- * Renders translucent beams above road network nodes when the player holds the Survey tool item.
+ * Renders End Rod markers above road network nodes when the player holds the Survey tool item.
+ *
+ * <p>Uses the WorldRenderContext matrix for proper camera-relative transformation,
+ * ensuring markers stay anchored to world positions regardless of camera rotation.
  */
 public final class NodeIndicatorRenderer {
     private static final Logger LOGGER = LoggerFactory.getLogger("Wayfarer|NodeIndicator");
+
+    private static final float BASE_HEIGHT = 0.18f;
+    private static final float BASE_HALF_WIDTH = 0.09f;
+    private static final float ROD_HALF_WIDTH = 0.04f;
 
     private NodeIndicatorRenderer() {}
 
@@ -73,12 +80,10 @@ public final class NodeIndicatorRenderer {
 
         Set<BlockPos> seen = new HashSet<>();
 
-        double camX = ctx.camera().getPosition().x;
-        double camY = ctx.camera().getPosition().y;
-        double camZ = ctx.camera().getPosition().z;
+        float rodHeight = (float)config.getNodeIndicatorBeamHeight();
+        float rodAlpha = (float)config.getNodeIndicatorBeamAlpha();
 
-        float beamHeight = (float)config.getNodeIndicatorBeamHeight();
-        float beamAlpha = (float)config.getNodeIndicatorBeamAlpha();
+        Matrix4f viewMatrix = RenderSystem.getModelViewMatrix();
 
         RenderSystem.enableBlend();
         RenderSystem.defaultBlendFunc();
@@ -102,26 +107,85 @@ public final class NodeIndicatorRenderer {
             float g = ((color >> 8) & 0xFF) / 255.0f;
             float b = (color & 0xFF) / 255.0f;
 
-            renderBeam(bx + 0.5, by + 1.0, bz + 0.5, beamHeight, beamAlpha, r, g, b, camX, camY, camZ);
+            double cx = bx + 0.5;
+            double cy = by + 0.5;
+            double cz = bz + 0.5;
+
+            renderEndRodMarker(viewMatrix, cx, cy, cz, rodHeight, rodAlpha, r, g, b);
         }
 
         RenderSystem.depthMask(true);
         RenderSystem.disableBlend();
     }
 
-    private static void renderBeam(double cx, double cy, double cz, float height, float alpha, float r, float g,
-        float b, double camX, double camY, double camZ) {
+    private static void renderEndRodMarker(Matrix4f viewMatrix, double cx, double cy, double cz, float rodHeight,
+        float alpha, float r, float g, float b) {
 
-        float hw = 0.15f;
+        // Draw the End Rod base (small cube at bottom)
+        renderBox(viewMatrix, cx, cy, cz, BASE_HEIGHT, BASE_HALF_WIDTH, r, g, b, alpha);
 
-        Matrix4f matrix = new Matrix4f();
-        matrix.translate((float)(cx - camX), (float)(cy - camY), (float)(cz - camZ));
+        // Draw the rod (thin beam extending upward)
+        float rodBaseY = (float)cy + BASE_HEIGHT;
+        renderBeam(viewMatrix, cx, rodBaseY, cz, rodHeight, ROD_HALF_WIDTH, r, g, b, alpha);
+    }
+
+    private static void renderBox(Matrix4f viewMatrix, double cx, double cy, double cz, float height, float hw,
+        float r, float g, float b, float alpha) {
+
+        Matrix4f matrix = new Matrix4f(viewMatrix);
+        matrix.translate((float)cx, (float)cy, (float)cz);
 
         Tesselator tess = Tesselator.getInstance();
         BufferBuilder builder = tess.getBuilder();
         builder.begin(VertexFormat.Mode.QUADS, DefaultVertexFormat.POSITION_COLOR);
 
-        float topAlpha = alpha * 0.3f;
+        float topY = height;
+
+        // +X face
+        builder.vertex(matrix, +hw, 0, -hw).color(r, g, b, alpha).endVertex();
+        builder.vertex(matrix, +hw, topY, -hw).color(r, g, b, alpha).endVertex();
+        builder.vertex(matrix, +hw, topY, +hw).color(r, g, b, alpha).endVertex();
+        builder.vertex(matrix, +hw, 0, +hw).color(r, g, b, alpha).endVertex();
+        // -X face
+        builder.vertex(matrix, -hw, 0, +hw).color(r, g, b, alpha).endVertex();
+        builder.vertex(matrix, -hw, topY, +hw).color(r, g, b, alpha).endVertex();
+        builder.vertex(matrix, -hw, topY, -hw).color(r, g, b, alpha).endVertex();
+        builder.vertex(matrix, -hw, 0, -hw).color(r, g, b, alpha).endVertex();
+        // +Z face
+        builder.vertex(matrix, -hw, 0, +hw).color(r, g, b, alpha).endVertex();
+        builder.vertex(matrix, -hw, topY, +hw).color(r, g, b, alpha).endVertex();
+        builder.vertex(matrix, +hw, topY, +hw).color(r, g, b, alpha).endVertex();
+        builder.vertex(matrix, +hw, 0, +hw).color(r, g, b, alpha).endVertex();
+        // -Z face
+        builder.vertex(matrix, +hw, 0, -hw).color(r, g, b, alpha).endVertex();
+        builder.vertex(matrix, +hw, topY, -hw).color(r, g, b, alpha).endVertex();
+        builder.vertex(matrix, -hw, topY, -hw).color(r, g, b, alpha).endVertex();
+        builder.vertex(matrix, -hw, 0, -hw).color(r, g, b, alpha).endVertex();
+        // Top face
+        builder.vertex(matrix, -hw, topY, -hw).color(r, g, b, alpha).endVertex();
+        builder.vertex(matrix, -hw, topY, +hw).color(r, g, b, alpha).endVertex();
+        builder.vertex(matrix, +hw, topY, +hw).color(r, g, b, alpha).endVertex();
+        builder.vertex(matrix, +hw, topY, -hw).color(r, g, b, alpha).endVertex();
+        // Bottom face
+        builder.vertex(matrix, -hw, 0, -hw).color(r, g, b, alpha).endVertex();
+        builder.vertex(matrix, +hw, 0, -hw).color(r, g, b, alpha).endVertex();
+        builder.vertex(matrix, +hw, 0, +hw).color(r, g, b, alpha).endVertex();
+        builder.vertex(matrix, -hw, 0, +hw).color(r, g, b, alpha).endVertex();
+
+        BufferUploader.drawWithShader(builder.end());
+    }
+
+    private static void renderBeam(Matrix4f viewMatrix, double cx, double cy, double cz, float height, float hw,
+        float r, float g, float b, float alpha) {
+
+        Matrix4f matrix = new Matrix4f(viewMatrix);
+        matrix.translate((float)cx, (float)cy, (float)cz);
+
+        Tesselator tess = Tesselator.getInstance();
+        BufferBuilder builder = tess.getBuilder();
+        builder.begin(VertexFormat.Mode.QUADS, DefaultVertexFormat.POSITION_COLOR);
+
+        float topAlpha = alpha * 0.2f;
 
         // +X face
         builder.vertex(matrix, +hw, 0, -hw).color(r, g, b, alpha).endVertex();

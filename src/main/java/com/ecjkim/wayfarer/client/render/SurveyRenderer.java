@@ -24,7 +24,6 @@ import net.minecraft.client.Minecraft;
 import net.minecraft.client.player.LocalPlayer;
 import net.minecraft.client.renderer.GameRenderer;
 import net.minecraft.core.BlockPos;
-import net.minecraft.world.entity.Entity;
 import net.minecraft.world.phys.Vec3;
 
 import com.mojang.blaze3d.systems.RenderSystem;
@@ -45,6 +44,7 @@ import com.ecjkim.wayfarer.client.road.model.Node;
 import com.ecjkim.wayfarer.client.road.record.SurveySession;
 import com.ecjkim.wayfarer.client.road.record.SurveySession.State;
 
+import org.joml.Matrix4f;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -101,19 +101,12 @@ public final class SurveyRenderer {
         RoadNetworkDatabase db = RoadNetworkDatabase.getInstance();
         SurveySession session = WayfarerClient.getSurveySession();
 
-        Entity camera = ctx.camera().getEntity();
-        if (camera == null) {
-            return;
-        }
-
         List<Node> allNodes = new ArrayList<>(db.getAllNodes());
         if (allNodes.isEmpty()) {
             return;
         }
 
-        double camX = camera.getX();
-        double camY = camera.getY();
-        double camZ = camera.getZ();
+        Matrix4f viewMatrix = RenderSystem.getModelViewMatrix();
 
         UUID hoveredId = findHoveredNode(client);
 
@@ -124,10 +117,10 @@ public final class SurveyRenderer {
         RenderSystem.setShader(GameRenderer::getPositionColorShader);
 
         try {
-            renderNodeOutlines(client, db, allNodes, session, hoveredId, camX, camY, camZ);
+            renderNodeOutlines(viewMatrix, client, db, allNodes, session, hoveredId);
 
             if (session != null && session.getState() == State.RECORDING) {
-                renderPathConnections(session, db, camX, camY, camZ);
+                renderPathConnections(viewMatrix, session, db);
             }
         } finally {
             RenderSystem.depthMask(true);
@@ -135,8 +128,8 @@ public final class SurveyRenderer {
         }
     }
 
-    private static void renderNodeOutlines(Minecraft client, RoadNetworkDatabase db, List<Node> allNodes,
-        SurveySession session, UUID hoveredId, double camX, double camY, double camZ) {
+    private static void renderNodeOutlines(Matrix4f viewMatrix, Minecraft client, RoadNetworkDatabase db,
+        List<Node> allNodes, SurveySession session, UUID hoveredId) {
 
         RenderSystem.lineWidth(OUTLINE_WIDTH);
 
@@ -156,7 +149,7 @@ public final class SurveyRenderer {
             float b = (color & 0xFF) / 255.0f;
             float size = node.getId().equals(hoveredId) ? HOVER_SIZE : OUTLINE_SIZE;
 
-            renderBoxOutline(bx + 0.5, by + 0.5, bz + 0.5, size, r, g, b, camX, camY, camZ);
+            renderBoxOutline(viewMatrix, bx + 0.5, by + 0.5, bz + 0.5, size, r, g, b);
         }
     }
 
@@ -223,8 +216,7 @@ public final class SurveyRenderer {
         return closestId;
     }
 
-    private static void renderPathConnections(SurveySession session, RoadNetworkDatabase db, double camX, double camY,
-        double camZ) {
+    private static void renderPathConnections(Matrix4f viewMatrix, SurveySession session, RoadNetworkDatabase db) {
 
         List<UUID> nodeIds = session.getNodeIds();
         if (nodeIds.size() < 2) {
@@ -244,71 +236,68 @@ public final class SurveyRenderer {
                 continue;
             }
 
-            double ax = a.getX() + 0.5 - camX;
-            double ay = a.getY() + 0.5 - camY;
-            double az = a.getZ() + 0.5 - camZ;
-            double bx = bNode.getX() + 0.5 - camX;
-            double by = bNode.getY() + 0.5 - camY;
-            double bz = bNode.getZ() + 0.5 - camZ;
+            double ax = a.getX() + 0.5;
+            double ay = a.getY() + 0.5;
+            double az = a.getZ() + 0.5;
+            double bx = bNode.getX() + 0.5;
+            double by = bNode.getY() + 0.5;
+            double bz = bNode.getZ() + 0.5;
 
-            renderLine(ax, ay, az, bx, by, bz, r, g, b);
+            renderLine(viewMatrix, ax, ay, az, bx, by, bz, r, g, b);
         }
 
         RenderSystem.lineWidth(OUTLINE_WIDTH);
     }
 
-    private static void renderBoxOutline(double cx, double cy, double cz, float size, float r, float g, float b,
-        double camX, double camY, double camZ) {
+    private static void renderBoxOutline(Matrix4f viewMatrix, double cx, double cy, double cz, float size, float r,
+        float g, float b) {
 
         float hs = size * 0.5f;
-        float minX = (float)(cx - camX) - hs;
-        float minY = (float)(cy - camY) - hs;
-        float minZ = (float)(cz - camZ) - hs;
-        float maxX = (float)(cx - camX) + hs;
-        float maxY = (float)(cy - camY) + hs;
-        float maxZ = (float)(cz - camZ) + hs;
+
+        Matrix4f matrix = new Matrix4f(viewMatrix);
+        matrix.translate((float)cx, (float)cy, (float)cz);
 
         Tesselator tess = Tesselator.getInstance();
         BufferBuilder builder = tess.getBuilder();
         builder.begin(VertexFormat.Mode.LINES, DefaultVertexFormat.POSITION_COLOR);
 
         // Bottom face edges
-        addLine(builder, minX, minY, minZ, maxX, minY, minZ, r, g, b);
-        addLine(builder, maxX, minY, minZ, maxX, minY, maxZ, r, g, b);
-        addLine(builder, maxX, minY, maxZ, minX, minY, maxZ, r, g, b);
-        addLine(builder, minX, minY, maxZ, minX, minY, minZ, r, g, b);
+        addLine(builder, matrix, -hs, -hs, -hs, +hs, -hs, -hs, r, g, b);
+        addLine(builder, matrix, +hs, -hs, -hs, +hs, -hs, +hs, r, g, b);
+        addLine(builder, matrix, +hs, -hs, +hs, -hs, -hs, +hs, r, g, b);
+        addLine(builder, matrix, -hs, -hs, +hs, -hs, -hs, -hs, r, g, b);
 
         // Top face edges
-        addLine(builder, minX, maxY, minZ, maxX, maxY, minZ, r, g, b);
-        addLine(builder, maxX, maxY, minZ, maxX, maxY, maxZ, r, g, b);
-        addLine(builder, maxX, maxY, maxZ, minX, maxY, maxZ, r, g, b);
-        addLine(builder, minX, maxY, maxZ, minX, maxY, minZ, r, g, b);
+        addLine(builder, matrix, -hs, +hs, -hs, +hs, +hs, -hs, r, g, b);
+        addLine(builder, matrix, +hs, +hs, -hs, +hs, +hs, +hs, r, g, b);
+        addLine(builder, matrix, +hs, +hs, +hs, -hs, +hs, +hs, r, g, b);
+        addLine(builder, matrix, -hs, +hs, +hs, -hs, +hs, -hs, r, g, b);
 
         // Vertical edges
-        addLine(builder, minX, minY, minZ, minX, maxY, minZ, r, g, b);
-        addLine(builder, maxX, minY, minZ, maxX, maxY, minZ, r, g, b);
-        addLine(builder, maxX, minY, maxZ, maxX, maxY, maxZ, r, g, b);
-        addLine(builder, minX, minY, maxZ, minX, maxY, maxZ, r, g, b);
+        addLine(builder, matrix, -hs, -hs, -hs, -hs, +hs, -hs, r, g, b);
+        addLine(builder, matrix, +hs, -hs, -hs, +hs, +hs, -hs, r, g, b);
+        addLine(builder, matrix, +hs, -hs, +hs, +hs, +hs, +hs, r, g, b);
+        addLine(builder, matrix, -hs, -hs, +hs, -hs, +hs, +hs, r, g, b);
 
         BufferUploader.drawWithShader(builder.end());
     }
 
-    private static void renderLine(double x1, double y1, double z1, double x2, double y2, double z2, float r, float g,
-        float b) {
+    private static void renderLine(Matrix4f viewMatrix, double x1, double y1, double z1, double x2, double y2,
+        double z2, float r, float g, float b) {
 
         Tesselator tess = Tesselator.getInstance();
         BufferBuilder builder = tess.getBuilder();
         builder.begin(VertexFormat.Mode.LINES, DefaultVertexFormat.POSITION_COLOR);
 
-        builder.vertex(x1, y1, z1).color(r, g, b, 1.0f).endVertex();
-        builder.vertex(x2, y2, z2).color(r, g, b, 1.0f).endVertex();
+        builder.vertex(viewMatrix, (float)x1, (float)y1, (float)z1).color(r, g, b, 1.0f).endVertex();
+        builder.vertex(viewMatrix, (float)x2, (float)y2, (float)z2).color(r, g, b, 1.0f).endVertex();
 
         BufferUploader.drawWithShader(builder.end());
     }
 
-    private static void addLine(BufferBuilder builder, float x1, float y1, float z1, float x2, float y2, float z2,
-        float r, float g, float b) {
-        builder.vertex(x1, y1, z1).color(r, g, b, 1.0f).endVertex();
-        builder.vertex(x2, y2, z2).color(r, g, b, 1.0f).endVertex();
+    private static void addLine(BufferBuilder builder, Matrix4f matrix, float x1, float y1, float z1, float x2,
+        float y2, float z2, float r, float g, float b) {
+        builder.vertex(matrix, x1, y1, z1).color(r, g, b, 1.0f).endVertex();
+        builder.vertex(matrix, x2, y2, z2).color(r, g, b, 1.0f).endVertex();
     }
 }

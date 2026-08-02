@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="zh-CN">
+<html lang="en">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -238,93 +238,99 @@ button.danger:active { background:#B3201A; }
 <div id="map"></div>
 
 <div id="toolbar" class="toolbar-compact">
-  <button class="tool-btn" id="tool-move" title="移动节点">
+  <button class="tool-btn" id="tool-move" data-i18n-title="toolbar.move.title">
     <i class="fa-solid fa-arrows-up-down-left-right"></i>
-    <span class="tool-label">移动</span>
+    <span class="tool-label" data-i18n="toolbar.move.label"></span>
   </button>
   <div class="constrain-popup" id="constrain-popup">
-    <button class="constrain-btn active" id="constrain-btn" title="延长">
+    <button class="constrain-btn active" id="constrain-btn" data-i18n-title="toolbar.constrain.extend">
       <i class="fa-solid fa-angle-up"></i>
     </button>
   </div>
-  <button class="tool-btn" id="tool-point" title="描点">
+  <button class="tool-btn" id="tool-point" data-i18n-title="toolbar.point.title">
     <i class="fa-solid fa-circle-plus"></i>
-    <span class="tool-label">描点</span>
+    <span class="tool-label" data-i18n="toolbar.point.label"></span>
   </button>
-  <button class="tool-btn" id="tool-merge" title="合并节点">
+  <button class="tool-btn" id="tool-merge" data-i18n-title="toolbar.merge.title">
     <i class="fa-solid fa-object-group"></i>
-    <span class="tool-label">合并</span>
+    <span class="tool-label" data-i18n="toolbar.merge.label"></span>
   </button>
-  <button class="tool-btn" id="tool-fenhe" title="分合 (路段拆分/合并)">
+  <button class="tool-btn" id="tool-fenhe" data-i18n-title="toolbar.fenhe.title">
     <i class="fa-solid fa-code-branch"></i>
-    <span class="tool-label">分合</span>
+    <span class="tool-label" data-i18n="toolbar.fenhe.label"></span>
   </button>
-  <button class="tool-btn" id="tool-softdelete" title="软删除 (删除节点保留路段连续性)">
+  <button class="tool-btn" id="tool-softdelete" data-i18n-title="toolbar.softdelete.title">
     <i class="fa-solid fa-eraser"></i>
-    <span class="tool-label">软删</span>
+    <span class="tool-label" data-i18n="toolbar.softdelete.label"></span>
   </button>
   <div class="toolbar-divider"></div>
-  <button class="tool-btn" id="tool-undo" title="撤销 (Ctrl+Z)">
+  <button class="tool-btn" id="tool-undo" data-i18n-title="toolbar.undo.title">
     <i class="fa-solid fa-arrow-rotate-left"></i>
-    <span class="tool-label">撤销</span>
+    <span class="tool-label" data-i18n="toolbar.undo.label"></span>
   </button>
-  <button class="tool-btn" id="tool-redo" title="重做 (Ctrl+Shift+Z)">
+  <button class="tool-btn" id="tool-redo" data-i18n-title="toolbar.redo.title">
     <i class="fa-solid fa-arrow-rotate-right"></i>
-    <span class="tool-label">重做</span>
+    <span class="tool-label" data-i18n="toolbar.redo.label"></span>
   </button>
   <div class="toolbar-divider"></div>
-  <button class="tool-btn" id="tool-mode-toggle" title="展开工具栏">
+  <button class="tool-btn" id="tool-mode-toggle" data-i18n-title="toolbar.expand.title">
     <i class="fa-solid fa-chevron-right" id="mode-toggle-icon"></i>
-    <span class="tool-label">展开</span>
+    <span class="tool-label" data-i18n="toolbar.expand.label"></span>
+  </button>
+  <div class="toolbar-divider"></div>
+  <button class="tool-btn" id="tool-language" title="Change Language" data-i18n-title="toolbar.language.title">
+    <i class="fa-solid fa-language"></i>
+    <span class="tool-label" data-i18n="toolbar.language.label"></span>
   </button>
 </div>
 
 <div id="tool-toast"></div>
 
 <div id="editor-panel">
-  <div id="no-selection" class="empty-state">点击节点或路段查看属性</div>
+  <div id="no-selection" class="empty-state" data-i18n="editor.noSelection"></div>
 
   <div id="node-editor" style="display:none">
-    <div class="section-label">节点属性</div>
-    <div class="field"><span class="field-label">ID</span><span class="field-value mono" id="node-id"></span></div>
-    <div class="field"><span class="field-label">X</span><input type="number" id="node-x" step="0.1"></div>
-    <div class="field"><span class="field-label">Z</span><input type="number" id="node-z" step="0.1"></div>
-    <div class="field"><span class="field-label">来源</span><span class="field-value" id="node-source"></span></div>
+    <div class="section-label" data-i18n="editor.node.sectionLabel"></div>
+    <div class="field"><span class="field-label" data-i18n="editor.node.id"></span><span class="field-value mono" id="node-id"></span></div>
+    <div class="field"><span class="field-label" data-i18n="editor.node.x"></span><input type="number" id="node-x" step="0.1"></div>
+    <div class="field"><span class="field-label" data-i18n="editor.node.z"></span><input type="number" id="node-z" step="0.1"></div>
+    <div class="field"><span class="field-label" data-i18n="editor.node.source"></span><span class="field-value" id="node-source"></span></div>
     <div class="btn-row">
-      <button class="primary" onclick="saveNode()">保存</button>
-      <button class="secondary" onclick="clearSelection()">取消</button>
+      <button class="primary" onclick="saveNode()" data-i18n="editor.node.save"></button>
+      <button class="secondary" onclick="clearSelection()" data-i18n="editor.node.cancel"></button>
 
-      <button class="danger" onclick="deleteNode()">删除节点</button>
+      <button class="danger" onclick="deleteNode()" data-i18n="editor.node.delete"></button>
     </div>
   </div>
 
   <div id="segment-editor" style="display:none">
-    <div class="section-label">路段属性</div>
-    <div class="field"><span class="field-label">ID</span><span class="field-value mono" id="seg-id"></span></div>
-    <div class="field"><span class="field-label">等级</span>
+    <div class="section-label" data-i18n="editor.segment.sectionLabel"></div>
+    <div class="field"><span class="field-label" data-i18n="editor.segment.id"></span><span class="field-value mono" id="seg-id"></span></div>
+    <div class="field"><span class="field-label" data-i18n="editor.segment.classification"></span>
       <select id="seg-classification">
-        <option value="">—</option>
-        <option value="G">国道/高速</option>
-        <option value="S">省道/高架</option>
-        <option value="X">县道</option>
-        <option value="Y">乡道</option>
-        <option value="C">村道</option>
+        <option value="" data-i18n="editor.segment.classification.none"></option>
+        <option value="G" data-i18n="editor.segment.classification.G"></option>
+        <option value="S" data-i18n="editor.segment.classification.S"></option>
+        <option value="X" data-i18n="editor.segment.classification.X"></option>
+        <option value="Y" data-i18n="editor.segment.classification.Y"></option>
+        <option value="C" data-i18n="editor.segment.classification.C"></option>
       </select>
     </div>
-    <div class="field"><span class="field-label">编号</span><input type="text" id="seg-number" placeholder="如 107"></div>
-    <div class="field"><span class="field-label">道路名</span><input type="text" id="seg-road-name" placeholder="未命名道路"></div>
-    <div class="field"><span class="field-label">来源</span><span class="field-value" id="seg-source"></span></div>
-    <div class="field"><span class="field-label">状态</span><span class="field-value" id="seg-status"></span></div>
+    <div class="field"><span class="field-label" data-i18n="editor.segment.number"></span><input type="text" id="seg-number" data-i18n-placeholder="editor.segment.number.placeholder"></div>
+    <div class="field"><span class="field-label" data-i18n="editor.segment.roadName"></span><input type="text" id="seg-road-name" data-i18n-placeholder="editor.segment.roadName.placeholder"></div>
+    <div class="field"><span class="field-label" data-i18n="editor.segment.source"></span><span class="field-value" id="seg-source"></span></div>
+    <div class="field"><span class="field-label" data-i18n="editor.segment.status"></span><span class="field-value" id="seg-status"></span></div>
     <div class="btn-row">
-      <button class="primary" onclick="saveRoad()">保存道路</button>
-      <button class="secondary" onclick="clearSelection()">取消</button>
-      <button class="primary" id="merge-btn" style="display:none" onclick="mergeSegments()">合并选中</button>
-      <button class="danger" onclick="deleteSegment()">删除路段</button>
+      <button class="primary" onclick="saveRoad()" data-i18n="editor.segment.save"></button>
+      <button class="secondary" onclick="clearSelection()" data-i18n="editor.segment.cancel"></button>
+      <button class="primary" id="merge-btn" style="display:none" onclick="mergeSegments()" data-i18n="editor.segment.mergeSelected"></button>
+      <button class="danger" onclick="deleteSegment()" data-i18n="editor.segment.delete"></button>
     </div>
   </div>
 </div>
 
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="/static/i18n.js"></script>
 <script src="/static/app.js"></script>
 </body>
 </html>
