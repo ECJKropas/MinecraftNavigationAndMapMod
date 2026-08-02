@@ -126,6 +126,13 @@ public class SurveySession {
             }
         }
 
+        // Process mouse clicks in both IDLE and RECORDING states.
+        // IDLE: left-click starts recording; right-click is handled but handlers safely no-op.
+        // RECORDING: left-click ends recording; right-click adds waypoints.
+        if (state == State.IDLE || state == State.RECORDING) {
+            processMouseClicks(client, window);
+        }
+
         if (state == State.IDLE)
             return;
 
@@ -137,7 +144,6 @@ public class SurveySession {
                 return;
             }
             spawnPathParticles(client);
-            processMouseClicks(client, window);
         } else if (state == State.PAUSED) {
             if (hasTool) {
                 // Tool picked up: resume recording
