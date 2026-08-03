@@ -468,7 +468,12 @@ public class SurveySession {
         RoadNetworkDatabase db = RoadNetworkDatabase.getInstance();
         synchronized (db) {
             for (UUID nodeId : nodeIds) {
-                db.removeNode(nodeId);
+                // Only remove nodes that are exclusive to this recording (not shared with other segments)
+                int segmentCount = db.getSegmentCountForNode(nodeId);
+                if (segmentCount <= 1) {
+                    db.removeNode(nodeId);
+                }
+                // If segmentCount > 1, the node is shared - don't remove it
             }
             if (pendingSegment != null) {
                 db.removeSegment(pendingSegment.getId());
@@ -479,8 +484,7 @@ public class SurveySession {
     }
 
     /**
-     * Clean up a segment and all its nodes when the user cancels metadata editing. This is called when
-     * RoadMetadataScreen is dismissed without saving.
+     * Clean up a segment and its exclusive nodes when the user cancels metadata editing. Shared nodes are preserved.
      */
     private void cleanupPendingSegmentAndNodes(Segment segment) {
         if (segment == null) {
@@ -488,11 +492,15 @@ public class SurveySession {
         }
         RoadNetworkDatabase db = RoadNetworkDatabase.getInstance();
         synchronized (db) {
-            // Remove all nodes associated with this segment
+            // Remove exclusive nodes (not shared with other segments)
             List<UUID> nodeIdsToClean = segment.getNodeIds();
             if (nodeIdsToClean != null) {
                 for (UUID nodeId : nodeIdsToClean) {
-                    db.removeNode(nodeId);
+                    // Only remove nodes that are exclusive to this segment
+                    int segmentCount = db.getSegmentCountForNode(nodeId);
+                    if (segmentCount <= 1) {
+                        db.removeNode(nodeId);
+                    }
                 }
             }
             // Remove the segment itself
