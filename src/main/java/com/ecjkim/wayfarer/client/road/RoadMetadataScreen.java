@@ -41,20 +41,20 @@ public class RoadMetadataScreen extends Screen {
 
     private static final Map<String, String> CLASSIFICATION_I18N_MAP = new HashMap<>();
     static {
-        CLASSIFICATION_I18N_MAP.put("", "wayfarer.classification.none");
-        CLASSIFICATION_I18N_MAP.put("G国道", "wayfarer.classification.national");
-        CLASSIFICATION_I18N_MAP.put("G高速", "wayfarer.classification.highway");
-        CLASSIFICATION_I18N_MAP.put("S省道", "wayfarer.classification.provincial");
-        CLASSIFICATION_I18N_MAP.put("S高架", "wayfarer.classification.elevated");
-        CLASSIFICATION_I18N_MAP.put("X乡道", "wayfarer.classification.township");
-        CLASSIFICATION_I18N_MAP.put("Y县道", "wayfarer.classification.county");
-        CLASSIFICATION_I18N_MAP.put("C村道", "wayfarer.classification.village");
+        CLASSIFICATION_I18N_MAP.put("", "classification.none");
+        CLASSIFICATION_I18N_MAP.put("G国道", "classification.national");
+        CLASSIFICATION_I18N_MAP.put("G高速", "classification.highway");
+        CLASSIFICATION_I18N_MAP.put("S省道", "classification.provincial");
+        CLASSIFICATION_I18N_MAP.put("S高架", "classification.elevated");
+        CLASSIFICATION_I18N_MAP.put("X乡道", "classification.township");
+        CLASSIFICATION_I18N_MAP.put("Y县道", "classification.county");
+        CLASSIFICATION_I18N_MAP.put("C村道", "classification.village");
     }
 
     /** Convert stored classification code to localized display label. */
     public static String getClassificationDisplay(String code) {
         if (code == null || code.isEmpty()) {
-            return I18n.get("wayfarer.classification.none");
+            return I18n.get("classification.none");
         }
         String i18nKey = CLASSIFICATION_I18N_MAP.get(code);
         if (i18nKey != null) {
