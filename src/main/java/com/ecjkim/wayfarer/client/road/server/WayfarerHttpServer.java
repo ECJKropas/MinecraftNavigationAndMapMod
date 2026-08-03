@@ -35,11 +35,11 @@ import java.util.regex.Pattern;
 
 import com.ecjkim.wayfarer.client.config.WayfarerConfigs;
 import com.ecjkim.wayfarer.client.road.data.RoadNetworkDatabase;
+import com.ecjkim.wayfarer.client.road.model.Direction;
 import com.ecjkim.wayfarer.client.road.model.Node;
 import com.ecjkim.wayfarer.client.road.model.Road;
 import com.ecjkim.wayfarer.client.road.model.Segment;
 import com.ecjkim.wayfarer.client.road.model.Source;
-import com.ecjkim.wayfarer.client.road.model.Status;
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
 import com.google.gson.JsonArray;
@@ -548,7 +548,7 @@ public class WayfarerHttpServer implements Runnable {
                 }
             }
 
-            Segment segment = new Segment(UUID.randomUUID(), nodeIds, null, Source.USER, Status.CONFIRMED, 1);
+            Segment segment = new Segment(UUID.randomUUID(), nodeIds, null, Source.USER, Direction.BIDIRECTIONAL, 1);
             database.addSegment(segment);
             database.saveToDisk();
             sendJson(req.exchange, 201, GSON.toJsonTree(segment));

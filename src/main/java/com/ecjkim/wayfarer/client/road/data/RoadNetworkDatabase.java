@@ -36,12 +36,11 @@ import java.util.logging.Logger;
 import net.fabricmc.loader.api.FabricLoader;
 
 import com.ecjkim.wayfarer.client.WayfarerConfig;
-import com.ecjkim.wayfarer.client.road.model.CornerType;
+import com.ecjkim.wayfarer.client.road.model.Direction;
 import com.ecjkim.wayfarer.client.road.model.Node;
 import com.ecjkim.wayfarer.client.road.model.Road;
 import com.ecjkim.wayfarer.client.road.model.Segment;
 import com.ecjkim.wayfarer.client.road.model.Source;
-import com.ecjkim.wayfarer.client.road.model.Status;
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
 import com.google.gson.JsonArray;
@@ -149,7 +148,6 @@ public class RoadNetworkDatabase {
     public synchronized void updateNode(UUID id, Node updated) {
         Node existing = nodes.get(id);
         if (existing != null) {
-            existing.setCornerType(updated.getCornerType());
             existing.setModifiedAt(System.currentTimeMillis());
             markDirty();
         }
@@ -485,7 +483,7 @@ public class RoadNetworkDatabase {
         Road road1 = findRoadForSegment(s1.getId());
         Road road2 = findRoadForSegment(s2.getId());
 
-        Segment merged = new Segment(UUID.randomUUID(), mergedIds, null, s1.getSource(), s1.getStatus(), 1);
+        Segment merged = new Segment(UUID.randomUUID(), mergedIds, null, s1.getSource(), s1.getDirection(), 1);
         segments.put(merged.getId(), merged);
 
         if (road1 != null && road2 != null && road1.getId().equals(road2.getId())) {
@@ -558,7 +556,7 @@ public class RoadNetworkDatabase {
     public synchronized void updateSegment(UUID id, Segment updated) {
         Segment existing = segments.get(id);
         if (existing != null) {
-            existing.setStatus(updated.getStatus());
+            existing.setDirection(updated.getDirection());
             existing.setRoadId(updated.getRoadId());
             if (updated.getNodeIds() != null) {
                 existing.setNodeIds(updated.getNodeIds());
@@ -945,7 +943,7 @@ public class RoadNetworkDatabase {
             }
         }
 
-        Segment merged = new Segment(UUID.randomUUID(), mergedNodeIds, null, Source.USER, Status.CONFIRMED, 1);
+        Segment merged = new Segment(UUID.randomUUID(), mergedNodeIds, null, Source.USER, Direction.BIDIRECTIONAL, 1);
         segments.put(merged.getId(), merged);
 
         for (UUID segId : segmentIds) {
@@ -1026,7 +1024,7 @@ public class RoadNetworkDatabase {
             }
         }
 
-        Segment mergedSeg = new Segment(UUID.randomUUID(), merged, null, Source.USER, Status.CONFIRMED, 1);
+        Segment mergedSeg = new Segment(UUID.randomUUID(), merged, null, Source.USER, Direction.BIDIRECTIONAL, 1);
         segments.put(mergedSeg.getId(), mergedSeg);
 
         // Road inheritance
@@ -1059,8 +1057,10 @@ public class RoadNetworkDatabase {
         List<UUID> leftIds = new ArrayList<>(ids.subList(0, nodeIndex + 1));
         List<UUID> rightIds = new ArrayList<>(ids.subList(nodeIndex, ids.size()));
 
-        Segment left = new Segment(UUID.randomUUID(), leftIds, seg.getRoadId(), Source.USER, Status.CONFIRMED, 1);
-        Segment right = new Segment(UUID.randomUUID(), rightIds, seg.getRoadId(), Source.USER, Status.CONFIRMED, 1);
+        Segment left =
+            new Segment(UUID.randomUUID(), leftIds, seg.getRoadId(), Source.USER, Direction.BIDIRECTIONAL, 1);
+        Segment right =
+            new Segment(UUID.randomUUID(), rightIds, seg.getRoadId(), Source.USER, Direction.BIDIRECTIONAL, 1);
 
         segments.put(left.getId(), left);
         segments.put(right.getId(), right);
@@ -1100,7 +1100,7 @@ public class RoadNetworkDatabase {
 
         long now = System.currentTimeMillis();
         double y = interpolateY(ids, insertIndex, x, z);
-        Node newNode = new Node(UUID.randomUUID(), x, y, z, CornerType.AUTO, Source.USER, 1, now);
+        Node newNode = new Node(UUID.randomUUID(), x, y, z, Source.USER, 1, now);
         nodes.put(newNode.getId(), newNode);
 
         List<UUID> leftIds = new ArrayList<>(ids.subList(0, insertIndex));
@@ -1109,8 +1109,10 @@ public class RoadNetworkDatabase {
         rightIds.add(newNode.getId());
         rightIds.addAll(ids.subList(insertIndex, ids.size()));
 
-        Segment left = new Segment(UUID.randomUUID(), leftIds, seg.getRoadId(), Source.USER, Status.CONFIRMED, 1);
-        Segment right = new Segment(UUID.randomUUID(), rightIds, seg.getRoadId(), Source.USER, Status.CONFIRMED, 1);
+        Segment left =
+            new Segment(UUID.randomUUID(), leftIds, seg.getRoadId(), Source.USER, Direction.BIDIRECTIONAL, 1);
+        Segment right =
+            new Segment(UUID.randomUUID(), rightIds, seg.getRoadId(), Source.USER, Direction.BIDIRECTIONAL, 1);
 
         segments.put(left.getId(), left);
         segments.put(right.getId(), right);
@@ -1142,7 +1144,7 @@ public class RoadNetworkDatabase {
         }
         long now = System.currentTimeMillis();
         double y = interpolateYForIntersection(segIdA, insertIndexA, segIdB, insertIndexB, x, z);
-        Node newNode = new Node(UUID.randomUUID(), x, y, z, CornerType.AUTO, Source.USER, 1, now);
+        Node newNode = new Node(UUID.randomUUID(), x, y, z, Source.USER, 1, now);
         nodes.put(newNode.getId(), newNode);
 
         splitSegmentWithNode(segIdA, insertIndexA, newNode.getId());
@@ -1168,8 +1170,10 @@ public class RoadNetworkDatabase {
         rightIds.add(newNodeId);
         rightIds.addAll(ids.subList(insertIndex, ids.size()));
 
-        Segment left = new Segment(UUID.randomUUID(), leftIds, seg.getRoadId(), Source.USER, Status.CONFIRMED, 1);
-        Segment right = new Segment(UUID.randomUUID(), rightIds, seg.getRoadId(), Source.USER, Status.CONFIRMED, 1);
+        Segment left =
+            new Segment(UUID.randomUUID(), leftIds, seg.getRoadId(), Source.USER, Direction.BIDIRECTIONAL, 1);
+        Segment right =
+            new Segment(UUID.randomUUID(), rightIds, seg.getRoadId(), Source.USER, Direction.BIDIRECTIONAL, 1);
 
         segments.put(left.getId(), left);
         segments.put(right.getId(), right);
@@ -1538,7 +1542,6 @@ public class RoadNetworkDatabase {
 
             JsonObject props = new JsonObject();
             props.addProperty("id", node.getId().toString());
-            props.addProperty("cornerType", node.getCornerType().name());
             props.addProperty("source", node.getSource().name());
             props.addProperty("version", node.getVersion());
             feature.add("properties", props);
@@ -1563,7 +1566,7 @@ public class RoadNetworkDatabase {
             JsonObject props = new JsonObject();
             props.addProperty("id", segment.getId().toString());
             props.addProperty("source", segment.getSource() != null ? segment.getSource().name() : null);
-            props.addProperty("status", segment.getStatus() != null ? segment.getStatus().name() : null);
+            props.addProperty("direction", segment.getDirection() != null ? segment.getDirection().name() : null);
             props.addProperty("version", segment.getVersion());
             if (segment.getRoadId() != null) {
                 props.addProperty("roadId", segment.getRoadId().toString());

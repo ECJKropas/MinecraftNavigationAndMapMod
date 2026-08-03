@@ -30,11 +30,10 @@ import net.minecraft.client.resources.language.I18n;
 import net.minecraft.network.chat.Component;
 
 import com.ecjkim.wayfarer.client.road.data.RoadNetworkDatabase;
-import com.ecjkim.wayfarer.client.road.model.CornerType;
+import com.ecjkim.wayfarer.client.road.model.Direction;
 import com.ecjkim.wayfarer.client.road.model.Node;
 import com.ecjkim.wayfarer.client.road.model.Road;
 import com.ecjkim.wayfarer.client.road.model.Segment;
-import com.ecjkim.wayfarer.client.road.model.Status;
 
 import org.lwjgl.glfw.GLFW;
 
@@ -306,9 +305,9 @@ public class RoadListScreen extends Screen {
             boolean hov = hit(mx, my, x, py, colMidW, ITEM_H);
             int n = seg.getNodeIds() != null ? seg.getNodeIds().size() : 0;
             String src = seg.getSource() != null ? seg.getSource().name() : "";
-            String st = seg.getStatus() != null ? " " + seg.getStatus().name() : "";
+            String dir = seg.getDirection() != null ? " " + seg.getDirection().name() : "";
             String sid = seg.getId().toString();
-            String label = "Seg-" + sid.substring(sid.length() - 4) + " (" + n + "n)" + st + " [" + src + "]";
+            String label = "Seg-" + sid.substring(sid.length() - 4) + " (" + n + "n)" + dir + " [" + src + "]";
             drawItem(g, x, py, colMidW, ITEM_H, label, null, sel ? 0xFF88FF88 : (hov ? 0xFFCCCCCC : 0xFFAAAAAA), sel,
                 hov);
             py += ITEM_H;
@@ -352,10 +351,9 @@ public class RoadListScreen extends Screen {
             Node node = nodes.get(i);
             boolean sel = selectedNode != null && selectedNode.getId().equals(node.getId());
             boolean hov = hit(mx, my, x, py, colRightW, ITEM_H);
-            String ct = node.getCornerType() != null ? node.getCornerType().name() : "?";
             String nid = node.getId().toString();
             String label = "N-" + nid.substring(nid.length() - 4) + " (" + fmt(node.getX()) + "," + fmt(node.getY())
-                + "," + fmt(node.getZ()) + ") [" + ct + "]";
+                + "," + fmt(node.getZ()) + ")";
             drawItem(g, x, py, colRightW, ITEM_H, label, null, sel ? 0xFF88FFFF : (hov ? 0xFFDDDDDD : 0xFFFFFFFF), sel,
                 hov);
             py += ITEM_H;
@@ -550,11 +548,6 @@ public class RoadListScreen extends Screen {
         int idx = relY / ITEM_H;
         if (idx >= 0 && idx < nodes.size()) {
             selectedNode = nodes.get(idx);
-            CornerType[] vals = CornerType.values();
-            CornerType next = vals[(selectedNode.getCornerType().ordinal() + 1) % vals.length];
-            selectedNode.setCornerType(next);
-            db.updateNode(selectedNode.getId(), selectedNode);
-            db.saveToDisk();
         }
     }
 
@@ -565,8 +558,10 @@ public class RoadListScreen extends Screen {
         int idx = relY / ITEM_H;
         if (idx >= 0 && idx < segs.size()) {
             Segment seg = segs.get(idx);
-            Status next = seg.getStatus() == Status.CONFIRMED ? Status.DRAFT : Status.CONFIRMED;
-            seg.setStatus(next);
+            Direction[] vals = Direction.values();
+            int curIdx = seg.getDirection() != null ? seg.getDirection().ordinal() : 0;
+            Direction next = vals[(curIdx + 1) % vals.length];
+            seg.setDirection(next);
             db.updateSegment(seg.getId(), seg);
             db.saveToDisk();
         }

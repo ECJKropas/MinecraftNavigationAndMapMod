@@ -33,11 +33,10 @@ import com.ecjkim.wayfarer.client.ToolItemManager;
 import com.ecjkim.wayfarer.client.WayfarerConfig;
 import com.ecjkim.wayfarer.client.road.RoadMetadataScreen;
 import com.ecjkim.wayfarer.client.road.data.RoadNetworkDatabase;
-import com.ecjkim.wayfarer.client.road.model.CornerType;
+import com.ecjkim.wayfarer.client.road.model.Direction;
 import com.ecjkim.wayfarer.client.road.model.Node;
 import com.ecjkim.wayfarer.client.road.model.Segment;
 import com.ecjkim.wayfarer.client.road.model.Source;
-import com.ecjkim.wayfarer.client.road.model.Status;
 
 import it.unimi.dsi.fastutil.ints.IntOpenHashSet;
 import it.unimi.dsi.fastutil.ints.IntSet;
@@ -61,7 +60,7 @@ public class SurveySession {
 
     private State state = State.IDLE;
     private final List<UUID> nodeIds = new ArrayList<>();
-    private CornerType currentCornerType = CornerType.SHARP;
+    private Direction currentDirection = Direction.BIDIRECTIONAL;
     private Vec3 lastNodePos;
     private Segment pendingSegment;
     private int particleTickCounter;
@@ -72,8 +71,8 @@ public class SurveySession {
         return state;
     }
 
-    public CornerType getCurrentCornerType() {
-        return currentCornerType;
+    public Direction getCurrentDirection() {
+        return currentDirection;
     }
 
     public Vec3 getLastNodePos() {
@@ -88,26 +87,26 @@ public class SurveySession {
         return nodeIds;
     }
 
-    // ---- Corner type cycling ----
+    // ---- Direction cycling ----
 
-    public void cycleCornerTypeNext() {
-        CornerType[] values = CornerType.values();
-        int idx = (currentCornerType.ordinal() + 1) % values.length;
-        currentCornerType = values[idx];
+    public void cycleDirectionNext() {
+        Direction[] values = Direction.values();
+        int idx = (currentDirection.ordinal() + 1) % values.length;
+        currentDirection = values[idx];
     }
 
-    public void cycleCornerTypePrev() {
-        CornerType[] values = CornerType.values();
-        int idx = (currentCornerType.ordinal() - 1 + values.length) % values.length;
-        currentCornerType = values[idx];
+    public void cycleDirectionPrev() {
+        Direction[] values = Direction.values();
+        int idx = (currentDirection.ordinal() - 1 + values.length) % values.length;
+        currentDirection = values[idx];
     }
 
-    /** Cycle corner type and notify the player. */
-    public void cycleCornerType(LocalPlayer player) {
-        cycleCornerTypeNext();
+    /** Cycle direction type and notify the player. */
+    public void cycleDirection(LocalPlayer player) {
+        cycleDirectionNext();
         if (player != null) {
             player.displayClientMessage(
-                Component.translatable("wayfarer.road.survey.corner_type", currentCornerType.name()), false);
+                Component.translatable("wayfarer.road.survey.direction", currentDirection.name()), false);
         }
     }
 
@@ -118,15 +117,16 @@ public class SurveySession {
             return;
 
         boolean hasTool = ToolItemManager.hasToolItem(client.player);
+        boolean inGui = client.screen != null;
 
-        // Process mouse clicks only when holding the Survey tool item.
-        if (hasTool && (state == State.IDLE || state == State.RECORDING)) {
+        // Process mouse clicks only when holding the Survey tool item and NOT in a GUI screen.
+        if (hasTool && !inGui && (state == State.IDLE || state == State.RECORDING)) {
             processMouseClicks(client, window);
         }
 
-        // If tool is not held, clear the tracked mouse button state so we don't miss
-        // a subsequent press when the player picks the tool up again.
-        if (!hasTool) {
+        // If tool is not held or we're in a GUI, clear the tracked mouse button state
+        // so we don't miss a subsequent press when the player picks the tool up again.
+        if (!hasTool || inGui) {
             mouseButtonDownLastTick.clear();
         }
 
@@ -141,7 +141,10 @@ public class SurveySession {
                     false);
                 return;
             }
-            spawnPathParticles(client);
+            // Don't spawn particles when in a GUI screen
+            if (!inGui) {
+                spawnPathParticles(client);
+            }
         } else if (state == State.PAUSED) {
             if (hasTool) {
                 // Tool picked up: resume recording
@@ -412,7 +415,7 @@ public class SurveySession {
             List<UUID> nodesToRollback = new ArrayList<>(nodeIds);
 
             Segment segment =
-                new Segment(UUID.randomUUID(), new ArrayList<>(nodeIds), null, Source.USER, Status.DRAFT, 1);
+                new Segment(UUID.randomUUID(), new ArrayList<>(nodeIds), null, Source.USER, currentDirection, 1);
             db.addSegment(segment);
 
             if (!db.saveToDisk()) {
@@ -438,11 +441,8 @@ public class SurveySession {
                 player.displayClientMessage(
                     Component.translatable("wayfarer.road.survey.road_saved", savedRoad.getName()), false);
                 pendingSegment = null;
-                // Save was successful, mark segment as committed (no cleanup needed)
-                segment.setStatus(Status.CONFIRMED);
             }, () -> {
-                // User closed metadata screen without saving — segment stays as unfiled DRAFT
-                segment.setStatus(Status.DRAFT);
+                // User closed metadata screen without saving — segment stays as unfiled
                 segment.setModifiedAt(System.currentTimeMillis());
                 RoadNetworkDatabase.getInstance().updateSegment(segment.getId(), segment);
                 RoadNetworkDatabase.getInstance().saveToDisk();
@@ -461,7 +461,7 @@ public class SurveySession {
     // ---- Helper methods ----
 
     private Node createNode(double x, double y, double z) {
-        return new Node(UUID.randomUUID(), x, y, z, currentCornerType, Source.USER, 1, System.currentTimeMillis());
+        return new Node(UUID.randomUUID(), x, y, z, Source.USER, 1, System.currentTimeMillis());
     }
 
     private void cleanupOrphanData() {
@@ -647,7 +647,7 @@ public class SurveySession {
         state = State.IDLE;
         nodeIds.clear();
         lastNodePos = null;
-        currentCornerType = CornerType.SHARP;
+        currentDirection = Direction.BIDIRECTIONAL;
         pendingSegment = null;
         mouseButtonDownLastTick.clear();
         particleTickCounter = 0;

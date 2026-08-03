@@ -179,11 +179,11 @@ public class WayfarerClient implements ClientModInitializer {
                 || GLFW.glfwGetKey(window, GLFW.GLFW_KEY_RIGHT_CONTROL) == GLFW.GLFW_PRESS;
             if (ctrlDown && hasTool) {
                 if (scroll > 0) {
-                    SURVEY_SESSION.cycleCornerTypeNext();
+                    SURVEY_SESSION.cycleDirectionNext();
                 } else {
-                    SURVEY_SESSION.cycleCornerTypePrev();
+                    SURVEY_SESSION.cycleDirectionPrev();
                 }
-                player.sendSystemMessage(Component.literal("拐角类型: " + SURVEY_SESSION.getCurrentCornerType().name()));
+                player.sendSystemMessage(Component.literal("方向类型: " + SURVEY_SESSION.getCurrentDirection().name()));
             }
         }
 

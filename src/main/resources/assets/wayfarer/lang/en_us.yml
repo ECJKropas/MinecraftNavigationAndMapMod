@@ -77,10 +77,10 @@ wayfarer:
         paused: Survey recording paused (data preserved). Press ESC again to resume.
         resumed: "Survey recording resumed (%d nodes)"
         tool_ready: Survey tool ready.
-        hint_idle: "Survey [LMB+Block] Start | [Ctrl+Scroll] Corner type"
-        hint_recording: "Survey [LMB+Block] End | [RMB+Block] Waypoint | [Ctrl+Scroll] Corner"
+        hint_idle: "Survey [LMB+Block] Start | [Ctrl+Scroll] Direction type"
+        hint_recording: "Survey [LMB+Block] End | [RMB+Block] Waypoint | [Ctrl+Scroll] Direction"
         hint_paused: "Survey [Pick up tool] Resume recording"
-        corner_type: "Survey corner type: %s"
+        direction: "Survey direction type: %s"
         tool_removed_paused: Tool removed, Survey recording paused (data preserved).
         tool_resumed: "Tool picked up, Survey recording resumed (%d nodes)"
         integrity_failed: Data integrity check failed, Survey recording cancelled.

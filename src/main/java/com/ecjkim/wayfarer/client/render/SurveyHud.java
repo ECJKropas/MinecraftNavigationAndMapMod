@@ -30,7 +30,7 @@ import com.ecjkim.wayfarer.client.ToolItemManager;
 import com.ecjkim.wayfarer.client.WayfarerClient;
 import com.ecjkim.wayfarer.client.WayfarerConfig;
 import com.ecjkim.wayfarer.client.road.data.RoadNetworkDatabase;
-import com.ecjkim.wayfarer.client.road.model.CornerType;
+import com.ecjkim.wayfarer.client.road.model.Direction;
 import com.ecjkim.wayfarer.client.road.model.Node;
 import com.ecjkim.wayfarer.client.road.record.SurveySession;
 import com.ecjkim.wayfarer.client.road.record.SurveySession.State;
@@ -109,9 +109,9 @@ public final class SurveyHud {
     private static void renderTwoColumnPanel(GuiGraphics graphics, Minecraft client, SurveySession session, State state,
         int windowWidth, int windowHeight) {
 
-        CornerType cornerType = session.getCurrentCornerType();
-        String cornerIcon = getCornerIcon(cornerType);
-        String cornerName = cornerType.name();
+        Direction direction = session.getCurrentDirection();
+        String directionIcon = getDirectionIcon(direction);
+        String directionName = getDirectionDisplayName(direction);
 
         // State indicator
         String stateLabel;
@@ -127,9 +127,9 @@ public final class SurveyHud {
             stateColor = YELLOW;
         }
 
-        // Build left column: state + corner
+        // Build left column: state + direction
         String leftLine1 = stateLabel;
-        String leftLine2 = cornerIcon + " " + cornerName;
+        String leftLine2 = directionIcon + " " + directionName;
 
         // Build right column: node count + distance
         String rightLine1;
@@ -162,9 +162,9 @@ public final class SurveyHud {
         int textY = panelY + 2;
         graphics.drawString(client.font, leftLine1, panelX + 3, textY, stateColor);
         textY += LINE_HEIGHT;
-        graphics.drawString(client.font, cornerIcon, panelX + 3, textY, YELLOW);
-        int iconW = client.font.width(cornerIcon);
-        graphics.drawString(client.font, " " + cornerName, panelX + 3 + iconW, textY, GOLD);
+        graphics.drawString(client.font, directionIcon, panelX + 3, textY, YELLOW);
+        int iconW = client.font.width(directionIcon);
+        graphics.drawString(client.font, " " + directionName, panelX + 3 + iconW, textY, GOLD);
 
         // Draw right column
         int rightX = panelX + leftWidth + GAP;
@@ -238,17 +238,33 @@ public final class SurveyHud {
             segCount >= 3 ? GOLD : (segCount == 0 ? RED : WHITE));
     }
 
-    private static String getCornerIcon(CornerType type) {
-        if (type == null) {
+    private static String getDirectionIcon(Direction direction) {
+        if (direction == null) {
             return "?";
         }
-        switch (type) {
-            case SHARP:
-                return "◆";
-            case ROUND:
-                return "●";
-            case AUTO:
-                return "■";
+        switch (direction) {
+            case BIDIRECTIONAL:
+                return "⇆";
+            case FORWARD:
+                return "→";
+            case BACKWARD:
+                return "←";
+            default:
+                return "?";
+        }
+    }
+
+    private static String getDirectionDisplayName(Direction direction) {
+        if (direction == null) {
+            return "?";
+        }
+        switch (direction) {
+            case BIDIRECTIONAL:
+                return "双向";
+            case FORWARD:
+                return "起点→终点";
+            case BACKWARD:
+                return "终点→起点";
             default:
                 return "?";
         }

@@ -17,8 +17,9 @@
 package com.ecjkim.wayfarer.client.road.model;
 
 /**
- * Corner type for road network nodes.
+ * Direction type for road network segments. BIDIRECTIONAL: Two-way road FORWARD: One-way from start to end BACKWARD:
+ * One-way from end to start
  */
-public enum CornerType {
-    SHARP, ROUND, AUTO
+public enum Direction {
+    BIDIRECTIONAL, FORWARD, BACKWARD
 }

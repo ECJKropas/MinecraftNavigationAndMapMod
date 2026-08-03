@@ -60,12 +60,13 @@ public abstract class MouseScrollMixin {
             return;
 
         if (scroll > 0) {
-            session.cycleCornerTypeNext();
+            session.cycleDirectionNext();
         } else {
-            session.cycleCornerTypePrev();
+            session.cycleDirectionPrev();
         }
 
-        client.player.displayClientMessage(Component.literal("拐角类型: " + session.getCurrentCornerType().name()), true);
+        client.player.displayClientMessage(
+            Component.translatable("wayfarer.road.survey.direction", session.getCurrentDirection().name()), true);
         ci.cancel();
     }
 }

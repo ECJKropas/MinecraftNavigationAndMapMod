@@ -77,10 +77,10 @@ wayfarer:
         paused: Survey 录制已暂停（数据保留）。再次按 ESC 继续录制。
         resumed: "Survey 录制继续 (%d 个节点)"
         tool_ready: Survey 工具就绪。
-        hint_idle: "Survey [LMB+方块] 开始录制 | [Ctrl+滚轮] 切换拐角类型"
-        hint_recording: "Survey [LMB+方块] 结束 | [RMB+方块] 路径点 | [Ctrl+滚轮] 拐角"
+        hint_idle: "Survey [LMB+方块] 开始录制 | [Ctrl+滚轮] 切换方向类型"
+        hint_recording: "Survey [LMB+方块] 结束 | [RMB+方块] 路径点 | [Ctrl+滚轮] 方向"
         hint_paused: "Survey [拾取工具] 继续录制"
-        corner_type: "Survey 角落类型: %s"
+        direction: "Survey 方向类型: %s"
         tool_removed_paused: 工具已离手，Survey 录制暂停（数据保留）。
         tool_resumed: "工具已切回，Survey 录制继续 (%d 个节点)"
         integrity_failed: 数据校验失败，Survey 录制已取消。

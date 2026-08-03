@@ -28,11 +28,10 @@ import net.minecraft.core.BlockPos;
 
 import com.ecjkim.wayfarer.client.WayfarerConfig;
 import com.ecjkim.wayfarer.client.road.data.RoadNetworkDatabase;
-import com.ecjkim.wayfarer.client.road.model.CornerType;
+import com.ecjkim.wayfarer.client.road.model.Direction;
 import com.ecjkim.wayfarer.client.road.model.Node;
 import com.ecjkim.wayfarer.client.road.model.Segment;
 import com.ecjkim.wayfarer.client.road.model.Source;
-import com.ecjkim.wayfarer.client.road.model.Status;
 
 public class RoadRecordingManager {
     private static final Logger LOGGER = Logger.getLogger("Wayfarer|RoadRecording");
@@ -149,14 +148,14 @@ public class RoadRecordingManager {
                 nodeIds.add(snappedEndId);
             } else {
                 double[] pt = simplified.get(i);
-                Node node = new Node(UUID.randomUUID(), pt[0], pt[1], pt[2], CornerType.AUTO, Source.USER, 1, now);
+                Node node = new Node(UUID.randomUUID(), pt[0], pt[1], pt[2], Source.USER, 1, now);
                 db.addNode(node);
                 nodeIds.add(node.getId());
             }
         }
 
         // 4. Create Segment
-        Segment segment = new Segment(UUID.randomUUID(), nodeIds, null, Source.USER, Status.CONFIRMED, 1);
+        Segment segment = new Segment(UUID.randomUUID(), nodeIds, null, Source.USER, Direction.BIDIRECTIONAL, 1);
         db.addSegment(segment);
 
         sessionPoints.clear();
@@ -232,8 +231,7 @@ public class RoadRecordingManager {
 
         if (bestSeg != null) {
             long now = System.currentTimeMillis();
-            Node newNode =
-                new Node(UUID.randomUUID(), bestFootX, bestFootY, bestFootZ, CornerType.AUTO, Source.USER, 1, now);
+            Node newNode = new Node(UUID.randomUUID(), bestFootX, bestFootY, bestFootZ, Source.USER, 1, now);
             db.addNode(newNode);
             List<UUID> newIds = new ArrayList<>(bestSeg.getNodeIds());
             newIds.add(bestInsertAfter + 1, newNode.getId());

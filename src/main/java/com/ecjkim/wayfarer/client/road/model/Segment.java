@@ -27,18 +27,28 @@ public class Segment {
     private List<UUID> nodeIds;
     private UUID roadId;
     private Source source;
-    private Status status;
+    private Direction direction = Direction.BIDIRECTIONAL;
     private int version;
     private long modifiedAt;
 
     public Segment() {}
 
-    public Segment(UUID id, List<UUID> nodeIds, UUID roadId, Source source, Status status, int version) {
+    public Segment(UUID id, List<UUID> nodeIds, UUID roadId, Source source, int version) {
         this.id = id;
         this.nodeIds = nodeIds;
         this.roadId = roadId;
         this.source = source;
-        this.status = status;
+        this.direction = Direction.BIDIRECTIONAL;
+        this.version = version;
+        this.modifiedAt = System.currentTimeMillis();
+    }
+
+    public Segment(UUID id, List<UUID> nodeIds, UUID roadId, Source source, Direction direction, int version) {
+        this.id = id;
+        this.nodeIds = nodeIds;
+        this.roadId = roadId;
+        this.source = source;
+        this.direction = direction != null ? direction : Direction.BIDIRECTIONAL;
         this.version = version;
         this.modifiedAt = System.currentTimeMillis();
     }
@@ -75,12 +85,12 @@ public class Segment {
         this.source = source;
     }
 
-    public Status getStatus() {
-        return status;
+    public Direction getDirection() {
+        return direction;
     }
 
-    public void setStatus(Status status) {
-        this.status = status;
+    public void setDirection(Direction direction) {
+        this.direction = direction;
     }
 
     public int getVersion() {

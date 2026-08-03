@@ -29,11 +29,10 @@ import net.minecraft.world.phys.Vec3;
 import com.ecjkim.wayfarer.client.ToolItemManager;
 import com.ecjkim.wayfarer.client.road.RoadMetadataScreen;
 import com.ecjkim.wayfarer.client.road.data.RoadNetworkDatabase;
-import com.ecjkim.wayfarer.client.road.model.CornerType;
+import com.ecjkim.wayfarer.client.road.model.Direction;
 import com.ecjkim.wayfarer.client.road.model.Node;
 import com.ecjkim.wayfarer.client.road.model.Segment;
 import com.ecjkim.wayfarer.client.road.model.Source;
-import com.ecjkim.wayfarer.client.road.model.Status;
 
 import it.unimi.dsi.fastutil.ints.IntOpenHashSet;
 import it.unimi.dsi.fastutil.ints.IntSet;
@@ -49,7 +48,7 @@ public class SurveySession {
 
     private State state = State.IDLE;
     private final List<UUID> nodeIds = new ArrayList<>();
-    private CornerType currentCornerType = CornerType.SHARP;
+    private Direction currentDirection = Direction.BIDIRECTIONAL;
     private Vec3 lastNodePos;
     private Segment pendingSegment;
     private int particleTickCounter;
@@ -60,8 +59,8 @@ public class SurveySession {
         return state;
     }
 
-    public CornerType getCurrentCornerType() {
-        return currentCornerType;
+    public Direction getCurrentDirection() {
+        return currentDirection;
     }
 
     public Vec3 getLastNodePos() {
@@ -76,14 +75,14 @@ public class SurveySession {
         return nodeIds;
     }
 
-    public void cycleCornerTypeNext() {
-        CornerType[] values = CornerType.values();
-        currentCornerType = values[(currentCornerType.ordinal() + 1) % values.length];
+    public void cycleDirectionNext() {
+        Direction[] values = Direction.values();
+        currentDirection = values[(currentDirection.ordinal() + 1) % values.length];
     }
 
-    public void cycleCornerTypePrev() {
-        CornerType[] values = CornerType.values();
-        currentCornerType = values[(currentCornerType.ordinal() - 1 + values.length) % values.length];
+    public void cycleDirectionPrev() {
+        Direction[] values = Direction.values();
+        currentDirection = values[(currentDirection.ordinal() - 1 + values.length) % values.length];
     }
 
     public void tick(Minecraft client, long window) {
@@ -223,7 +222,8 @@ public class SurveySession {
         }
 
         RoadNetworkDatabase db = RoadNetworkDatabase.getInstance();
-        Segment segment = new Segment(UUID.randomUUID(), new ArrayList<>(nodeIds), null, Source.USER, Status.DRAFT, 1);
+        Segment segment =
+            new Segment(UUID.randomUUID(), new ArrayList<>(nodeIds), null, Source.USER, Direction.BIDIRECTIONAL, 1);
         db.addSegment(segment);
         db.saveToDisk();
 
@@ -244,7 +244,7 @@ public class SurveySession {
     }
 
     private Node createNode(double x, double y, double z) {
-        return new Node(UUID.randomUUID(), x, y, z, currentCornerType, Source.USER, 1, System.currentTimeMillis());
+        return new Node(UUID.randomUUID(), x, y, z, Source.USER, 1, System.currentTimeMillis());
     }
 
     private void cleanupOrphanData() {
@@ -330,7 +330,7 @@ public class SurveySession {
         state = State.IDLE;
         nodeIds.clear();
         lastNodePos = null;
-        currentCornerType = CornerType.SHARP;
+        currentDirection = Direction.BIDIRECTIONAL;
         pendingSegment = null;
         mouseButtonDownLastTick.clear();
         particleTickCounter = 0;

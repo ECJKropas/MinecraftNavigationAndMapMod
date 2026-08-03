@@ -26,20 +26,17 @@ public class Node {
     private double x;
     private double y;
     private double z;
-    private CornerType cornerType;
     private Source source;
     private int version;
     private long modifiedAt;
 
     public Node() {}
 
-    public Node(UUID id, double x, double y, double z, CornerType cornerType, Source source, int version,
-        long modifiedAt) {
+    public Node(UUID id, double x, double y, double z, Source source, int version, long modifiedAt) {
         this.id = id;
         this.x = x;
         this.y = y;
         this.z = z;
-        this.cornerType = cornerType;
         this.source = source;
         this.version = version;
         this.modifiedAt = modifiedAt;
@@ -75,14 +72,6 @@ public class Node {
 
     public void setZ(double z) {
         this.z = z;
-    }
-
-    public CornerType getCornerType() {
-        return cornerType;
-    }
-
-    public void setCornerType(CornerType cornerType) {
-        this.cornerType = cornerType;
     }
 
     public Source getSource() {
