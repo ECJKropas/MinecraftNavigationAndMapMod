@@ -24,6 +24,7 @@ import java.util.logging.Logger;
 
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.player.LocalPlayer;
+import net.minecraft.core.BlockPos;
 
 import com.ecjkim.wayfarer.client.WayfarerConfig;
 import com.ecjkim.wayfarer.client.road.data.RoadNetworkDatabase;
@@ -75,9 +76,11 @@ public class RoadRecordingManager {
         if (player == null)
             return;
 
-        double x = player.getX();
-        double y = player.getY();
-        double z = player.getZ();
+        // Use blockPosition() to get exact block coordinates (avoids Y offset issues)
+        BlockPos blockPos = player.blockPosition();
+        double x = blockPos.getX();
+        double y = blockPos.getY();
+        double z = blockPos.getZ();
 
         if (WayfarerConfig.getInstance().isAutoIntegral()) {
             x = Math.round(x);
