@@ -21,7 +21,6 @@ import java.lang.reflect.Type;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.nio.file.StandardCopyOption;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashSet;
@@ -94,9 +93,8 @@ public class RoadNetworkDatabase {
     }
 
     /**
-     * Switches the backing file to {@code wayfarer/{worldKey}/roads.json} in the game run directory. Migrates legacy
-     * data from both the old config directory ({@code config/wayfarer/roads.json}) and the old flat location
-     * ({@code wayfarer/roads.json}), creates the target directory, and calls {@link #loadFromDisk()}.
+     * Switches the backing file to {@code wayfarer/{worldKey}/roads.json} in the game run directory, creates the target
+     * directory, and calls {@link #loadFromDisk()}.
      */
     public synchronized void setWorldKey(String worldKey) {
         if (worldKey == null || worldKey.isEmpty()) {
@@ -117,11 +115,6 @@ public class RoadNetworkDatabase {
 
         this.worldKey = worldKey;
 
-        // Old legacy path: config/wayfarer/roads.json (from earlier versions)
-        Path legacyConfigPath = FabricLoader.getInstance().getConfigDir().resolve("wayfarer/roads.json");
-        // Old flat path in game dir: wayfarer/roads.json (before per-world storage)
-        Path legacyGamePath = FabricLoader.getInstance().getGameDir().resolve("wayfarer/roads.json");
-        // New per-world path: wayfarer/{worldKey}/roads.json
         Path newDir = FabricLoader.getInstance().getGameDir().resolve("wayfarer").resolve(worldKey);
         this.savePath = newDir.resolve("roads.json");
 
@@ -133,54 +126,12 @@ public class RoadNetworkDatabase {
             return;
         }
 
-        // Migrate from both legacy locations (config/wayfarer and flat wayfarer/)
-        migrateFromLegacy(legacyConfigPath);
-        migrateFromLegacy(legacyGamePath);
         loadFromDisk();
     }
 
     /** Returns the current world key, or null if not yet set. */
     public String getWorldKey() {
         return worldKey;
-    }
-
-    /**
-     * If a legacy roads.json exists and contains data, copies its content to the current {@code savePath}. After
-     * migration, renames the legacy file to {@code roads.json.migrated} to prevent re-migration when joining other new
-     * worlds.
-     */
-    private void migrateFromLegacy(Path legacyPath) {
-        if (!Files.exists(legacyPath)) {
-            return;
-        }
-        if (legacyPath.toAbsolutePath().normalize().equals(this.savePath.toAbsolutePath().normalize())) {
-            return; // already at legacy path — nothing to migrate
-        }
-        try {
-            String json = Files.readString(legacyPath, StandardCharsets.UTF_8);
-            JsonObject root = GSON.fromJson(json, JsonObject.class);
-            if (root == null) {
-                return;
-            }
-            boolean hasData = (root.has("nodes") && root.get("nodes").getAsJsonArray().size() > 0)
-                || (root.has("segments") && root.get("segments").getAsJsonArray().size() > 0)
-                || (root.has("roads") && root.get("roads").getAsJsonArray().size() > 0);
-            if (hasData && !Files.exists(this.savePath)) {
-                Files.writeString(this.savePath, json, StandardCharsets.UTF_8);
-                LOGGER.log(Level.INFO, "Migrated legacy road data from {0} to {1}",
-                    new Object[] {legacyPath, this.savePath});
-                // Rename legacy file so it won't be re-migrated for subsequent worlds
-                Path migratedMarker = legacyPath.resolveSibling("roads.json.migrated");
-                Files.move(legacyPath, migratedMarker, StandardCopyOption.REPLACE_EXISTING);
-                LOGGER.log(Level.INFO, "Renamed legacy road file to {0} to prevent re-migration", migratedMarker);
-            } else if (!hasData) {
-                // Empty legacy file — just rename it to skip future checks
-                Path migratedMarker = legacyPath.resolveSibling("roads.json.migrated");
-                Files.move(legacyPath, migratedMarker, StandardCopyOption.REPLACE_EXISTING);
-            }
-        } catch (IOException e) {
-            LOGGER.log(Level.WARNING, "Failed to migrate legacy road data: {0}", e.getMessage());
-        }
     }
 
     // ---------- Node CRUD ----------
