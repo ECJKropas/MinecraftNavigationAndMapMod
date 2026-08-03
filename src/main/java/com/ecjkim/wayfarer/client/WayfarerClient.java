@@ -110,15 +110,16 @@ public class WayfarerClient implements ClientModInitializer {
     }
 
     /**
-     * Sanitizes a world key string to be safe for use as a directory name.
-     * Replaces characters that are invalid in file paths (e.g., colons in IP addresses like "127.0.0.1:25565").
+     * Sanitizes a world key string to be safe for use as a directory name. Replaces characters that are invalid in file
+     * paths (e.g., colons in IP addresses like "127.0.0.1:25565").
      */
     private static String sanitizeWorldKey(String key) {
         if (key == null || key.isEmpty()) {
             return "default";
         }
         // Replace characters that are problematic in directory names across platforms
-        return key.replace(':', '_').replace('/', '_').replace('\\', '_').replace('*', '_').replace('?', '_').replace('"', '_').replace('<', '_').replace('>', '_').replace('|', '_');
+        return key.replace(':', '_').replace('/', '_').replace('\\', '_').replace('*', '_').replace('?', '_')
+            .replace('"', '_').replace('<', '_').replace('>', '_').replace('|', '_');
     }
 
     private void handleClientTick(Minecraft client) {

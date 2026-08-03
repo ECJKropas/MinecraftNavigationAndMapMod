@@ -53,8 +53,8 @@ import com.google.gson.reflect.TypeToken;
  * Singleton database holding the complete road network in memory.
  *
  * <p>
- * Stores data to {@code wayfarer/roads.json} inside the Fabric config directory. All public write methods are
- * synchronized for thread safety.
+ * Stores data to {@code wayfarer/roads.json} inside the game run directory. All public write methods are synchronized
+ * for thread safety.
  * </p>
  */
 public class RoadNetworkDatabase {
@@ -72,7 +72,7 @@ public class RoadNetworkDatabase {
     private volatile boolean dirty;
 
     private RoadNetworkDatabase() {
-        savePath = FabricLoader.getInstance().getConfigDir().resolve("wayfarer/roads.json");
+        savePath = FabricLoader.getInstance().getGameDir().resolve("wayfarer/roads.json");
         worldKey = null;
     }
 
@@ -94,13 +94,17 @@ public class RoadNetworkDatabase {
     }
 
     /**
-     * Switches the backing file to {@code config/wayfarer/{worldKey}/roads.json}. Migrates legacy data from
-     * {@code config/wayfarer/roads.json} (once), creates the target directory, and calls {@link #loadFromDisk()}.
+     * Switches the backing file to {@code wayfarer/{worldKey}/roads.json} in the game run directory. Migrates legacy
+     * data from both the old config directory ({@code config/wayfarer/roads.json}) and the old flat location
+     * ({@code wayfarer/roads.json}), creates the target directory, and calls {@link #loadFromDisk()}.
      */
     public synchronized void setWorldKey(String worldKey) {
         if (worldKey == null || worldKey.isEmpty()) {
             worldKey = "default";
         }
+        // Sanitize worldKey to be safe for directory names (e.g., replace colons in IP addresses)
+        worldKey = worldKey.replace(':', '_').replace('/', '_').replace('\\', '_').replace('*', '_').replace('?', '_')
+            .replace('"', '_').replace('<', '_').replace('>', '_').replace('|', '_');
         if (worldKey.equals(this.worldKey)) {
             return;
         }
@@ -113,8 +117,12 @@ public class RoadNetworkDatabase {
 
         this.worldKey = worldKey;
 
-        Path legacyPath = FabricLoader.getInstance().getConfigDir().resolve("wayfarer/roads.json");
-        Path newDir = FabricLoader.getInstance().getConfigDir().resolve("wayfarer").resolve(worldKey);
+        // Old legacy path: config/wayfarer/roads.json (from earlier versions)
+        Path legacyConfigPath = FabricLoader.getInstance().getConfigDir().resolve("wayfarer/roads.json");
+        // Old flat path in game dir: wayfarer/roads.json (before per-world storage)
+        Path legacyGamePath = FabricLoader.getInstance().getGameDir().resolve("wayfarer/roads.json");
+        // New per-world path: wayfarer/{worldKey}/roads.json
+        Path newDir = FabricLoader.getInstance().getGameDir().resolve("wayfarer").resolve(worldKey);
         this.savePath = newDir.resolve("roads.json");
 
         try {
@@ -125,7 +133,9 @@ public class RoadNetworkDatabase {
             return;
         }
 
-        migrateFromLegacy(legacyPath);
+        // Migrate from both legacy locations (config/wayfarer and flat wayfarer/)
+        migrateFromLegacy(legacyConfigPath);
+        migrateFromLegacy(legacyGamePath);
         loadFromDisk();
     }
 
@@ -135,9 +145,9 @@ public class RoadNetworkDatabase {
     }
 
     /**
-     * If legacy {@code config/wayfarer/roads.json} exists and contains data, copies its content to the current
-     * {@code savePath}. After migration, renames the legacy file to {@code roads.json.migrated} to prevent re-migration
-     * when joining other new worlds.
+     * If a legacy roads.json exists and contains data, copies its content to the current {@code savePath}. After
+     * migration, renames the legacy file to {@code roads.json.migrated} to prevent re-migration when joining other new
+     * worlds.
      */
     private void migrateFromLegacy(Path legacyPath) {
         if (!Files.exists(legacyPath)) {
