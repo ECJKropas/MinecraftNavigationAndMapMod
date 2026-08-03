@@ -88,6 +88,7 @@ wayfarer:
         recording_started_snapped: Survey recording started (snapped to existing node)
         recording_started_hotkey: Survey recording started (hotkey)
         recording_started: Road recording started.
+        node_inserted_to_segment: "New node inserted to segment[%s]"
         waypoint_placed: "Waypoint #%d placed @ %s"
         waypoint_snapped: "Snapped to existing node #%d @ %s"
         too_few_nodes: Too few nodes, recording cancelled.

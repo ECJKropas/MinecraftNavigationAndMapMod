@@ -88,6 +88,7 @@ wayfarer:
         recording_started_snapped: Survey 录制已开始（吸附到现有节点）
         recording_started_hotkey: Survey 录制已开始（快捷键）
         recording_started: 道路记录已开始。
+        node_inserted_to_segment: "已插入新节点到路段[%s]"
         waypoint_placed: "已放置路径点 #%d @ %s"
         waypoint_snapped: "已吸附到现有节点 #%d @ %s"
         too_few_nodes: 节点太少，已取消录制。

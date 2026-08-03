@@ -248,6 +248,31 @@ public class SurveySession {
         }
 
         if (state == State.IDLE) {
+            // Try auto-snap to a segment if enabled
+            WayfarerConfig config = WayfarerConfig.getInstance();
+            if (config.isAutoSnapEndpoints()) {
+                UUID[] snapResult = snapToSegment(blockPos.x, blockPos.y, blockPos.z, config.getRdpEpsilon());
+                if (snapResult != null) {
+                    // Successfully snapped to a segment
+                    Node snappedNode = RoadNetworkDatabase.getInstance().getNode(snapResult[0]);
+                    if (snappedNode != null) {
+                        RoadNetworkDatabase db = RoadNetworkDatabase.getInstance();
+                        synchronized (db) {
+                            nodeIds.add(snappedNode.getId());
+                            lastNodePos = new Vec3(snappedNode.getX(), snappedNode.getY(), snappedNode.getZ());
+                            state = State.RECORDING;
+                        }
+                        String segmentIdSuffix =
+                            snapResult[1].toString().substring(snapResult[1].toString().length() - 4);
+                        player.displayClientMessage(
+                            Component.translatable("wayfarer.road.survey.node_inserted_to_segment", segmentIdSuffix),
+                            false);
+                        return;
+                    }
+                }
+            }
+
+            // No snap target found, create a new node
             Node startNode = createNode(blockPos.x, blockPos.y, blockPos.z);
             RoadNetworkDatabase db = RoadNetworkDatabase.getInstance();
             synchronized (db) {
@@ -259,6 +284,30 @@ public class SurveySession {
             player.displayClientMessage(
                 Component.translatable("wayfarer.road.survey.recording_started_node", formatCoord(blockPos)), false);
         } else if (state == State.RECORDING) {
+            // Try auto-snap to a segment if enabled
+            WayfarerConfig config = WayfarerConfig.getInstance();
+            if (config.isAutoSnapEndpoints()) {
+                UUID[] snapResult = snapToSegment(blockPos.x, blockPos.y, blockPos.z, config.getRdpEpsilon());
+                if (snapResult != null) {
+                    // Successfully snapped to a segment
+                    Node snappedNode = RoadNetworkDatabase.getInstance().getNode(snapResult[0]);
+                    if (snappedNode != null) {
+                        RoadNetworkDatabase db = RoadNetworkDatabase.getInstance();
+                        synchronized (db) {
+                            nodeIds.add(snappedNode.getId());
+                            lastNodePos = new Vec3(snappedNode.getX(), snappedNode.getY(), snappedNode.getZ());
+                            finishRecording(player);
+                        }
+                        String segmentIdSuffix =
+                            snapResult[1].toString().substring(snapResult[1].toString().length() - 4);
+                        player.displayClientMessage(
+                            Component.translatable("wayfarer.road.survey.node_inserted_to_segment", segmentIdSuffix),
+                            false);
+                        return;
+                    }
+                }
+            }
+
             Node endNode = createNode(blockPos.x, blockPos.y, blockPos.z);
             RoadNetworkDatabase db = RoadNetworkDatabase.getInstance();
             synchronized (db) {
@@ -481,6 +530,66 @@ public class SurveySession {
             }
         }
         return closest;
+    }
+
+    /**
+     * Try to snap a point to the nearest road segment edge. If the point is within {@code epsilon} distance of a
+     * segment edge, insert a new node at the perpendicular foot and split the segment.
+     *
+     * @param x X coordinate of the point
+     * @param y Y coordinate of the point
+     * @param z Z coordinate of the point
+     * @param epsilon maximum snap distance
+     * @return a UUID array [nodeId, segmentId] if snapped, or null if no snap target found
+     */
+    private UUID[] snapToSegment(double x, double y, double z, double epsilon) {
+        RoadNetworkDatabase db = RoadNetworkDatabase.getInstance();
+
+        double bestDist = epsilon;
+        Segment bestSeg = null;
+        int bestInsertAfter = -1;
+        double bestFootX = 0;
+        double bestFootY = 0;
+        double bestFootZ = 0;
+
+        for (Segment seg : db.getAllSegments()) {
+            List<Node> segNodes = db.getNodesForSegment(seg.getId());
+            for (int i = 0; i < segNodes.size() - 1; i++) {
+                Node a = segNodes.get(i);
+                Node b = segNodes.get(i + 1);
+                double dx2 = b.getX() - a.getX();
+                double dz2 = b.getZ() - a.getZ();
+                double lenSq = dx2 * dx2 + dz2 * dz2;
+                if (lenSq == 0)
+                    continue;
+                double t = ((x - a.getX()) * dx2 + (z - a.getZ()) * dz2) / lenSq;
+                if (t < 0 || t > 1)
+                    continue;
+                double projX = a.getX() + t * dx2;
+                double projZ = a.getZ() + t * dz2;
+                double pdx = x - projX;
+                double pdz = z - projZ;
+                double d = Math.sqrt(pdx * pdx + pdz * pdz);
+                if (d < bestDist) {
+                    bestDist = d;
+                    bestSeg = seg;
+                    bestInsertAfter = i;
+                    bestFootX = projX;
+                    bestFootY = a.getY() + t * (b.getY() - a.getY());
+                    bestFootZ = projZ;
+                }
+            }
+        }
+
+        if (bestSeg != null) {
+            // Insert node into segment (this will split the segment into two)
+            Node newNode = db.insertNodeIntoSegment(bestSeg.getId(), bestInsertAfter + 1, bestFootX, bestFootZ);
+            if (newNode != null) {
+                return new UUID[] {newNode.getId(), bestSeg.getId()};
+            }
+        }
+
+        return null;
     }
 
     /**
