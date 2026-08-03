@@ -24,7 +24,6 @@ import net.minecraft.client.Minecraft;
 import net.minecraft.client.player.LocalPlayer;
 import net.minecraft.core.BlockPos;
 import net.minecraft.network.chat.Component;
-import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.phys.BlockHitResult;
 import net.minecraft.world.phys.HitResult;
 import net.minecraft.world.phys.Vec3;
@@ -54,7 +53,6 @@ public class SurveySession {
         IDLE, RECORDING, PAUSED
     }
 
-    private static final double NODE_HIT_RADIUS = 2.0;
     private static final int MOUSE_LEFT = 0;
     private static final int MOUSE_RIGHT = 1;
 
@@ -510,29 +508,41 @@ public class SurveySession {
         }
     }
 
-    /** Raycast from player's eyes to find the nearest node within hit radius. */
-    private static UUID findNearbyNode(Minecraft client) {
+    /**
+     * Find a nearby node that the player is looking at, within a distance based on rdpEpsilon. Excludes nodes that are
+     * already in the current recording list.
+     */
+    private UUID findNearbyNode(Minecraft client) {
         if (client.player == null)
             return null;
-        Player player = client.player;
-        Vec3 eyePos = player.getEyePosition(1.0F);
-        Vec3 lookVec = player.getViewVector(1.0F);
+        LocalPlayer player = client.player;
+
+        // Get the looked-at block position
+        Vec3 blockPos = getLookedAtBlockPos(player);
+        if (blockPos == null) {
+            return null;
+        }
+
+        // Use rdpEpsilon as the snap distance threshold
+        WayfarerConfig config = WayfarerConfig.getInstance();
+        double epsilon = config.getRdpEpsilon();
+        double maxDistSq = epsilon * epsilon;
 
         RoadNetworkDatabase db = RoadNetworkDatabase.getInstance();
         UUID closest = null;
-        double closestDistSq = NODE_HIT_RADIUS * NODE_HIT_RADIUS;
+        double closestDistSq = maxDistSq;
 
         for (Node node : db.getAllNodes()) {
-            Vec3 nodePos = new Vec3(node.getX(), node.getY(), node.getZ());
-            Vec3 eyeToNode = nodePos.subtract(eyePos);
-            double t = eyeToNode.dot(lookVec);
-            if (t < 0)
-                continue; // behind the player
+            // Skip nodes that are already in the current recording list
+            if (nodeIds.contains(node.getId())) {
+                continue;
+            }
 
-            Vec3 closestPointOnRay = eyePos.add(lookVec.scale(t));
-            double distSq = closestPointOnRay.distanceToSqr(nodePos);
+            double dx = blockPos.x - node.getX();
+            double dz = blockPos.z - node.getZ();
+            double distSq = dx * dx + dz * dz;
 
-            if (distSq < closestDistSq && t < 50.0) { // max 50 block range
+            if (distSq < closestDistSq) {
                 closestDistSq = distSq;
                 closest = node.getId();
             }
@@ -543,6 +553,11 @@ public class SurveySession {
     /**
      * Try to snap a point to the nearest road segment edge. If the point is within {@code epsilon} distance of a
      * segment edge, insert a new node at the perpendicular foot and split the segment.
+     *
+     * <p>
+     * Segments that contain nodes from the current recording list are excluded to prevent snapping to nodes that were
+     * just created in this recording session.
+     * </p>
      *
      * @param x X coordinate of the point
      * @param y Y coordinate of the point
@@ -561,6 +576,12 @@ public class SurveySession {
         double bestFootZ = 0;
 
         for (Segment seg : db.getAllSegments()) {
+            // Skip segments that contain nodes from the current recording
+            List<UUID> segNodeIds = seg.getNodeIds();
+            if (segNodeIds != null && segNodeIds.stream().anyMatch(nodeIds::contains)) {
+                continue;
+            }
+
             List<Node> segNodes = db.getNodesForSegment(seg.getId());
             for (int i = 0; i < segNodes.size() - 1; i++) {
                 Node a = segNodes.get(i);
