@@ -22,7 +22,6 @@ import java.util.UUID;
 
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.player.LocalPlayer;
-import net.minecraft.core.BlockPos;
 import net.minecraft.network.chat.Component;
 import net.minecraft.world.phys.BlockHitResult;
 import net.minecraft.world.phys.HitResult;
@@ -622,10 +621,10 @@ public class SurveySession {
     }
 
     /**
-     * Get the block position the player is currently looking at. Uses Minecraft's built-in raycast to find the targeted
-     * block.
+     * Get the exact position the player is currently looking at on a block surface. Uses Minecraft's built-in raycast
+     * to find the targeted block and returns the precise hit location on its surface.
      *
-     * @return the block position as Vec3, or null if not looking at a block
+     * @return the exact hit position as Vec3, or null if not looking at a block
      */
     private Vec3 getLookedAtBlockPos(LocalPlayer player) {
         // Use the player's pick() method which returns the block the player is looking at
@@ -636,10 +635,9 @@ public class SurveySession {
             return null;
         }
 
-        // Get the block position from the BlockHitResult
+        // Get the exact hit location on the block surface (not the block center)
         BlockHitResult blockHit = (BlockHitResult)hitResult;
-        BlockPos blockPos = blockHit.getBlockPos();
-        return new Vec3(blockPos.getX() + 0.5, blockPos.getY() + 0.5, blockPos.getZ() + 0.5);
+        return blockHit.getLocation();
     }
 
     /** Format a coordinate vector for display. */
