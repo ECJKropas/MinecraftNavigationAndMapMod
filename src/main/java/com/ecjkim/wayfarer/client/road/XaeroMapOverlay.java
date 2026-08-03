@@ -147,6 +147,7 @@ public final class XaeroMapOverlay {
         RenderSystem.defaultBlendFunc();
         RenderSystem.disableDepthTest();
 
+        // Render filed segments (assigned to roads)
         for (Road road : roads) {
             List<Segment> segments = db.getSegmentsForRoad(road.getId());
             if (segments.isEmpty())
@@ -164,6 +165,25 @@ public final class XaeroMapOverlay {
                     continue;
 
                 renderSegment(graphics, nodes, effectiveScale, cameraX, cameraZ, centerX, centerY, color, lineWidth);
+            }
+        }
+
+        // Render unfiled segments (not assigned to any road)
+        List<Segment> unfiledSegments = db.getUnfiledSegments();
+        if (!unfiledSegments.isEmpty()) {
+            int unfiledColor = 0xFFFFD700; // Gold color for unfiled segments
+            float unfiledLineWidth = 2.5f;
+
+            for (Segment segment : unfiledSegments) {
+                List<Node> nodes = db.getNodesForSegment(segment.getId());
+                if (nodes == null || nodes.size() < 2)
+                    continue;
+
+                if (!isSegmentVisible(nodes, minWorldX, maxWorldX, minWorldZ, maxWorldZ))
+                    continue;
+
+                renderSegment(graphics, nodes, effectiveScale, cameraX, cameraZ, centerX, centerY, unfiledColor,
+                    unfiledLineWidth);
             }
         }
 

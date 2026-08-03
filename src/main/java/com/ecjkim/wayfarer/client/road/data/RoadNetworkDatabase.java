@@ -888,6 +888,19 @@ public class RoadNetworkDatabase {
     }
 
     /**
+     * Returns all Segments that are not assigned to any Road (unfiled).
+     */
+    public List<Segment> getUnfiledSegments() {
+        List<Segment> result = new ArrayList<>();
+        for (Segment seg : segments.values()) {
+            if (seg.getRoadId() == null) {
+                result.add(seg);
+            }
+        }
+        return result;
+    }
+
+    /**
      * Appends a Segment to an existing Road and updates the Segment's roadId.
      */
     public synchronized void addSegmentToRoad(UUID roadId, UUID segmentId) {
