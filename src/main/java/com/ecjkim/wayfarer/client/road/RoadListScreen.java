@@ -722,7 +722,7 @@ public class RoadListScreen extends Screen {
         if (r.getNumber() != null && !r.getNumber().isEmpty())
             sb.append("[").append(r.getNumber()).append("] ");
         if (r.getClassification() != null && !r.getClassification().isEmpty())
-            sb.append(r.getClassification()).append(" ");
+            sb.append(RoadMetadataScreen.getClassificationDisplay(r.getClassification())).append(" ");
         sb.append(r.getName());
         return sb.toString();
     }

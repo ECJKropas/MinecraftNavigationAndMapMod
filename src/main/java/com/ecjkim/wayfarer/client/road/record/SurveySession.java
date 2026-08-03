@@ -106,7 +106,8 @@ public class SurveySession {
     public void cycleCornerType(LocalPlayer player) {
         cycleCornerTypeNext();
         if (player != null) {
-            player.displayClientMessage(Component.literal("Survey 角落类型: " + currentCornerType.name()), false);
+            player.displayClientMessage(
+                Component.translatable("wayfarer.road.survey.corner_type", currentCornerType.name()), false);
         }
     }
 
@@ -136,7 +137,8 @@ public class SurveySession {
             if (!hasTool) {
                 // Tool removed: transition to PAUSED (preserve all data)
                 state = State.PAUSED;
-                client.player.displayClientMessage(Component.literal("工具已离手，Survey 录制暂停（数据保留）。"), false);
+                client.player.displayClientMessage(Component.translatable("wayfarer.road.survey.tool_removed_paused"),
+                    false);
                 return;
             }
             spawnPathParticles(client);
@@ -148,10 +150,11 @@ public class SurveySession {
                     state = State.RECORDING;
                     particleTickCounter = 0;
                     client.player.displayClientMessage(
-                        Component.literal("工具已切回，Survey 录制继续 (" + nodeIds.size() + " 个节点)"), false);
+                        Component.translatable("wayfarer.road.survey.tool_resumed", nodeIds.size()), false);
                 } else {
                     // Data integrity check failed, cancel the recording
-                    client.player.displayClientMessage(Component.literal("数据校验失败，Survey 录制已取消。"), false);
+                    client.player.displayClientMessage(Component.translatable("wayfarer.road.survey.integrity_failed"),
+                        false);
                     cancelRecording(client.player);
                 }
             }
@@ -253,7 +256,8 @@ public class SurveySession {
                 lastNodePos = blockPos;
                 state = State.RECORDING;
             }
-            player.displayClientMessage(Component.literal("Survey 录制已开始（节点 " + formatCoord(blockPos) + "）"), false);
+            player.displayClientMessage(
+                Component.translatable("wayfarer.road.survey.recording_started_node", formatCoord(blockPos)), false);
         } else if (state == State.RECORDING) {
             Node endNode = createNode(blockPos.x, blockPos.y, blockPos.z);
             RoadNetworkDatabase db = RoadNetworkDatabase.getInstance();
@@ -279,7 +283,8 @@ public class SurveySession {
                 }
                 state = State.RECORDING;
             }
-            player.displayClientMessage(Component.literal("Survey 录制已开始（吸附到现有节点）"), false);
+            player.displayClientMessage(Component.translatable("wayfarer.road.survey.recording_started_snapped"),
+                false);
         } else if (state == State.RECORDING) {
             // Ad-snap: connect to existing node, then end
             RoadNetworkDatabase db = RoadNetworkDatabase.getInstance();
@@ -318,7 +323,8 @@ public class SurveySession {
             nodeIds.add(waypoint.getId());
             lastNodePos = blockPos;
         }
-        player.displayClientMessage(Component.literal("已放置路径点 #" + nodeIds.size() + " @ " + formatCoord(blockPos)),
+        player.displayClientMessage(
+            Component.translatable("wayfarer.road.survey.waypoint_placed", nodeIds.size(), formatCoord(blockPos)),
             false);
     }
 
@@ -336,7 +342,8 @@ public class SurveySession {
                 lastNodePos = new Vec3(hitNode.getX(), hitNode.getY(), hitNode.getZ());
             }
         }
-        player.displayClientMessage(Component.literal("已吸附到现有节点 #" + nodeIds.size() + " @ " + formatCoord(lastNodePos)),
+        player.displayClientMessage(
+            Component.translatable("wayfarer.road.survey.waypoint_snapped", nodeIds.size(), formatCoord(lastNodePos)),
             false);
     }
 
@@ -345,7 +352,7 @@ public class SurveySession {
     private void finishRecording(LocalPlayer player) {
         if (nodeIds.size() < 2) {
             cleanupOrphanData();
-            player.displayClientMessage(Component.literal("节点太少，已取消录制。"), false);
+            player.displayClientMessage(Component.translatable("wayfarer.road.survey.too_few_nodes"), false);
             state = State.IDLE;
             return;
         }
@@ -365,7 +372,8 @@ public class SurveySession {
                 for (UUID nodeId : nodesToRollback) {
                     db.removeNode(nodeId);
                 }
-                player.displayClientMessage(Component.literal("保存失败，Survey 录制未结束。"), false);
+                player.displayClientMessage(Component.translatable("wayfarer.road.survey.save_failed_not_ended"),
+                    false);
                 return;
             }
 
@@ -378,7 +386,8 @@ public class SurveySession {
 
             Minecraft client = Minecraft.getInstance();
             client.setScreen(new RoadMetadataScreen(segment, savedRoad -> {
-                player.displayClientMessage(Component.literal("道路已保存: " + savedRoad.getName()), false);
+                player.displayClientMessage(
+                    Component.translatable("wayfarer.road.survey.road_saved", savedRoad.getName()), false);
                 pendingSegment = null;
                 // Save was successful, mark segment as committed (no cleanup needed)
                 segment.setStatus(Status.CONFIRMED);
@@ -394,9 +403,9 @@ public class SurveySession {
             }, () -> {
                 // User discarded the segment — clean up was already done by RoadMetadataScreen.discardSegment()
                 pendingSegment = null;
-                player.displayClientMessage(Component.literal("路段已放弃，录制数据已删除。"), false);
+                player.displayClientMessage(Component.translatable("wayfarer.road.survey.segment_discarded"), false);
             }));
-            player.displayClientMessage(Component.literal("道路记录已停止，选择或创建道路后保存。"), false);
+            player.displayClientMessage(Component.translatable("wayfarer.road.survey.recording_ended"), false);
         }
     }
 
@@ -543,7 +552,7 @@ public class SurveySession {
             return;
         }
         if (state != State.IDLE) {
-            player.displayClientMessage(Component.literal("Survey 已在录制中"), false);
+            player.displayClientMessage(Component.translatable("wayfarer.road.survey.already_recording"), false);
             return;
         }
 
@@ -556,7 +565,7 @@ public class SurveySession {
             lastNodePos = new Vec3(pos.x, pos.y, pos.z);
             state = State.RECORDING;
         }
-        player.displayClientMessage(Component.literal("Survey 录制已开始（快捷键）"), false);
+        player.displayClientMessage(Component.translatable("wayfarer.road.survey.recording_started_hotkey"), false);
     }
 
     /** Force stop recording at player's current position (RECORDING → IDLE, save flow). */
@@ -565,7 +574,7 @@ public class SurveySession {
             return;
         }
         if (state != State.RECORDING) {
-            player.displayClientMessage(Component.literal("Survey 未在录制中"), false);
+            player.displayClientMessage(Component.translatable("wayfarer.road.survey.not_recording"), false);
             return;
         }
 
@@ -585,7 +594,7 @@ public class SurveySession {
             return;
         }
         if (state == State.IDLE && nodeIds.isEmpty()) {
-            player.displayClientMessage(Component.literal("没有可取消的录制"), false);
+            player.displayClientMessage(Component.translatable("wayfarer.road.survey.nothing_to_cancel"), false);
             return;
         }
 
@@ -595,7 +604,7 @@ public class SurveySession {
         lastNodePos = null;
         pendingSegment = null;
 
-        player.displayClientMessage(Component.literal("Survey 录制已取消"), false);
+        player.displayClientMessage(Component.translatable("wayfarer.road.survey.recording_cancelled"), false);
     }
 
     // ---- Particle path ----

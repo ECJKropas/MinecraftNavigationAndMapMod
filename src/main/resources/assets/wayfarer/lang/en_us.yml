@@ -80,8 +80,41 @@ wayfarer:
         hint_idle: "Survey [LMB+Block] Start | [Ctrl+Scroll] Corner type"
         hint_recording: "Survey [LMB+Block] End | [RMB+Block] Waypoint | [Ctrl+Scroll] Corner"
         hint_paused: "Survey [Pick up tool] Resume recording"
+        corner_type: "Survey corner type: %s"
+        tool_removed_paused: Tool removed, Survey recording paused (data preserved).
+        tool_resumed: "Tool picked up, Survey recording resumed (%d nodes)"
+        integrity_failed: Data integrity check failed, Survey recording cancelled.
+        recording_started_node: "Survey recording started (node %s)"
+        recording_started_snapped: Survey recording started (snapped to existing node)
+        recording_started_hotkey: Survey recording started (hotkey)
+        recording_started: Road recording started.
+        waypoint_placed: "Waypoint #%d placed @ %s"
+        waypoint_snapped: "Snapped to existing node #%d @ %s"
+        too_few_nodes: Too few nodes, recording cancelled.
+        too_few_points_cancel: Too few track points, this road recording cancelled.
+        save_failed_not_ended: Save failed, Survey recording not ended.
+        road_saved: "Road saved: %s"
+        segment_discarded: Segment discarded, recording data deleted.
+        recording_ended: Road recording stopped, select or create a road to save.
+        already_recording: Survey already recording
+        not_recording: Survey not recording
+        nothing_to_cancel: Nothing to cancel
+        recording_cancelled: Survey recording cancelled
+        tool_cleared_empty: Tool item slot is empty, Survey tool setting cleared.
+        tool_set: "Held item set as Survey tool: %s"
+        in_survey_mode: Already in Survey mode, please switch items and retry
 category:
   wayfarer: Wayfarer
+
+classification:
+  none: Unclassified
+  national: National (G)
+  highway: Highway (G)
+  provincial: Provincial (S)
+  elevated: Elevated (S)
+  township: Township (X)
+  county: County (Y)
+  village: Village (C)
 
 wayfarer.gui.title.configs: Wayfarer Settings
 

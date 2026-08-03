@@ -17,7 +17,9 @@
 package com.ecjkim.wayfarer.client.road;
 
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 import java.util.function.Consumer;
 
@@ -34,7 +36,33 @@ import com.ecjkim.wayfarer.client.road.model.Road;
 import com.ecjkim.wayfarer.client.road.model.Segment;
 
 public class RoadMetadataScreen extends Screen {
-    private static final List<String> CLASSIFICATIONS = List.of("", "G国道", "G高速", "S省道", "S高架", "X乡道", "Y县道", "C村道");
+    private static final List<String> CLASSIFICATION_CODES =
+        List.of("", "G国道", "G高速", "S省道", "S高架", "X乡道", "Y县道", "C村道");
+
+    private static final Map<String, String> CLASSIFICATION_I18N_MAP = new HashMap<>();
+    static {
+        CLASSIFICATION_I18N_MAP.put("", "wayfarer.classification.none");
+        CLASSIFICATION_I18N_MAP.put("G国道", "wayfarer.classification.national");
+        CLASSIFICATION_I18N_MAP.put("G高速", "wayfarer.classification.highway");
+        CLASSIFICATION_I18N_MAP.put("S省道", "wayfarer.classification.provincial");
+        CLASSIFICATION_I18N_MAP.put("S高架", "wayfarer.classification.elevated");
+        CLASSIFICATION_I18N_MAP.put("X乡道", "wayfarer.classification.township");
+        CLASSIFICATION_I18N_MAP.put("Y县道", "wayfarer.classification.county");
+        CLASSIFICATION_I18N_MAP.put("C村道", "wayfarer.classification.village");
+    }
+
+    /** Convert stored classification code to localized display label. */
+    public static String getClassificationDisplay(String code) {
+        if (code == null || code.isEmpty()) {
+            return I18n.get("wayfarer.classification.none");
+        }
+        String i18nKey = CLASSIFICATION_I18N_MAP.get(code);
+        if (i18nKey != null) {
+            return I18n.get(i18nKey);
+        }
+        return code; // fallback for unknown codes
+    }
+
     private static final int PANEL_WIDTH = 300;
     private static final int PANEL_HEIGHT = 224;
 
@@ -61,7 +89,7 @@ public class RoadMetadataScreen extends Screen {
     protected void init() {
         String defaultCls = WayfarerConfig.getInstance().getDefaultClassification();
         if (defaultCls != null && !defaultCls.isEmpty()) {
-            int idx = CLASSIFICATIONS.indexOf(defaultCls);
+            int idx = CLASSIFICATION_CODES.indexOf(defaultCls);
             if (idx >= 0) {
                 classificationIndex = idx;
             }
@@ -81,7 +109,7 @@ public class RoadMetadataScreen extends Screen {
         String selectLabel = selectedRoad != null
             ? (selectedRoad.getName()
                 + (selectedRoad.getClassification() != null && !selectedRoad.getClassification().isEmpty()
-                    ? " (" + selectedRoad.getClassification() + ")" : ""))
+                    ? " (" + getClassificationDisplay(selectedRoad.getClassification()) + ")" : ""))
             : I18n.get("wayfarer.road.gui.metadata.select_road");
         this.addRenderableWidget(Button.builder(Component.literal(selectLabel), btn -> {
             this.minecraft.setScreen(new RoadListScreen(road -> {
@@ -125,7 +153,7 @@ public class RoadMetadataScreen extends Screen {
         int halfGap = 8;
         int cycleButtonWidth = 110;
         this.cycleButton = Button.builder(Component.literal(classificationLabel()), btn -> {
-            classificationIndex = (classificationIndex + 1) % CLASSIFICATIONS.size();
+            classificationIndex = (classificationIndex + 1) % CLASSIFICATION_CODES.size();
             btn.setMessage(Component.literal(classificationLabel()));
         }).bounds(fieldLeft, classifRowY, cycleButtonWidth, 20).build();
         this.addRenderableWidget(this.cycleButton);
@@ -156,7 +184,7 @@ public class RoadMetadataScreen extends Screen {
                 onSave.accept(selectedRoad);
             } else {
                 String roadName = this.nameBox.getValue().trim();
-                String classification = CLASSIFICATIONS.get(classificationIndex);
+                String classification = CLASSIFICATION_CODES.get(classificationIndex);
                 String number = this.numberBox.getValue().trim();
 
                 if (roadName.isEmpty() && !classification.isEmpty() && !number.isEmpty()) {
@@ -279,7 +307,7 @@ public class RoadMetadataScreen extends Screen {
     }
 
     private String classificationLabel() {
-        String val = CLASSIFICATIONS.get(classificationIndex);
-        return val.isEmpty() ? I18n.get("wayfarer.road.gui.metadata.classification_default") : val;
+        String val = CLASSIFICATION_CODES.get(classificationIndex);
+        return getClassificationDisplay(val);
     }
 }

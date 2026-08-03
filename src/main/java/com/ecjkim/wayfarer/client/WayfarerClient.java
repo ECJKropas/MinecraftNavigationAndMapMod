@@ -104,7 +104,21 @@ public class WayfarerClient implements ClientModInitializer {
         } else {
             worldKey = "default";
         }
+        // Sanitize worldKey to be a valid directory name: replace colons and other problematic characters
+        worldKey = sanitizeWorldKey(worldKey);
         RoadNetworkDatabase.getInstance().setWorldKey(worldKey);
+    }
+
+    /**
+     * Sanitizes a world key string to be safe for use as a directory name.
+     * Replaces characters that are invalid in file paths (e.g., colons in IP addresses like "127.0.0.1:25565").
+     */
+    private static String sanitizeWorldKey(String key) {
+        if (key == null || key.isEmpty()) {
+            return "default";
+        }
+        // Replace characters that are problematic in directory names across platforms
+        return key.replace(':', '_').replace('/', '_').replace('\\', '_').replace('*', '_').replace('?', '_').replace('"', '_').replace('<', '_').replace('>', '_').replace('|', '_');
     }
 
     private void handleClientTick(Minecraft client) {
@@ -186,11 +200,10 @@ public class WayfarerClient implements ClientModInitializer {
             return;
         ToolItemManager.setHeldItemAsTool(player);
         if (ToolItemManager.getToolItem().isEmpty()) {
-            player.displayClientMessage(Component.literal("手持物品为空，已清除 Survey 工具设置。"), false);
+            player.displayClientMessage(Component.translatable("wayfarer.road.survey.tool_cleared_empty"), false);
         } else {
-            player.displayClientMessage(
-                Component.literal("已将手持物品设为 Survey 工具: " + ToolItemManager.getToolItem().getHoverName().getString()),
-                false);
+            player.displayClientMessage(Component.translatable("wayfarer.road.survey.tool_set",
+                ToolItemManager.getToolItem().getHoverName().getString()), false);
         }
     }
 
@@ -222,7 +235,7 @@ public class WayfarerClient implements ClientModInitializer {
         // Auto / Survey mutual exclusion
         if (ToolItemManager.hasToolItem(player) && WayfarerConfig.getInstance().isToolItemEnabled()) {
             if (!ROAD_MANAGER.isRecording()) {
-                player.displayClientMessage(Component.literal("正在 Survey 模式，请切换手中物品后重试"), false);
+                player.displayClientMessage(Component.translatable("wayfarer.road.survey.in_survey_mode"), false);
             }
             return;
         }
@@ -231,23 +244,25 @@ public class WayfarerClient implements ClientModInitializer {
             ROAD_MANAGER.stopRecording();
             if (ROAD_MANAGER.getRecordedPointCount() < 2) {
                 ROAD_MANAGER.discardRecording();
-                player.displayClientMessage(Component.literal("记录点太少，已取消这次道路记录。"), false);
+                player.displayClientMessage(Component.translatable("wayfarer.road.survey.too_few_points_cancel"),
+                    false);
             } else {
                 Segment segment = ROAD_MANAGER.saveRecording();
                 if (segment != null) {
                     client.setScreen(new RoadMetadataScreen(segment, savedRoad -> {
-                        player.displayClientMessage(Component.literal("道路已保存: " + savedRoad.getName()), false);
+                        player.displayClientMessage(
+                            Component.translatable("wayfarer.road.survey.road_saved", savedRoad.getName()), false);
                     }, () -> {
                         // Close without saving — segment stays as unfiled
                         player.displayClientMessage(
                             Component.translatable("wayfarer.road.gui.metadata.segment_left_unfiled"), false);
                     }, ROAD_MANAGER::discardRecording));
-                    player.displayClientMessage(Component.literal("道路记录已停止，选择或创建道路后保存。"), false);
+                    player.displayClientMessage(Component.translatable("wayfarer.road.survey.recording_ended"), false);
                 }
             }
         } else {
             ROAD_MANAGER.startRecording();
-            player.displayClientMessage(Component.literal("道路记录已开始。"), false);
+            player.displayClientMessage(Component.translatable("wayfarer.road.survey.recording_started"), false);
         }
     }
 }
