@@ -237,6 +237,10 @@ public class WayfarerClient implements ClientModInitializer {
                 if (segment != null) {
                     client.setScreen(new RoadMetadataScreen(segment, savedRoad -> {
                         player.displayClientMessage(Component.literal("道路已保存: " + savedRoad.getName()), false);
+                    }, () -> {
+                        // Close without saving — segment stays as unfiled
+                        player.displayClientMessage(
+                            Component.translatable("wayfarer.road.gui.metadata.segment_left_unfiled"), false);
                     }, ROAD_MANAGER::discardRecording));
                     player.displayClientMessage(Component.literal("道路记录已停止，选择或创建道路后保存。"), false);
                 }

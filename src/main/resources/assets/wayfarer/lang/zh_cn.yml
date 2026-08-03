@@ -66,6 +66,20 @@ wayfarer:
         button_cancel_edit: 放弃修改
         button_cancel: 放弃
         subtitle_classify: 记录完成后补充名称和分级
+        segment_node_count: "线段节点数: %d"
+        assigned_road: "已关联道路: %s"
+        save_failed_associate: 保存失败，道路未关联。
+        save_failed_create: 保存失败，道路未创建。
+        button_close: 关闭
+        button_discard: 放弃
+        segment_left_unfiled: 路段已保存为未归档，可稍后在道路列表中关联。
+    survey:
+        paused: Survey 录制已暂停（数据保留）。再次按 ESC 继续录制。
+        resumed: "Survey 录制继续 (%d 个节点)"
+        tool_ready: Survey 工具就绪。
+        hint_idle: "Survey [LMB+方块] 开始录制 | [Ctrl+滚轮] 切换拐角类型"
+        hint_recording: "Survey [LMB+方块] 结束 | [RMB+方块] 路径点 | [Ctrl+滚轮] 拐角"
+        hint_paused: "Survey [拾取工具] 继续录制"
 category:
   wayfarer: Wayfarer
 
@@ -74,5 +88,7 @@ wayfarer.gui.title.configs: Wayfarer 设置
 defaultClassification: 默认分级代码
 tileProviderMode: 地图瓦片提供者模式
 rdpEpsilon: RDP简化容差
+nodeIndicatorBeamAlpha: 节点指示物光柱透明度
+showKeyHints: 开启按键提示
 toggleRecording: 切换道路录制
 openMenu: 打开导航菜单

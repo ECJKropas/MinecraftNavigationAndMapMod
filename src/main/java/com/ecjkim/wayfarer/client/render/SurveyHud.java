@@ -42,21 +42,20 @@ import org.slf4j.LoggerFactory;
  * Enhanced HUD overlay for Survey mode.
  *
  * <p>
- * Displays:
+ * Displays a two-column panel above the hotbar to avoid overlap:
  * <ul>
- * <li>Mode indicator (IDLE / RECORDING) with color coding</li>
- * <li>Node count and total distance during recording</li>
- * <li>Corner type indicator with icon</li>
- * <li>Keyboard shortcut hints</li>
- * <li>Hovered node information (coordinates, type)</li>
+ * <li>Left column: mode indicator + corner type</li>
+ * <li>Right column: node count + total distance</li>
+ * <li>Hovered node information above crosshair</li>
  * </ul>
  */
 public final class SurveyHud {
     private static final Logger LOGGER = LoggerFactory.getLogger("Wayfarer|SurveyHUD");
 
-    private static final int HUD_X = 5;
-    private static final int HUD_MARGIN = 2;
+    private static final int MARGIN = 4;
+    private static final int GAP = 6;
     private static final int LINE_HEIGHT = 12;
+    private static final int HOTBAR_HEIGHT = 22;
 
     private static final int WHITE = 0xFFFFFFFF;
     private static final int GRAY = 0xFFAAAAAA;
@@ -103,77 +102,77 @@ public final class SurveyHud {
         int windowWidth = client.getWindow().getGuiScaledWidth();
         int windowHeight = client.getWindow().getGuiScaledHeight();
 
-        renderMainPanel(graphics, client, session, state, windowHeight);
+        renderTwoColumnPanel(graphics, client, session, state, windowWidth, windowHeight);
         renderHoveredNodeInfo(graphics, client, player, windowWidth, windowHeight);
-        renderShortcutHints(graphics, client, state, windowWidth, windowHeight);
     }
 
-    private static void renderMainPanel(GuiGraphics graphics, Minecraft client, SurveySession session, State state,
-        int windowHeight) {
-
-        int y = windowHeight - HUD_MARGIN;
-        int contentWidth = 200;
+    private static void renderTwoColumnPanel(GuiGraphics graphics, Minecraft client, SurveySession session, State state,
+        int windowWidth, int windowHeight) {
 
         CornerType cornerType = session.getCurrentCornerType();
         String cornerIcon = getCornerIcon(cornerType);
         String cornerName = cornerType.name();
 
-        // First line: state indicator
-        String statePrefix;
+        // State indicator
+        String stateLabel;
         int stateColor;
         if (state == State.IDLE) {
-            statePrefix = "▶ Survey IDLE";
+            stateLabel = "▶ Survey IDLE";
             stateColor = GRAY;
         } else if (state == State.RECORDING) {
-            statePrefix = "● RECORDING";
+            stateLabel = "● RECORDING";
             stateColor = RED;
-        } else { // PAUSED
-            statePrefix = "⏸ PAUSED";
+        } else {
+            stateLabel = "⏸ PAUSED";
             stateColor = YELLOW;
         }
 
-        String cornerPart = cornerIcon + " " + cornerName;
-        String firstLine = statePrefix + "  |  " + cornerPart;
+        // Build left column: state + corner
+        String leftLine1 = stateLabel;
+        String leftLine2 = cornerIcon + " " + cornerName;
 
-        int firstLineWidth = client.font.width(firstLine);
-        contentWidth = Math.max(contentWidth, firstLineWidth + 4);
-
-        // Second line: node count & distance (during recording or paused)
-        int secondLineWidth = 0;
-        String secondLine = "";
+        // Build right column: node count + distance
+        String rightLine1;
+        String rightLine2 = "";
         if (state == State.RECORDING || state == State.PAUSED) {
             int nodeCount = session.getNodeCount();
             double totalDist = computeTotalDistance(session);
-            secondLine =
-                String.format("  ⌂ %d nodes  |  %.1f m%s", nodeCount, totalDist, state == State.PAUSED ? " (暂停中)" : "");
-            secondLineWidth = client.font.width(secondLine);
-            contentWidth = Math.max(contentWidth, secondLineWidth + 4);
+            rightLine1 = String.format("⌂ %d nodes", nodeCount);
+            rightLine2 = String.format("%.1f m%s", totalDist, state == State.PAUSED ? " (paused)" : "");
+        } else {
+            rightLine1 = "⌂ 0 nodes";
+            rightLine2 = "0.0 m";
         }
 
+        int leftWidth = Math.max(client.font.width(leftLine1), client.font.width(leftLine2)) + 6;
+        int rightWidth = Math.max(client.font.width(rightLine1), client.font.width(rightLine2)) + 6;
+        int totalWidth = leftWidth + GAP + rightWidth;
+
+        // Position: above the hotbar, centered
+        int barY = windowHeight - HOTBAR_HEIGHT - MARGIN;
+        int panelY = barY - LINE_HEIGHT * 2 - 4;
+        int panelX = (windowWidth - totalWidth) / 2;
+
         // Draw background
-        int panelHeight = (state == State.RECORDING || state == State.PAUSED) ? LINE_HEIGHT * 2 + 4 : LINE_HEIGHT + 4;
-        int bgY = y - panelHeight;
-        graphics.fill(HUD_X - 1, bgY, HUD_X + contentWidth + 1, y, BG_COLOR);
-        graphics.fill(HUD_X - 1, bgY, HUD_X + contentWidth + 1, bgY + 1, BG_BORDER);
-        graphics.fill(HUD_X - 1, y - 1, HUD_X + contentWidth + 1, y, BG_BORDER);
+        graphics.fill(panelX - 1, panelY, panelX + totalWidth + 1, barY, BG_COLOR);
+        graphics.fill(panelX - 1, panelY, panelX + totalWidth + 1, panelY + 1, BG_BORDER);
+        graphics.fill(panelX - 1, barY - 1, panelX + totalWidth + 1, barY, BG_BORDER);
 
-        // Draw first line
-        int textY = bgY + 2;
-        // State part
-        graphics.drawString(client.font, statePrefix, HUD_X, textY, stateColor);
-        int stateWidth = client.font.width(statePrefix);
-        // Separator
-        graphics.drawString(client.font, "  |  ", HUD_X + stateWidth, textY, DARK_GRAY);
-        int sepWidth = client.font.width("  |  ");
-        // Corner icon + name
-        graphics.drawString(client.font, cornerIcon, HUD_X + stateWidth + sepWidth, textY, YELLOW);
-        int iconWidth = client.font.width(cornerIcon);
-        graphics.drawString(client.font, " " + cornerName, HUD_X + stateWidth + sepWidth + iconWidth, textY, GOLD);
+        // Draw left column
+        int textY = panelY + 2;
+        graphics.drawString(client.font, leftLine1, panelX + 3, textY, stateColor);
+        textY += LINE_HEIGHT;
+        graphics.drawString(client.font, cornerIcon, panelX + 3, textY, YELLOW);
+        int iconW = client.font.width(cornerIcon);
+        graphics.drawString(client.font, " " + cornerName, panelX + 3 + iconW, textY, GOLD);
 
-        // Draw second line (recording stats, also shown when paused)
-        if (state == State.RECORDING || state == State.PAUSED) {
-            textY += LINE_HEIGHT;
-            graphics.drawString(client.font, secondLine, HUD_X + 4, textY, state == State.PAUSED ? GRAY : WHITE);
+        // Draw right column
+        int rightX = panelX + leftWidth + GAP;
+        textY = panelY + 2;
+        graphics.drawString(client.font, rightLine1, rightX + 3, textY, state == State.PAUSED ? GRAY : WHITE);
+        textY += LINE_HEIGHT;
+        if (!rightLine2.isEmpty()) {
+            graphics.drawString(client.font, rightLine2, rightX + 3, textY, state == State.PAUSED ? GRAY : CYAN);
         }
     }
 
@@ -237,29 +236,6 @@ public final class SurveyHud {
         // Segment count line
         graphics.drawString(client.font, segText, bgX + 4, infoY + LINE_HEIGHT + 2,
             segCount >= 3 ? GOLD : (segCount == 0 ? RED : WHITE));
-    }
-
-    private static void renderShortcutHints(GuiGraphics graphics, Minecraft client, State state, int windowWidth,
-        int windowHeight) {
-
-        int y = windowHeight - HUD_MARGIN;
-        int hintY = y - 40;
-
-        String hints;
-        if (state == State.IDLE) {
-            hints = "  [LMB+Block] Start  |  [Ctrl+Scroll] Corner  |  [ESC] Cancel";
-        } else if (state == State.RECORDING) {
-            hints = "  [LMB+Block] End  |  [RMB+Block] Waypoint  |  [Ctrl+Scroll] Corner  |  [ESC] Cancel";
-        } else { // PAUSED
-            hints = "  [Pick up tool] Resume  |  [ESC] Cancel Recording";
-        }
-
-        int hintWidth = client.font.width(hints);
-        int x = windowWidth - hintWidth - HUD_X;
-
-        // Semi-transparent background for readability
-        graphics.fill(x - 2, hintY - 2, windowWidth - 2, hintY + LINE_HEIGHT + 2, 0x80000000);
-        graphics.drawString(client.font, hints, x, hintY, state == State.PAUSED ? YELLOW : GRAY);
     }
 
     private static String getCornerIcon(CornerType type) {

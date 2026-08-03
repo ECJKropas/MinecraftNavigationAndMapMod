@@ -66,6 +66,20 @@ wayfarer:
         button_cancel_edit: Discard Changes
         button_cancel: Cancel
         subtitle_classify: Fill in name and classification after recording
+        segment_node_count: "Segment nodes: %d"
+        assigned_road: "Assigned road: %s"
+        save_failed_associate: "Save failed, road not associated."
+        save_failed_create: "Save failed, road not created."
+        button_close: Close
+        button_discard: Discard
+        segment_left_unfiled: Segment saved as unfiled, can be assigned later in road list.
+    survey:
+        paused: Survey recording paused (data preserved). Press ESC again to resume.
+        resumed: "Survey recording resumed (%d nodes)"
+        tool_ready: Survey tool ready.
+        hint_idle: "Survey [LMB+Block] Start | [Ctrl+Scroll] Corner type"
+        hint_recording: "Survey [LMB+Block] End | [RMB+Block] Waypoint | [Ctrl+Scroll] Corner"
+        hint_paused: "Survey [Pick up tool] Resume recording"
 category:
   wayfarer: Wayfarer
 
@@ -74,5 +88,7 @@ wayfarer.gui.title.configs: Wayfarer Settings
 defaultClassification: Default Classification
 tileProviderMode: Tile Provider Mode
 rdpEpsilon: RDP Epsilon
+nodeIndicatorBeamAlpha: Node indicator beam alpha
+showKeyHints: Show key hints
 toggleRecording: Toggle Recording
 openMenu: Open Menu

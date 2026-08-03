@@ -67,9 +67,13 @@ public class WayfarerConfigs {
         public static final ConfigDouble NODE_INDICATOR_BEAM_ALPHA =
             new ConfigDouble("nodeIndicatorBeamAlpha", 0.3, 0.05, 1.0, "节点指示物光柱透明度（0-1）");
 
-        public static final ImmutableList<IConfigBase> OPTIONS = ImmutableList.of(DEFAULT_CLASSIFICATION, AUTO_INTEGRAL,
-            AUTO_SNAP_ENDPOINTS, RDP_EPSILON, AUTO_DELETE_ORPHAN_NODES, WEB_MAX_ZOOM, AUTO_GRAPHIFY, TOOL_ITEM,
-            TOOL_ITEM_ENABLED, NODE_INDICATOR_ENABLED, NODE_INDICATOR_BEAM_HEIGHT, NODE_INDICATOR_BEAM_ALPHA);
+        public static final ConfigBoolean SHOW_KEY_HINTS =
+            new ConfigBoolean("showKeyHints", true, "切换到 Survey 工具物品时显示按键提示（action bar）");
+
+        public static final ImmutableList<IConfigBase> OPTIONS =
+            ImmutableList.of(DEFAULT_CLASSIFICATION, AUTO_INTEGRAL, AUTO_SNAP_ENDPOINTS, RDP_EPSILON,
+                AUTO_DELETE_ORPHAN_NODES, WEB_MAX_ZOOM, AUTO_GRAPHIFY, TOOL_ITEM, TOOL_ITEM_ENABLED,
+                NODE_INDICATOR_ENABLED, NODE_INDICATOR_BEAM_HEIGHT, NODE_INDICATOR_BEAM_ALPHA, SHOW_KEY_HINTS);
     }
 
     public static List<IConfigBase> getAllConfigs() {

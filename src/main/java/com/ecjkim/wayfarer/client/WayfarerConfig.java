@@ -76,6 +76,10 @@ public class WayfarerConfig {
         return WayfarerConfigs.Generic.NODE_INDICATOR_BEAM_ALPHA.getDoubleValue();
     }
 
+    public boolean isShowKeyHints() {
+        return WayfarerConfigs.Generic.SHOW_KEY_HINTS.getBooleanValue();
+    }
+
     public static WayfarerConfig getInstance() {
         if (instance == null) {
             instance = new WayfarerConfig();

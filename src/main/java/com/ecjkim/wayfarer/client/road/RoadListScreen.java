@@ -82,6 +82,7 @@ public class RoadListScreen extends Screen {
     private Road selectedRoad;
     private Segment selectedSegment;
     private Node selectedNode;
+    private final UUID highlightedSegmentId;
 
     // Drag state
     private boolean dragging = false;
@@ -106,14 +107,19 @@ public class RoadListScreen extends Screen {
     // ----- Constructors -----
 
     public RoadListScreen() {
-        this(null, null);
+        this(null, null, null);
     }
 
     public RoadListScreen(Consumer<Road> onRoadSelected, Runnable onCancel) {
+        this(onRoadSelected, onCancel, null);
+    }
+
+    public RoadListScreen(Consumer<Road> onRoadSelected, Runnable onCancel, UUID highlightedSegmentId) {
         super(Component.literal(I18n.get("wayfarer.road.gui.title")));
         this.mode = (onRoadSelected != null) ? Mode.SELECT : Mode.LIST;
         this.onRoadSelected = onRoadSelected;
         this.onCancel = onCancel;
+        this.highlightedSegmentId = highlightedSegmentId;
     }
 
     // ----- Init -----
@@ -133,6 +139,37 @@ public class RoadListScreen extends Screen {
 
         panelTop = 10 + SEARCH_H + GAP;
         panelBottom = this.height - STATUS_H - (mode == Mode.LIST ? BTN_H + 4 : 2);
+
+        // Auto-select and scroll to highlighted segment if provided
+        if (highlightedSegmentId != null && mode == Mode.SELECT) {
+            refreshCache();
+            List<Segment> segs = currentSegments();
+            for (int i = 0; i < segs.size(); i++) {
+                if (segs.get(i).getId().equals(highlightedSegmentId)) {
+                    selectedSegment = segs.get(i);
+                    // Calculate scroll so highlighted segment is visible
+                    int maxVis = (panelBottom - panelTop) / ITEM_H;
+                    if (i >= maxVis) {
+                        scrollMid = i - maxVis + 1;
+                    } else {
+                        scrollMid = 0;
+                    }
+                    break;
+                }
+            }
+            // If not found in unfiled, check all segments
+            if (selectedSegment == null) {
+                for (Segment s : db.getAllSegments()) {
+                    if (s.getId().equals(highlightedSegmentId)) {
+                        if (s.getRoadId() != null) {
+                            selectedRoad = db.getRoad(s.getRoadId());
+                            selectedSegment = s;
+                        }
+                        break;
+                    }
+                }
+            }
+        }
 
         if (mode == Mode.LIST) {
             int halfW = (colLeftW - 8) / 2;
@@ -311,14 +348,24 @@ public class RoadListScreen extends Screen {
             if (py + ITEM_H > panelBottom)
                 break;
             boolean sel = selectedSegment != null && selectedSegment.getId().equals(seg.getId());
+            boolean highlighted = highlightedSegmentId != null && highlightedSegmentId.equals(seg.getId());
             boolean hov = hit(mx, my, x, py, colMidW, ITEM_H);
             int n = seg.getNodeIds() != null ? seg.getNodeIds().size() : 0;
             String src = seg.getSource() != null ? seg.getSource().name() : "";
             String st = seg.getStatus() != null ? " " + seg.getStatus().name() : "";
             String sid = seg.getId().toString();
             String label = "Seg-" + sid.substring(sid.length() - 4) + " (" + n + "n)" + st + " [" + src + "]";
-            drawItem(g, x, py, colMidW, ITEM_H, label, null, sel ? 0xFF88FF88 : (hov ? 0xFFCCCCCC : 0xFFAAAAAA), sel,
-                hov);
+            int color;
+            if (highlighted) {
+                color = 0xFFFFFF88;
+            } else if (sel) {
+                color = 0xFF88FF88;
+            } else if (hov) {
+                color = 0xFFCCCCCC;
+            } else {
+                color = 0xFFAAAAAA;
+            }
+            drawItem(g, x, py, colMidW, ITEM_H, label, null, color, sel, hov, highlighted);
             py += ITEM_H;
         }
 
@@ -434,18 +481,6 @@ public class RoadListScreen extends Screen {
             return true;
         }
         return super.mouseScrolled(mx, my, amount);
-    }
-
-    @Override
-    public boolean keyPressed(int keyCode, int scanCode, int modifiers) {
-        if (keyCode == GLFW.GLFW_KEY_ESCAPE) {
-            dragging = false;
-            if (mode == Mode.SELECT && onCancel != null)
-                onCancel.run();
-            this.minecraft.setScreen(null);
-            return true;
-        }
-        return super.keyPressed(keyCode, scanCode, modifiers);
     }
 
     // ---- Click handlers ----
@@ -648,6 +683,8 @@ public class RoadListScreen extends Screen {
             if (s.getRoadId() == null)
                 allUnfiled.add(s);
         }
+        // Sort unfiled segments by modifiedAt descending (newest first)
+        allUnfiled.sort((a, b) -> Long.compare(b.getModifiedAt(), a.getModifiedAt()));
     }
 
     private List<Segment> currentSegments() {
@@ -698,6 +735,22 @@ public class RoadListScreen extends Screen {
     private void drawItem(GuiGraphics g, int x, int y, int w, int h, String label, String badge, int color, boolean sel,
         boolean hov) {
         if (sel)
+            g.fill(x, y, x + w, y + h, 0x663366AA);
+        else if (hov)
+            g.fill(x, y, x + w, y + h, 0x33333333);
+        g.drawString(this.font, label, x + 5, y + 1, color, false);
+        if (badge != null) {
+            int bw = this.font.width(badge) + 6;
+            g.fill(x + w - bw - 4, y + 1, x + w - 4, y + h - 2, 0x66444444);
+            g.drawString(this.font, badge, x + w - bw + 1, y + 2, 0xFFAAAAAA, false);
+        }
+    }
+
+    private void drawItem(GuiGraphics g, int x, int y, int w, int h, String label, String badge, int color, boolean sel,
+        boolean hov, boolean highlighted) {
+        if (highlighted)
+            g.fill(x, y, x + w, y + h, 0x44FFD700);
+        else if (sel)
             g.fill(x, y, x + w, y + h, 0x663366AA);
         else if (hov)
             g.fill(x, y, x + w, y + h, 0x33333333);

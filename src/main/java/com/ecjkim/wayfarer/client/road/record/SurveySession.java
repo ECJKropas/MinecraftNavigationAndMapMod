@@ -30,6 +30,7 @@ import net.minecraft.world.phys.HitResult;
 import net.minecraft.world.phys.Vec3;
 
 import com.ecjkim.wayfarer.client.ToolItemManager;
+import com.ecjkim.wayfarer.client.WayfarerConfig;
 import com.ecjkim.wayfarer.client.road.RoadMetadataScreen;
 import com.ecjkim.wayfarer.client.road.data.RoadNetworkDatabase;
 import com.ecjkim.wayfarer.client.road.model.CornerType;
@@ -117,20 +118,15 @@ public class SurveySession {
 
         boolean hasTool = ToolItemManager.hasToolItem(client.player);
 
-        // ESC key to cancel recording (works in both RECORDING and PAUSED states)
-        if (state == State.RECORDING || state == State.PAUSED) {
-            if (org.lwjgl.glfw.GLFW.glfwGetKey(window,
-                org.lwjgl.glfw.GLFW.GLFW_KEY_ESCAPE) == org.lwjgl.glfw.GLFW.GLFW_PRESS) {
-                cancelRecording(client.player);
-                return;
-            }
+        // Process mouse clicks only when holding the Survey tool item.
+        if (hasTool && (state == State.IDLE || state == State.RECORDING)) {
+            processMouseClicks(client, window);
         }
 
-        // Process mouse clicks in both IDLE and RECORDING states.
-        // IDLE: left-click starts recording; right-click is handled but handlers safely no-op.
-        // RECORDING: left-click ends recording; right-click adds waypoints.
-        if (state == State.IDLE || state == State.RECORDING) {
-            processMouseClicks(client, window);
+        // If tool is not held, clear the tracked mouse button state so we don't miss
+        // a subsequent press when the player picks the tool up again.
+        if (!hasTool) {
+            mouseButtonDownLastTick.clear();
         }
 
         if (state == State.IDLE)
@@ -387,9 +383,18 @@ public class SurveySession {
                 // Save was successful, mark segment as committed (no cleanup needed)
                 segment.setStatus(Status.CONFIRMED);
             }, () -> {
-                // User cancelled metadata screen - clean up ALL data (nodes + segment)
-                cleanupPendingSegmentAndNodes(segment);
+                // User closed metadata screen without saving — segment stays as unfiled DRAFT
+                segment.setStatus(Status.DRAFT);
+                segment.setModifiedAt(System.currentTimeMillis());
+                RoadNetworkDatabase.getInstance().updateSegment(segment.getId(), segment);
+                RoadNetworkDatabase.getInstance().saveToDisk();
                 pendingSegment = null;
+                player.displayClientMessage(Component.translatable("wayfarer.road.gui.metadata.segment_left_unfiled"),
+                    false);
+            }, () -> {
+                // User discarded the segment — clean up was already done by RoadMetadataScreen.discardSegment()
+                pendingSegment = null;
+                player.displayClientMessage(Component.literal("路段已放弃，录制数据已删除。"), false);
             }));
             player.displayClientMessage(Component.literal("道路记录已停止，选择或创建道路后保存。"), false);
         }
@@ -502,10 +507,20 @@ public class SurveySession {
      */
     public void onToolPickedUp(LocalPlayer player) {
         particleTickCounter = 0;
-        if (state == State.IDLE) {
-            player.displayClientMessage(Component.literal("Survey 工具就绪，左键点击方块开始录制。"), false);
+        WayfarerConfig config = WayfarerConfig.getInstance();
+        if (config.isShowKeyHints()) {
+            if (state == State.IDLE) {
+                player.displayClientMessage(Component.translatable("wayfarer.road.survey.hint_idle"), false);
+            } else if (state == State.RECORDING) {
+                player.displayClientMessage(Component.translatable("wayfarer.road.survey.hint_recording"), false);
+            } else if (state == State.PAUSED) {
+                player.displayClientMessage(Component.translatable("wayfarer.road.survey.hint_paused"), false);
+            }
+        } else {
+            if (state == State.IDLE) {
+                player.displayClientMessage(Component.translatable("wayfarer.road.survey.tool_ready"), false);
+            }
         }
-        // PAUSED → RECORDING transition is handled in tick() with integrity validation
     }
 
     /** Reset the session completely. */

@@ -1150,7 +1150,7 @@ public class RoadNetworkDatabase {
             return null;
         }
         long now = System.currentTimeMillis();
-        double y = interpolateYForIntersection(segIdA, insertIndexA, segIdB, insertIndexB);
+        double y = interpolateYForIntersection(segIdA, insertIndexA, segIdB, insertIndexB, x, z);
         Node newNode = new Node(UUID.randomUUID(), x, y, z, CornerType.AUTO, Source.USER, 1, now);
         nodes.put(newNode.getId(), newNode);
 
@@ -1474,9 +1474,9 @@ public class RoadNetworkDatabase {
     /**
      * Interpolates Y coordinate for an intersection insert by averaging Y from both segments.
      */
-    private double interpolateYForIntersection(UUID segIdA, int idxA, UUID segIdB, int idxB) {
-        double yA = interpolateYForSegment(segIdA, idxA);
-        double yB = interpolateYForSegment(segIdB, idxB);
+    private double interpolateYForIntersection(UUID segIdA, int idxA, UUID segIdB, int idxB, double x, double z) {
+        double yA = interpolateYForSegment(segIdA, idxA, x, z);
+        double yB = interpolateYForSegment(segIdB, idxB, x, z);
         if (Double.isNaN(yA) && Double.isNaN(yB))
             return 64.0;
         if (Double.isNaN(yA))
@@ -1486,7 +1486,7 @@ public class RoadNetworkDatabase {
         return (yA + yB) / 2.0;
     }
 
-    private double interpolateYForSegment(UUID segId, int insertIndex) {
+    private double interpolateYForSegment(UUID segId, int insertIndex, double x, double z) {
         Segment seg = segments.get(segId);
         if (seg == null || seg.getNodeIds() == null)
             return Double.NaN;
@@ -1498,6 +1498,13 @@ public class RoadNetworkDatabase {
             Node before = nodes.get(ids.get(beforeIdx));
             Node after = nodes.get(ids.get(afterIdx));
             if (before != null && after != null) {
+                double segLen =
+                    Math.sqrt(Math.pow(after.getX() - before.getX(), 2) + Math.pow(after.getZ() - before.getZ(), 2));
+                if (segLen > 0.001) {
+                    double distFromBefore = Math.sqrt(Math.pow(x - before.getX(), 2) + Math.pow(z - before.getZ(), 2));
+                    double t = Math.min(1.0, Math.max(0.0, distFromBefore / segLen));
+                    return before.getY() + t * (after.getY() - before.getY());
+                }
                 return (before.getY() + after.getY()) / 2.0;
             }
             if (before != null)
