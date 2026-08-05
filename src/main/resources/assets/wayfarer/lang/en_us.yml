@@ -81,6 +81,10 @@ wayfarer:
         hint_recording: "Survey [LMB+Block] End | [RMB+Block] Waypoint | [Ctrl+Scroll] Direction"
         hint_paused: "Survey [Pick up tool] Resume recording"
         direction: "Survey direction type: %s"
+        direction_type:
+          bidirectional: Bidirectional
+          forward: "Start → End"
+          backward: "End → Start"
         tool_removed_paused: Tool removed, Survey recording paused (data preserved).
         tool_resumed: "Tool picked up, Survey recording resumed (%d nodes)"
         integrity_failed: Data integrity check failed, Survey recording cancelled.

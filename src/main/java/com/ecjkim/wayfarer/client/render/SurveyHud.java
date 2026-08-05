@@ -22,6 +22,7 @@ import java.util.UUID;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.player.LocalPlayer;
+import net.minecraft.client.resources.language.I18n;
 import net.minecraft.world.phys.Vec3;
 
 import net.fabricmc.fabric.api.client.rendering.v1.HudRenderCallback;
@@ -260,11 +261,11 @@ public final class SurveyHud {
         }
         switch (direction) {
             case BIDIRECTIONAL:
-                return "双向";
+                return I18n.get("wayfarer.road.survey.direction_type.bidirectional");
             case FORWARD:
-                return "起点→终点";
+                return I18n.get("wayfarer.road.survey.direction_type.forward");
             case BACKWARD:
-                return "终点→起点";
+                return I18n.get("wayfarer.road.survey.direction_type.backward");
             default:
                 return "?";
         }

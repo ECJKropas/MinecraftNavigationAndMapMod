@@ -63,10 +63,17 @@ public class RoadMetadataScreen extends Screen {
         return code; // fallback for unknown codes
     }
 
-    private static final int PANEL_WIDTH = 300;
-    private static final int PANEL_HEIGHT = 224;
+    private enum Mode {
+        CREATE, EDIT
+    }
 
+    private static final int PANEL_WIDTH = 300;
+    private static final int PANEL_HEIGHT_CREATE = 224;
+    private static final int PANEL_HEIGHT_EDIT = 168;
+
+    private final Mode mode;
     private final Segment segment;
+    private final Road editRoad;
     private final Consumer<Road> onSave;
     private final Runnable onCancel;
     private final Runnable onDiscard;
@@ -79,54 +86,81 @@ public class RoadMetadataScreen extends Screen {
 
     public RoadMetadataScreen(Segment segment, Consumer<Road> onSave, Runnable onCancel, Runnable onDiscard) {
         super(Component.translatable("wayfarer.road.gui.metadata.title_create"));
+        this.mode = Mode.CREATE;
         this.segment = segment;
+        this.editRoad = null;
         this.onSave = onSave;
         this.onCancel = onCancel;
         this.onDiscard = onDiscard;
     }
 
+    public RoadMetadataScreen(Road editRoad) {
+        super(Component.translatable("wayfarer.road.gui.metadata.title_edit"));
+        this.mode = Mode.EDIT;
+        this.segment = null;
+        this.editRoad = editRoad;
+        this.onSave = null;
+        this.onCancel = null;
+        this.onDiscard = null;
+    }
+
     @Override
     protected void init() {
-        String defaultCls = WayfarerConfig.getInstance().getDefaultClassification();
-        if (defaultCls != null && !defaultCls.isEmpty()) {
-            int idx = CLASSIFICATION_CODES.indexOf(defaultCls);
-            if (idx >= 0) {
-                classificationIndex = idx;
+        int panelHeight = (mode == Mode.EDIT) ? PANEL_HEIGHT_EDIT : PANEL_HEIGHT_CREATE;
+
+        if (mode == Mode.EDIT && editRoad != null) {
+            String cls = editRoad.getClassification();
+            if (cls != null && !cls.isEmpty()) {
+                int idx = CLASSIFICATION_CODES.indexOf(cls);
+                classificationIndex = (idx >= 0) ? idx : 0;
+            }
+        } else {
+            String defaultCls = WayfarerConfig.getInstance().getDefaultClassification();
+            if (defaultCls != null && !defaultCls.isEmpty()) {
+                int idx = CLASSIFICATION_CODES.indexOf(defaultCls);
+                if (idx >= 0) {
+                    classificationIndex = idx;
+                }
             }
         }
 
         int centerX = this.width / 2;
         int left = centerX - PANEL_WIDTH / 2;
-        int top = this.height / 2 - PANEL_HEIGHT / 2;
+        int top = this.height / 2 - panelHeight / 2;
         int fieldLeft = left + 20;
         int fieldWidth = PANEL_WIDTH - 40;
 
-        // --- Select existing road button ---
-        int buttonWidth = (int)(PANEL_WIDTH * 0.8);
-        int buttonLeft = centerX - buttonWidth / 2;
-        int selectButtonY = top + 24;
+        if (mode == Mode.CREATE) {
+            // --- Select existing road button ---
+            int buttonWidth = (int)(PANEL_WIDTH * 0.8);
+            int buttonLeft = centerX - buttonWidth / 2;
+            int selectButtonY = top + 24;
 
-        String selectLabel = selectedRoad != null
-            ? (selectedRoad.getName()
-                + (selectedRoad.getClassification() != null && !selectedRoad.getClassification().isEmpty()
-                    ? " (" + getClassificationDisplay(selectedRoad.getClassification()) + ")" : ""))
-            : I18n.get("wayfarer.road.gui.metadata.select_road");
-        this.addRenderableWidget(Button.builder(Component.literal(selectLabel), btn -> {
-            this.minecraft.setScreen(new RoadListScreen(road -> {
-                this.selectedRoad = road;
-                this.minecraft.setScreen(this);
-                this.rebuildWidgets();
-            }, () -> this.minecraft.setScreen(this), segment.getId()));
-        }).bounds(buttonLeft, selectButtonY, buttonWidth, 20).build());
+            String selectLabel = selectedRoad != null
+                ? (selectedRoad.getName()
+                    + (selectedRoad.getClassification() != null && !selectedRoad.getClassification().isEmpty()
+                        ? " (" + getClassificationDisplay(selectedRoad.getClassification()) + ")" : ""))
+                : I18n.get("wayfarer.road.gui.metadata.select_road");
+            this.addRenderableWidget(Button.builder(Component.literal(selectLabel), btn -> {
+                this.minecraft.setScreen(new RoadListScreen(road -> {
+                    this.selectedRoad = road;
+                    this.minecraft.setScreen(this);
+                    this.rebuildWidgets();
+                }, () -> {
+                    this.onCancel.run();
+                    this.minecraft.setScreen(null);
+                }, segment.getId()));
+            }).bounds(buttonLeft, selectButtonY, buttonWidth, 20).build());
+        }
 
-        // --- Create new road form ---
-        int nameBoxY = top + 78;
-        int classifRowY = top + 114;
-        int buttonY = top + PANEL_HEIGHT - 24;
+        // --- Form fields ---
+        int nameBoxY = (mode == Mode.EDIT) ? top + 28 : top + 78;
+        int classifRowY = (mode == Mode.EDIT) ? top + 64 : top + 114;
+        int buttonY = top + panelHeight - 24;
 
         int btnW = 88;
         int btnGap = 4;
-        int totalW = btnW * 3 + btnGap * 2;
+        int totalW = btnW * 2 + btnGap;
         int btnStartX = centerX - totalW / 2;
 
         this.addRenderableWidget(
@@ -134,20 +168,20 @@ public class RoadMetadataScreen extends Screen {
                 saveRoad();
             }).bounds(btnStartX, buttonY, btnW, 20).build());
 
-        this.addRenderableWidget(
-            Button.builder(Component.literal(I18n.get("wayfarer.road.gui.metadata.button_discard")), button -> {
-                discardSegment();
-            }).bounds(btnStartX + btnW + btnGap, buttonY, btnW, 20).build());
-
-        this.addRenderableWidget(
-            Button.builder(Component.literal(I18n.get("wayfarer.road.gui.metadata.button_close")), button -> {
-                closeScreen();
-            }).bounds(btnStartX + (btnW + btnGap) * 2, buttonY, btnW, 20).build());
+        String discardLabel = (mode == Mode.EDIT) ? I18n.get("wayfarer.road.gui.metadata.button_cancel_edit")
+            : I18n.get("wayfarer.road.gui.metadata.button_discard");
+        this.addRenderableWidget(Button.builder(Component.literal(discardLabel), button -> {
+            handleDiscard();
+        }).bounds(btnStartX + btnW + btnGap, buttonY, btnW, 20).build());
 
         this.nameBox = new EditBox(this.font, fieldLeft, nameBoxY, fieldWidth, 20,
             Component.literal(I18n.get("wayfarer.road.gui.metadata.field_name")));
         this.nameBox.setMaxLength(64);
-        this.nameBox.setValue("");
+        if (mode == Mode.EDIT && editRoad != null) {
+            this.nameBox.setValue(editRoad.getName() != null ? editRoad.getName() : "");
+        } else {
+            this.nameBox.setValue("");
+        }
         this.addRenderableWidget(this.nameBox);
 
         int halfGap = 8;
@@ -163,13 +197,39 @@ public class RoadMetadataScreen extends Screen {
         this.numberBox = new EditBox(this.font, numberLeft, classifRowY, numberWidth, 20,
             Component.literal(I18n.get("wayfarer.road.gui.metadata.field_number")));
         this.numberBox.setMaxLength(16);
-        this.numberBox.setValue("");
+        if (mode == Mode.EDIT && editRoad != null) {
+            this.numberBox.setValue(editRoad.getNumber() != null ? editRoad.getNumber() : "");
+        } else {
+            this.numberBox.setValue("");
+        }
         this.addRenderableWidget(this.numberBox);
 
         this.setInitialFocus(this.nameBox);
     }
 
     private void saveRoad() {
+        if (mode == Mode.EDIT) {
+            RoadNetworkDatabase db = RoadNetworkDatabase.getInstance();
+            synchronized (db) {
+                Road road = db.getRoad(editRoad.getId());
+                if (road != null) {
+                    road.setName(this.nameBox.getValue().trim());
+                    road.setClassification(CLASSIFICATION_CODES.get(classificationIndex));
+                    road.setNumber(this.numberBox.getValue().trim());
+                    db.updateRoad(road.getId(), road);
+                    if (!db.saveToDisk()) {
+                        if (this.minecraft.player != null) {
+                            this.minecraft.player.displayClientMessage(
+                                Component.translatable("wayfarer.road.gui.metadata.save_failed_associate"), false);
+                        }
+                        return;
+                    }
+                }
+            }
+            this.minecraft.setScreen(null);
+            return;
+        }
+
         RoadNetworkDatabase db = RoadNetworkDatabase.getInstance();
         synchronized (db) {
             if (selectedRoad != null) {
@@ -200,7 +260,6 @@ public class RoadMetadataScreen extends Screen {
                 db.addRoad(road);
                 db.updateSegment(segment.getId(), segment);
                 if (!db.saveToDisk()) {
-                    // Roll back: undo the in-memory references so the user can retry.
                     db.removeRoad(road.getId());
                     segment.setRoadId(null);
                     if (this.minecraft.player != null) {
@@ -219,73 +278,89 @@ public class RoadMetadataScreen extends Screen {
     @Override
     public void render(GuiGraphics graphics, int mouseX, int mouseY, float partialTick) {
         this.renderBackground(graphics);
+        int panelHeight = (mode == Mode.EDIT) ? PANEL_HEIGHT_EDIT : PANEL_HEIGHT_CREATE;
         int centerX = this.width / 2;
         int left = centerX - PANEL_WIDTH / 2;
-        int top = this.height / 2 - PANEL_HEIGHT / 2;
+        int top = this.height / 2 - panelHeight / 2;
         int fieldLeft = left + 20;
         int fieldWidth = PANEL_WIDTH - 40;
 
         // Panel background
-        graphics.fill(left, top, left + PANEL_WIDTH, top + PANEL_HEIGHT, 0xE01B1F28);
+        graphics.fill(left, top, left + PANEL_WIDTH, top + panelHeight, 0xE01B1F28);
         graphics.fill(left, top, left + PANEL_WIDTH, top + 1, 0xFF4E5768);
-        graphics.fill(left, top + PANEL_HEIGHT - 1, left + PANEL_WIDTH, top + PANEL_HEIGHT, 0xFF1A1F27);
+        graphics.fill(left, top + panelHeight - 1, left + PANEL_WIDTH, top + panelHeight, 0xFF1A1F27);
 
         // Title
         graphics.drawCenteredString(this.font, this.title, centerX, top + 6, 16777215);
 
-        // Separator line (just above the select button area)
-        int sepY = top + 48;
-        graphics.drawCenteredString(this.font, "——————————", centerX, sepY, 0xFF4E5768);
+        if (mode == Mode.CREATE) {
+            // Separator and select button area
+            int sepY = top + 48;
+            graphics.drawCenteredString(this.font, "——————————", centerX, sepY, 0xFF4E5768);
 
-        // --- "Create new" section ---
-        int createLabelY = top + 52;
-        graphics.drawString(this.font, I18n.get("wayfarer.road.gui.metadata.create_new"), fieldLeft, createLabelY,
-            11184810, false);
+            // "Create new" section
+            int createLabelY = top + 52;
+            graphics.drawString(this.font, I18n.get("wayfarer.road.gui.metadata.create_new"), fieldLeft, createLabelY,
+                11184810, false);
 
-        // Name field label
-        int nameLabelY = top + 68;
-        graphics.drawString(this.font, I18n.get("wayfarer.road.gui.metadata.field_name"), fieldLeft, nameLabelY,
-            11184810, false);
+            // Name field label
+            int nameLabelY = top + 68;
+            graphics.drawString(this.font, I18n.get("wayfarer.road.gui.metadata.field_name"), fieldLeft, nameLabelY,
+                11184810, false);
 
-        // Classification / Number label
-        int classifLabelY = top + 104;
-        graphics.drawString(this.font, I18n.get("wayfarer.road.gui.metadata.classification_number"), fieldLeft,
-            classifLabelY, 11184810, false);
+            // Classification / Number label
+            int classifLabelY = top + 104;
+            graphics.drawString(this.font, I18n.get("wayfarer.road.gui.metadata.classification_number"), fieldLeft,
+                classifLabelY, 11184810, false);
 
-        // Hint text (wrapped to fit panel width)
-        String hintText = I18n.get("wayfarer.road.gui.metadata.hint");
-        int hintY = top + 136;
-        List<String> hintLines = new ArrayList<>();
-        int start = 0;
-        while (start < hintText.length()) {
-            String remaining = hintText.substring(start);
-            String line = this.font.plainSubstrByWidth(remaining, fieldWidth);
-            if (line.isEmpty()) {
-                line = remaining.substring(0, 1);
+            // Hint text
+            String hintText = I18n.get("wayfarer.road.gui.metadata.hint");
+            int hintY = top + 136;
+            List<String> hintLines = new ArrayList<>();
+            int start = 0;
+            while (start < hintText.length()) {
+                String remaining = hintText.substring(start);
+                String line = this.font.plainSubstrByWidth(remaining, fieldWidth);
+                if (line.isEmpty()) {
+                    line = remaining.substring(0, 1);
+                }
+                hintLines.add(line);
+                start += line.length();
             }
-            hintLines.add(line);
-            start += line.length();
-        }
-        for (int i = 0; i < hintLines.size(); i++) {
-            graphics.drawString(this.font, hintLines.get(i), fieldLeft, hintY + i * 12, 8947848, false);
-        }
+            for (int i = 0; i < hintLines.size(); i++) {
+                graphics.drawString(this.font, hintLines.get(i), fieldLeft, hintY + i * 12, 8947848, false);
+            }
 
-        // Segment info: dynamic placement below the hint text
-        int infoY = hintY + hintLines.size() * 12 + 8;
-        graphics.drawString(this.font, I18n.get("wayfarer.road.gui.metadata.segment_node_count",
-            segment.getNodeIds() != null ? segment.getNodeIds().size() : 0), fieldLeft, infoY, 0xCCCCCC, false);
+            // Segment info
+            int infoY = hintY + hintLines.size() * 12 + 8;
+            graphics.drawString(this.font, I18n.get("wayfarer.road.gui.metadata.segment_node_count",
+                segment.getNodeIds() != null ? segment.getNodeIds().size() : 0), fieldLeft, infoY, 0xCCCCCC, false);
 
-        if (selectedRoad != null) {
-            graphics.drawString(this.font, I18n.get("wayfarer.road.gui.metadata.assigned_road", selectedRoad.getName()),
-                fieldLeft, top + 40, 0x66AAFF, false);
+            if (selectedRoad != null) {
+                graphics.drawString(this.font,
+                    I18n.get("wayfarer.road.gui.metadata.assigned_road", selectedRoad.getName()), fieldLeft, top + 40,
+                    0x66AAFF, false);
+            }
+        } else {
+            // EDIT mode: simplified layout
+            int nameLabelY = top + 12;
+            graphics.drawString(this.font, I18n.get("wayfarer.road.gui.metadata.field_name"), fieldLeft, nameLabelY,
+                11184810, false);
+
+            int classifLabelY = top + 48;
+            graphics.drawString(this.font, I18n.get("wayfarer.road.gui.metadata.classification_number"), fieldLeft,
+                classifLabelY, 11184810, false);
         }
 
         super.render(graphics, mouseX, mouseY, partialTick);
     }
 
-    private void closeScreen() {
-        this.onCancel.run();
-        this.minecraft.setScreen(null);
+    private void handleDiscard() {
+        if (mode == Mode.EDIT) {
+            this.minecraft.setScreen(null);
+            return;
+        }
+        discardSegment();
     }
 
     private void discardSegment() {
@@ -293,7 +368,6 @@ public class RoadMetadataScreen extends Screen {
         synchronized (db) {
             if (segment.getNodeIds() != null) {
                 for (UUID nodeId : segment.getNodeIds()) {
-                    // Only remove nodes exclusive to this segment (not shared with others)
                     if (db.getSegmentCountForNode(nodeId) <= 1) {
                         db.removeNode(nodeId);
                     }

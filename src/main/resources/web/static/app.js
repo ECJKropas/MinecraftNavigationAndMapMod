@@ -548,23 +548,102 @@ async function saveNode() {
   }
 }
 
+// ——— Direction arrows ———
+function renderDirectionArrows(sid, seg, pts) {
+  if (pts.length < 2) return;
+  const direction = (seg.direction || '').toUpperCase();
+  if (direction === 'BIDIRECTIONAL' || direction === '') return;
+
+  // Calculate cumulative distances in MC coordinates
+  const cumDist = [0];
+  for (let i = 1; i < pts.length; i++) {
+    const dx = (pts[i].lng - pts[i - 1].lng) * SCALE;
+    const dz = (pts[i].lat - pts[i - 1].lat) * SCALE;
+    cumDist.push(cumDist[i - 1] + Math.sqrt(dx * dx + dz * dz));
+  }
+  const totalLen = cumDist[cumDist.length - 1];
+  if (totalLen < 15) return;
+
+  // Determine arrow count and spacing
+  const spacing = 60; // MC units between arrows
+  const arrowCount = Math.max(1, Math.min(5, Math.floor(totalLen / spacing)));
+  const interval = totalLen / (arrowCount + 1);
+  const markers = [];
+
+  for (let a = 1; a <= arrowCount; a++) {
+    const targetDist = a * interval;
+
+    // Find the segment containing this distance
+    let segIdx = 1;
+    for (; segIdx < cumDist.length; segIdx++) {
+      if (cumDist[segIdx] >= targetDist) break;
+    }
+    if (segIdx >= cumDist.length) segIdx = cumDist.length - 1;
+
+    const segStartDist = cumDist[segIdx - 1];
+    const segLen = cumDist[segIdx] - segStartDist;
+    const t = segLen > 0 ? (targetDist - segStartDist) / segLen : 0;
+
+    const p1 = pts[segIdx - 1];
+    const p2 = pts[segIdx];
+    const lat = p1.lat + t * (p2.lat - p1.lat);
+    const lng = p1.lng + t * (p2.lng - p1.lng);
+
+    // Calculate bearing (degrees, 0=N, 90=E)
+    // Convert to screen bearing: dx=lng (E-W), dz=lat (N-S in Leaflet)
+    const dLng = p2.lng - p1.lng;
+    const dLat = p2.lat - p1.lat;
+    // In Leaflet CRS.Simple, lng maps to MC X, lat maps to MC Z
+    // Bearing: atan2(dLng, dLat) gives angle from north, clockwise
+    let bearing = Math.atan2(dLng, dLat) * 180 / Math.PI;
+
+    if (direction === 'BACKWARD') {
+      bearing += 180;
+    }
+
+    const normalizedBearing = ((bearing % 360) + 360) % 360;
+
+    // Create arrow marker using divIcon
+    const icon = L.divIcon({
+      className: '',
+      html: `<div style="
+        transform: rotate(${normalizedBearing}deg);
+        color: #BBBBBB;
+        font-size: 11px;
+        line-height: 1;
+        pointer-events: none;
+        filter: drop-shadow(0 0 1px rgba(255,255,255,0.7));
+      "><i class="fa-solid fa-angle-right"></i></div>`,
+      iconSize: [11, 11],
+      iconAnchor: [5.5, 5.5],
+    });
+    const marker = L.marker([lat, lng], { icon, interactive: false }).addTo(map);
+    markers.push(marker);
+  }
+
+  segmentArrows.set(sid, markers);
+}
+
 // ——— Road styling ———
 const ROAD_STYLES = {
-  G: { lineColor: '#DD3800', lineWeight: 3.5, badgeBg: '#DD0000', badgeBorder: '#FFFFFF', badgeColor: '#FFFFFF' },
-  S: { lineColor: '#E89200', lineWeight: 3, badgeBg: '#FFD700', badgeColor: '#000000' },
+  G: { lineColor: '#DD3800', lineWeight: 5, badgeBg: '#DD0000', badgeBorder: '#FFFFFF', badgeColor: '#FFFFFF' },
+  S: { lineColor: '#E89200', lineWeight: 4.5, badgeBg: '#FFD700', badgeColor: '#000000' },
 };
 
 let nodeMarkers = new Map();
 let segmentLines = new Map();
 let segmentFills = new Map();  // fill polylines for dual-layer roads
+let segmentArrows = new Map();  // direction arrow markers per segment
 
 function renderAll() {
   nodeMarkers.forEach(m => map.removeLayer(m));
   segmentLines.forEach(l => map.removeLayer(l));
   segmentFills.forEach(l => map.removeLayer(l));
+  segmentArrows.forEach(markers => markers.forEach(m => map.removeLayer(m)));
   nodeMarkers.clear();
   segmentLines.clear();
   segmentFills.clear();
+  segmentArrows.clear();
 
   // Clear label markers
   if (!window._roadLabels) window._roadLabels = new Set();
@@ -603,17 +682,18 @@ function renderAll() {
     const pts = buildPoints(seg);
     if (pts.length < 2) continue;
     const isSelected = selectedSegments.has(sid);
-    const eo = { color: '#BBBBBB', weight: isSelected ? 3.5 : 2.5, opacity: isSelected ? 1 : 0.5, smoothFactor: 0.2 };
-    const fo = { color: '#F8F8F8', weight: isSelected ? 2 : 1.5, opacity: isSelected ? 1 : 0.92, smoothFactor: 0.2 };
+    const eo = { color: '#BBBBBB', weight: isSelected ? 5 : 4, opacity: isSelected ? 1 : 0.5, smoothFactor: 0.2 };
+    const fo = { color: '#F8F8F8', weight: isSelected ? 3 : 2.5, opacity: isSelected ? 1 : 0.92, smoothFactor: 0.2 };
     const edge = L.polyline(pts, eo).addTo(map);
     const fill = L.polyline(pts, fo).addTo(map);
     [edge, fill].forEach(line => {
-      line.on('mouseover', () => { if (!isSelected) { edge.setStyle({ weight: 3.5, opacity: 0.7 }); fill.setStyle({ weight: 2.5 }); } });
+      line.on('mouseover', () => { if (!isSelected) { edge.setStyle({ weight: 5, opacity: 0.7 }); fill.setStyle({ weight: 3.5 }); } });
       line.on('mouseout', () => { if (!isSelected) { edge.setStyle(eo); fill.setStyle(fo); } });
       line.on('click', (e) => { L.DomEvent.stopPropagation(e); if (activeTool === 'point') { handlePointTool(e.latlng); return; } onSegmentClick(sid, e.originalEvent); });
     });
     segmentLines.set(sid, edge);
     segmentFills.set(sid, fill);
+    renderDirectionArrows(sid, seg, pts);
   }
 
   // Render road groups + labels
@@ -639,25 +719,27 @@ function renderAll() {
       if (isGorS) {
         // Colored line
         const c = isSelected ? '#007AFF' : styl.lineColor;
-        const opts = { color: c, weight: isSelected ? 4.5 : styl.lineWeight, opacity: isSelected ? 1 : 0.88, smoothFactor: 0.2 };
+        const opts = { color: c, weight: isSelected ? 6 : styl.lineWeight, opacity: isSelected ? 1 : 0.88, smoothFactor: 0.2 };
         const line = L.polyline(pts, opts).addTo(map);
-        line.on('mouseover', () => { if (!isSelected) line.setStyle({ weight: styl.lineWeight + 1.5, opacity: 1 }); });
+        line.on('mouseover', () => { if (!isSelected) line.setStyle({ weight: styl.lineWeight + 1, opacity: 1 }); });
         line.on('mouseout', () => { if (!isSelected) line.setStyle({ weight: styl.lineWeight, opacity: 0.88 }); });
         line.on('click', (e) => { L.DomEvent.stopPropagation(e); if (activeTool === 'point') { handlePointTool(e.latlng); return; } onSegmentClick(sid, e.originalEvent); });
         segmentLines.set(sid, line);
+        renderDirectionArrows(sid, seg, pts);
       } else {
         // White fill + gray edge
-        const eo = { color: '#BBBBBB', weight: isSelected ? 3.5 : 2.5, opacity: isSelected ? 1 : 0.5, smoothFactor: 0.2 };
-        const fo = { color: '#F8F8F8', weight: isSelected ? 2 : 1.5, opacity: isSelected ? 1 : 0.92, smoothFactor: 0.2 };
+        const eo = { color: '#BBBBBB', weight: isSelected ? 5 : 4, opacity: isSelected ? 1 : 0.5, smoothFactor: 0.2 };
+        const fo = { color: '#F8F8F8', weight: isSelected ? 3 : 2.5, opacity: isSelected ? 1 : 0.92, smoothFactor: 0.2 };
         const edge = L.polyline(pts, eo).addTo(map);
         const fill = L.polyline(pts, fo).addTo(map);
         [edge, fill].forEach(line => {
-          line.on('mouseover', () => { if (!isSelected) { edge.setStyle({ weight: 3.5, opacity: 0.7 }); fill.setStyle({ weight: 2.5 }); } });
+          line.on('mouseover', () => { if (!isSelected) { edge.setStyle({ weight: 5, opacity: 0.7 }); fill.setStyle({ weight: 3.5 }); } });
           line.on('mouseout', () => { if (!isSelected) { edge.setStyle(eo); fill.setStyle(fo); } });
           line.on('click', (e) => { L.DomEvent.stopPropagation(e); if (activeTool === 'point') { handlePointTool(e.latlng); return; } onSegmentClick(sid, e.originalEvent); });
         });
         segmentLines.set(sid, edge);
         segmentFills.set(sid, fill);
+        renderDirectionArrows(sid, seg, pts);
       }
     }
 
@@ -701,7 +783,7 @@ function renderAll() {
       radius: isMergeTarget ? 7 : 5,
       fillColor: isMergeTarget ? '#FFD60A' : fill,
       color: isMergeTarget ? '#FF9500' : 'rgba(255,255,255,0.9)',
-      weight: isMergeTarget ? 2.5 : 1.5,
+      weight: isMergeTarget ? 3.5 : 2.5,
       fillOpacity: 0.92,
     }).addTo(map);
     if (activeTool === 'move') {

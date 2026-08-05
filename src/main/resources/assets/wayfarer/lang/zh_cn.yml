@@ -81,6 +81,10 @@ wayfarer:
         hint_recording: "Survey [LMB+方块] 结束 | [RMB+方块] 路径点 | [Ctrl+滚轮] 方向"
         hint_paused: "Survey [拾取工具] 继续录制"
         direction: "Survey 方向类型: %s"
+        direction_type:
+          bidirectional: 双向
+          forward: "起点→终点"
+          backward: "终点→起点"
         tool_removed_paused: 工具已离手，Survey 录制暂停（数据保留）。
         tool_resumed: "工具已切回，Survey 录制继续 (%d 个节点)"
         integrity_failed: 数据校验失败，Survey 录制已取消。

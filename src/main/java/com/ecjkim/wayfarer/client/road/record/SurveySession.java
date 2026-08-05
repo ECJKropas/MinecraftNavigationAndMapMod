@@ -57,6 +57,7 @@ public class SurveySession {
 
     private State state = State.IDLE;
     private final List<UUID> nodeIds = new ArrayList<>();
+    private final List<NodeOrigin> nodeOrigins = new ArrayList<>();
     private Direction currentDirection = Direction.BIDIRECTIONAL;
     private Vec3 lastNodePos;
     private Segment pendingSegment;
@@ -246,6 +247,7 @@ public class SurveySession {
         if (blockPos == null) {
             return;
         }
+        blockPos = snapCoordIfNeeded(blockPos);
 
         if (state == State.IDLE) {
             // Try auto-snap to a segment if enabled
@@ -259,6 +261,7 @@ public class SurveySession {
                         RoadNetworkDatabase db = RoadNetworkDatabase.getInstance();
                         synchronized (db) {
                             nodeIds.add(snappedNode.getId());
+                            nodeOrigins.add(NodeOrigin.LEFT_CLICK);
                             lastNodePos = new Vec3(snappedNode.getX(), snappedNode.getY(), snappedNode.getZ());
                             state = State.RECORDING;
                         }
@@ -278,6 +281,7 @@ public class SurveySession {
             synchronized (db) {
                 db.addNode(startNode);
                 nodeIds.add(startNode.getId());
+                nodeOrigins.add(NodeOrigin.LEFT_CLICK);
                 lastNodePos = blockPos;
                 state = State.RECORDING;
             }
@@ -295,6 +299,7 @@ public class SurveySession {
                         RoadNetworkDatabase db = RoadNetworkDatabase.getInstance();
                         synchronized (db) {
                             nodeIds.add(snappedNode.getId());
+                            nodeOrigins.add(NodeOrigin.LEFT_CLICK);
                             lastNodePos = new Vec3(snappedNode.getX(), snappedNode.getY(), snappedNode.getZ());
                             finishRecording(player);
                         }
@@ -313,6 +318,7 @@ public class SurveySession {
             synchronized (db) {
                 db.addNode(endNode);
                 nodeIds.add(endNode.getId());
+                nodeOrigins.add(NodeOrigin.LEFT_CLICK);
                 finishRecording(player);
             }
         }
@@ -325,6 +331,7 @@ public class SurveySession {
             synchronized (db) {
                 if (!nodeIds.contains(hitNodeId)) {
                     nodeIds.add(hitNodeId);
+                    nodeOrigins.add(NodeOrigin.LEFT_CLICK);
                 }
                 Node hitNode = db.getNode(hitNodeId);
                 if (hitNode != null) {
@@ -340,6 +347,7 @@ public class SurveySession {
             synchronized (db) {
                 if (!nodeIds.contains(hitNodeId)) {
                     nodeIds.add(hitNodeId);
+                    nodeOrigins.add(NodeOrigin.LEFT_CLICK);
                 }
                 Node hitNode = db.getNode(hitNodeId);
                 if (hitNode != null) {
@@ -364,12 +372,14 @@ public class SurveySession {
         if (blockPos == null) {
             return;
         }
+        blockPos = snapCoordIfNeeded(blockPos);
 
         Node waypoint = createNode(blockPos.x, blockPos.y, blockPos.z);
         RoadNetworkDatabase db = RoadNetworkDatabase.getInstance();
         synchronized (db) {
             db.addNode(waypoint);
             nodeIds.add(waypoint.getId());
+            nodeOrigins.add(NodeOrigin.RIGHT_CLICK);
             lastNodePos = blockPos;
         }
         player.displayClientMessage(
@@ -385,6 +395,7 @@ public class SurveySession {
         synchronized (db) {
             if (!nodeIds.contains(hitNodeId)) {
                 nodeIds.add(hitNodeId);
+                nodeOrigins.add(NodeOrigin.RIGHT_CLICK);
             }
             Node hitNode = db.getNode(hitNodeId);
             if (hitNode != null) {
@@ -431,6 +442,7 @@ public class SurveySession {
             segment.setNodeIds(new ArrayList<>(nodeIds));
             state = State.IDLE;
             nodeIds.clear();
+            nodeOrigins.clear();
             lastNodePos = null;
 
             Minecraft client = Minecraft.getInstance();
@@ -521,6 +533,7 @@ public class SurveySession {
         if (blockPos == null) {
             return null;
         }
+        blockPos = snapCoordIfNeeded(blockPos);
 
         // Use rdpEpsilon as the snap distance threshold
         WayfarerConfig config = WayfarerConfig.getInstance();
@@ -531,10 +544,48 @@ public class SurveySession {
         UUID closest = null;
         double closestDistSq = maxDistSq;
 
+        // Find the last LEFT_CLICK node for near-node exception logic
+        UUID lastLeftClickNodeId = null;
+        double lastLeftClickX = Double.NaN, lastLeftClickZ = Double.NaN;
+        for (int i = nodeIds.size() - 1; i >= 0; i--) {
+            if (nodeOrigins.get(i) == NodeOrigin.LEFT_CLICK) {
+                lastLeftClickNodeId = nodeIds.get(i);
+                Node n = db.getNode(lastLeftClickNodeId);
+                if (n != null) {
+                    lastLeftClickX = n.getX();
+                    lastLeftClickZ = n.getZ();
+                }
+                break;
+            }
+        }
+        double nearExceptionDistSq = maxDistSq * 4.0;
+
         for (Node node : db.getAllNodes()) {
-            // Skip nodes that are already in the current recording list
-            if (nodeIds.contains(node.getId())) {
-                continue;
+            UUID nodeId = node.getId();
+            int nodeIdx = nodeIds.indexOf(nodeId);
+            boolean isInRecording = nodeIdx >= 0;
+
+            if (isInRecording) {
+                // Exception 1: always allow snapping to start node
+                if (nodeIdx == 0) {
+                    // allowed
+                } else {
+                    // Exception 2: allow snapping to a RIGHT_CLICK waypoint node
+                    // if the last LEFT_CLICK node is very close to it
+                    if (nodeOrigins.get(nodeIdx) == NodeOrigin.RIGHT_CLICK && lastLeftClickNodeId != null
+                        && !Double.isNaN(lastLeftClickX)) {
+                        double nDx = node.getX() - lastLeftClickX;
+                        double nDz = node.getZ() - lastLeftClickZ;
+                        double nDistSq = nDx * nDx + nDz * nDz;
+                        if (nDistSq < nearExceptionDistSq) {
+                            // allowed
+                        } else {
+                            continue;
+                        }
+                    } else {
+                        continue;
+                    }
+                }
             }
 
             double dx = blockPos.x - node.getX();
@@ -543,7 +594,7 @@ public class SurveySession {
 
             if (distSq < closestDistSq) {
                 closestDistSq = distSq;
-                closest = node.getId();
+                closest = nodeId;
             }
         }
         return closest;
@@ -645,6 +696,13 @@ public class SurveySession {
         return String.format("(%.1f, %.1f, %.1f)", pos.x, pos.y, pos.z);
     }
 
+    private static Vec3 snapCoordIfNeeded(Vec3 pos) {
+        if (WayfarerConfig.getInstance().isAutoIntegral()) {
+            return new Vec3(Math.round(pos.x), Math.round(pos.y), Math.round(pos.z));
+        }
+        return pos;
+    }
+
     // ---- Tool detection (called from WayfarerClient tick) ----
 
     /**
@@ -673,6 +731,7 @@ public class SurveySession {
         cleanupOrphanData();
         state = State.IDLE;
         nodeIds.clear();
+        nodeOrigins.clear();
         lastNodePos = null;
         currentDirection = Direction.BIDIRECTIONAL;
         pendingSegment = null;
@@ -698,6 +757,7 @@ public class SurveySession {
         synchronized (db) {
             db.addNode(startNode);
             nodeIds.add(startNode.getId());
+            nodeOrigins.add(NodeOrigin.LEFT_CLICK);
             lastNodePos = new Vec3(pos.x, pos.y, pos.z);
             state = State.RECORDING;
         }
@@ -720,6 +780,7 @@ public class SurveySession {
         synchronized (db) {
             db.addNode(endNode);
             nodeIds.add(endNode.getId());
+            nodeOrigins.add(NodeOrigin.LEFT_CLICK);
             finishRecording(player);
         }
     }
@@ -737,6 +798,7 @@ public class SurveySession {
         cleanupOrphanData();
         state = State.IDLE;
         nodeIds.clear();
+        nodeOrigins.clear();
         lastNodePos = null;
         pendingSegment = null;
 
@@ -773,5 +835,9 @@ public class SurveySession {
             client.particleEngine.createParticle(net.minecraft.core.particles.ParticleTypes.END_ROD, px, py, pz, 0,
                 0.01, 0);
         }
+    }
+
+    private enum NodeOrigin {
+        LEFT_CLICK, RIGHT_CLICK
     }
 }

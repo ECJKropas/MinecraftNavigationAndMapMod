@@ -76,6 +76,7 @@ public class RoadListScreen extends Screen {
 
     // Scroll
     private int scrollLeft, scrollMid, scrollRight;
+    private long scrollTimeMs = 0;
 
     // Selection
     private Road selectedRoad;
@@ -224,6 +225,7 @@ public class RoadListScreen extends Screen {
         renderBackground(g);
         refreshCache();
         updateButtonStates();
+        scrollTimeMs += (long)(partialTick * 1000);
 
         // Drag polling: hold left mouse to pick up, release to drop
         long window = this.minecraft.getWindow().getWindow();
@@ -302,8 +304,35 @@ public class RoadListScreen extends Screen {
             boolean sel = selectedRoad != null && selectedRoad.getId().equals(road.getId());
             boolean hov = hit(mx, my, x, py, colLeftW, ITEM_H);
             int n = road.getSegmentIds() != null ? road.getSegmentIds().size() : 0;
-            drawItem(g, x, py, colLeftW, ITEM_H, roadLabel(road), String.valueOf(n),
-                classificationColor(road.getClassification()), sel, hov);
+            String badge = String.valueOf(n);
+            String label = roadLabel(road);
+            int color = classificationColor(road.getClassification());
+
+            // Draw background
+            if (sel)
+                g.fill(x, py, x + colLeftW, py + ITEM_H, 0x663366AA);
+            else if (hov)
+                g.fill(x, py, x + colLeftW, py + ITEM_H, 0x33333333);
+
+            // Calculate available text width (reserve space for badge)
+            int bw = this.font.width(badge) + 6;
+            int badgeRightPad = 4;
+            int textX = x + 5;
+            int textW = colLeftW - 5 - bw - badgeRightPad;
+            int labelW = this.font.width(label);
+
+            if (labelW > textW + 4) {
+                // Marquee scroll for overflowing names
+                drawMarqueeText(g, label, textX, py + 1, color, textW, labelW);
+            } else {
+                g.drawString(this.font, label, textX, py + 1, color, false);
+            }
+
+            // Badge
+            g.fill(x + colLeftW - bw - badgeRightPad, py + 1, x + colLeftW - badgeRightPad, py + ITEM_H - 2,
+                0x66444444);
+            g.drawString(this.font, badge, x + colLeftW - bw + 1, py + 2, 0xFFAAAAAA, false);
+
             py += ITEM_H;
             rendered++;
         }
@@ -351,7 +380,7 @@ public class RoadListScreen extends Screen {
             boolean hov = hit(mx, my, x, py, colMidW, ITEM_H);
             int n = seg.getNodeIds() != null ? seg.getNodeIds().size() : 0;
             String src = seg.getSource() != null ? seg.getSource().name() : "";
-            String dir = seg.getDirection() != null ? " " + seg.getDirection().name() : "";
+            String dir = seg.getDirection() != null ? " " + shortDirection(seg.getDirection()) : "";
             String sid = seg.getId().toString();
             String label = "Seg-" + sid.substring(sid.length() - 4) + " (" + n + "n)" + dir + " [" + src + "]";
             int color;
@@ -456,6 +485,10 @@ public class RoadListScreen extends Screen {
                 return true;
             }
         }
+        if (button == 1 && ix >= colLeftX && ix <= colLeftX + colLeftW) {
+            rightClickLeft(ix, iy);
+            return true;
+        }
         if (button == 1 && ix >= colMidX && ix <= colMidX + colMidW) {
             rightClickMid(ix, iy);
             return true;
@@ -465,7 +498,7 @@ public class RoadListScreen extends Screen {
 
     @Override
     public boolean mouseScrolled(double mx, double my, double amount) {
-        int ix = (int)mx, da = (int)amount * 3;
+        int ix = (int)mx, da = (int)amount;
         if (ix >= colLeftX && ix <= colLeftX + colLeftW) {
             scrollLeft = clamp0(scrollLeft - da);
             return true;
@@ -584,6 +617,24 @@ public class RoadListScreen extends Screen {
             seg.setDirection(next);
             db.updateSegment(seg.getId(), seg);
             db.saveToDisk();
+        }
+    }
+
+    private void rightClickLeft(int mx, int my) {
+        if (mode != Mode.LIST)
+            return;
+
+        int off = 1;
+        int relY = my - panelTop + scrollLeft * ITEM_H;
+        int idx = relY / ITEM_H;
+
+        if (idx == 0)
+            return; // Unfiled is not editable
+
+        int ri = idx - off;
+        if (ri >= 0 && ri < filteredRoads.size()) {
+            Road road = filteredRoads.get(ri);
+            this.minecraft.setScreen(new RoadMetadataScreen(road));
         }
     }
 
@@ -757,7 +808,108 @@ public class RoadListScreen extends Screen {
         }
     }
 
+    // ---- Marquee text ----
+
+    private void drawMarqueeText(GuiGraphics g, String text, int x, int y, int color, int visibleW, int fullW) {
+        int overflow = fullW - visibleW;
+        if (overflow <= 0) {
+            g.drawString(this.font, text, x, y, color, false);
+            return;
+        }
+
+        int speed = 1;
+        long totalOffset = scrollTimeMs * speed / 1000L;
+
+        int startWrapped = (int)(((totalOffset - visibleW) % fullW + fullW) % fullW);
+        int endWrapped = (int)((totalOffset % fullW + fullW) % fullW);
+
+        if (startWrapped <= endWrapped) {
+            int startCharIdx = findCharAtPixel(text, startWrapped);
+            int endCharIdx = findCharAtPixel(text, endWrapped);
+            if (startCharIdx < endCharIdx) {
+                int drawX = x + startWrapped - getCharPixel(text, startCharIdx);
+                int remainingVisible =
+                    (endWrapped - startWrapped) - (getCharPixel(text, endCharIdx) - getCharPixel(text, startCharIdx));
+                if (remainingVisible > 0 && drawX >= x && drawX + remainingVisible <= x + visibleW) {
+                    String subText = text.substring(startCharIdx, endCharIdx);
+                    subText = clipTextToWidth(subText, remainingVisible);
+                    g.drawString(this.font, subText, drawX, y, color, false);
+                }
+            }
+        } else {
+            int firstEndPx = fullW - startWrapped;
+            int firstStartIdx = findCharAtPixel(text, startWrapped);
+            int firstEndIdx = text.length();
+            int firstDrawX = x + startWrapped - getCharPixel(text, firstStartIdx);
+            int firstVisible = firstEndPx - (getCharPixel(text, firstStartIdx) - startWrapped);
+            if (firstVisible > 0 && firstDrawX >= x && firstDrawX + firstVisible <= x + visibleW) {
+                String subText = text.substring(firstStartIdx, firstEndIdx);
+                subText = clipTextToWidth(subText, firstVisible);
+                g.drawString(this.font, subText, firstDrawX, y, color, false);
+            }
+
+            int secondStartPx = 0;
+            int secondEndPx = endWrapped;
+            int secondStartIdx = 0;
+            int secondEndIdx = findCharAtPixel(text, secondEndPx);
+            int secondDrawX = x + firstEndPx;
+            int secondVisible = secondEndPx - getCharPixel(text, secondEndIdx);
+            if (secondVisible > 0 && secondDrawX >= x && secondDrawX + secondVisible <= x + visibleW) {
+                String subText = text.substring(secondStartIdx, secondEndIdx);
+                subText = clipTextToWidth(subText, secondVisible);
+                g.drawString(this.font, subText, secondDrawX, y, color, false);
+            }
+        }
+    }
+
+    private int getCharPixel(String text, int charIdx) {
+        int px = 0;
+        for (int i = 0; i < charIdx && i < text.length(); i++) {
+            px += this.font.width(String.valueOf(text.charAt(i)));
+        }
+        return px;
+    }
+
+    private int findCharAtPixel(String text, int targetPx) {
+        int px = 0;
+        int i = 0;
+        while (i < text.length()) {
+            int cw = this.font.width(String.valueOf(text.charAt(i)));
+            if (px + cw > targetPx)
+                break;
+            px += cw;
+            i++;
+        }
+        return i;
+    }
+
+    private String clipTextToWidth(String text, int maxWidth) {
+        int w = 0;
+        int i = 0;
+        while (i < text.length()) {
+            int cw = this.font.width(String.valueOf(text.charAt(i)));
+            if (w + cw > maxWidth)
+                break;
+            w += cw;
+            i++;
+        }
+        return text.substring(0, i);
+    }
+
     // ---- Utility ----
+
+    private static String shortDirection(Direction dir) {
+        switch (dir) {
+            case BIDIRECTIONAL:
+                return "Bi-Dir";
+            case FORWARD:
+                return "Fwd";
+            case BACKWARD:
+                return "Bwd";
+            default:
+                return dir.name();
+        }
+    }
 
     private int classificationColor(String cls) {
         if (cls == null || cls.isEmpty())

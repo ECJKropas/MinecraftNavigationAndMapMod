@@ -134,6 +134,7 @@ public class WayfarerClient implements ClientModInitializer {
         if (client.screen != null) {
             keysDownLastTick.clear();
             ROAD_MANAGER.tick(client);
+            tickSurvey(client, client.getWindow().getWindow());
             return;
         }
 
