@@ -197,11 +197,11 @@ public final class XaeroMapOverlay {
         int sx = x1 < x2 ? 1 : -1;
         int sy = y1 < y2 ? 1 : -1;
         int err = dx - dy;
-        int half = (int) (thickness / 2.0f);
+        int half = (int)(thickness / 2.0f);
 
         int cx = x1, cy = y1;
         while (true) {
-            int t = (int) thickness;
+            int t = (int)thickness;
             graphics.fill(cx - half, cy - half, cx + t - half, cy + t - half, color);
 
             if (cx == x2 && cy == y2)

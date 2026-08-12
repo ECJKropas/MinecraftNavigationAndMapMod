@@ -110,7 +110,7 @@ public class WayfarerConfig {
     }
 
     public float getClassificationWidth(char classification) {
-        return (float) switch (classification) {
+        return (float)switch (classification) {
             case 'G' -> gWidth;
             case 'S' -> sWidth;
             case 'X' -> xWidth;
