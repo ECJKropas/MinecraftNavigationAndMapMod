@@ -28,6 +28,7 @@ import com.mojang.blaze3d.platform.Window;
 
 import net.fabricmc.fabric.api.client.screen.v1.ScreenEvents;
 
+import com.ecjkim.wayfarer.client.WayfarerConfig;
 import com.ecjkim.wayfarer.client.road.data.RoadNetworkDatabase;
 import com.ecjkim.wayfarer.client.road.model.Node;
 import com.ecjkim.wayfarer.client.road.model.Road;
@@ -145,13 +146,9 @@ public final class XaeroMapOverlay {
                 if (!isSegmentVisible(nodes, minWorldX, maxWorldX, minWorldZ, maxWorldZ))
                     continue;
 
-                int lineWidth = 4;
+                float lineWidth = 3.0f;
                 if (classification != null && !classification.isEmpty()) {
-                    char c = classification.charAt(0);
-                    if (c == 'G')
-                        lineWidth = 8;
-                    else if (c == 'S')
-                        lineWidth = 6;
+                    lineWidth = classificationLineWidth(classification);
                 }
 
                 renderSegment(graphics, nodes, effectiveScale, cameraX, cameraZ, centerX, centerY, color, lineWidth);
@@ -178,7 +175,7 @@ public final class XaeroMapOverlay {
     }
 
     private static void renderSegment(GuiGraphicsExtractor graphics, List<Node> nodes, double effectiveScale,
-        double cameraX, double cameraZ, double centerX, double centerY, int color, int thickness) {
+        double cameraX, double cameraZ, double centerX, double centerY, int color, float thickness) {
 
         for (int i = 0; i < nodes.size() - 1; i++) {
             Node n1 = nodes.get(i);
@@ -194,17 +191,18 @@ public final class XaeroMapOverlay {
     }
 
     private static void drawThickLine(GuiGraphicsExtractor graphics, int x1, int y1, int x2, int y2, int color,
-        int thickness) {
+        float thickness) {
         int dx = Math.abs(x2 - x1);
         int dy = Math.abs(y2 - y1);
         int sx = x1 < x2 ? 1 : -1;
         int sy = y1 < y2 ? 1 : -1;
         int err = dx - dy;
-        int half = thickness / 2;
+        int half = (int) (thickness / 2.0f);
 
         int cx = x1, cy = y1;
         while (true) {
-            graphics.fill(cx - half, cy - half, cx + thickness - half, cy + thickness - half, color);
+            int t = (int) thickness;
+            graphics.fill(cx - half, cy - half, cx + t - half, cy + t - half, color);
 
             if (cx == x2 && cy == y2)
                 break;
@@ -224,19 +222,17 @@ public final class XaeroMapOverlay {
     private static int classificationColor(String classification) {
         if (classification == null || classification.isEmpty())
             return 0xFFFFFFFF;
-        switch (classification.charAt(0)) {
-            case 'G':
-                return 0xFFFF8800;
-            case 'S':
-                return 0xFFFFFF00;
-            case 'X':
-                return 0xFF00FF00;
-            case 'Y':
-                return 0xFF4488FF;
-            case 'C':
-                return 0xFF888888;
-            default:
-                return 0xFFFFFFFF;
+        try {
+            String hex = WayfarerConfig.getInstance().getClassificationColor(classification.charAt(0));
+            return 0xFF000000 | Integer.parseInt(hex, 16);
+        } catch (NumberFormatException e) {
+            return 0xFFFFFFFF;
         }
+    }
+
+    private static float classificationLineWidth(String classification) {
+        if (classification == null || classification.isEmpty())
+            return 3.0f;
+        return WayfarerConfig.getInstance().getClassificationWidth(classification.charAt(0));
     }
 }

@@ -64,6 +64,7 @@ public class SurveySession {
     private int particleTickCounter;
 
     private final IntSet mouseButtonDownLastTick = new IntOpenHashSet();
+    private boolean wasInGuiLastTick = false;
 
     public State getState() {
         return state;
@@ -117,14 +118,25 @@ public class SurveySession {
         boolean hasTool = ToolItemManager.hasToolItem(client.player);
         boolean inGui = client.screen != null;
 
+        // Detect GUI → game transition: sync mouse state so the first frame back
+        // doesn't generate spurious click edges from a button still physically held.
+        if (!inGui && wasInGuiLastTick) {
+            mouseButtonDownLastTick.clear();
+            if (org.lwjgl.glfw.GLFW.glfwGetMouseButton(window, MOUSE_LEFT) == org.lwjgl.glfw.GLFW.GLFW_PRESS)
+                mouseButtonDownLastTick.add(MOUSE_LEFT);
+            if (org.lwjgl.glfw.GLFW.glfwGetMouseButton(window, MOUSE_RIGHT) == org.lwjgl.glfw.GLFW.GLFW_PRESS)
+                mouseButtonDownLastTick.add(MOUSE_RIGHT);
+        }
+        wasInGuiLastTick = inGui;
+
         // Process mouse clicks only when holding the Survey tool item and NOT in a GUI screen.
         if (hasTool && !inGui && (state == State.IDLE || state == State.RECORDING)) {
             processMouseClicks(client, window);
         }
 
-        // If tool is not held or we're in a GUI, clear the tracked mouse button state
+        // If tool is not held, clear the tracked mouse button state
         // so we don't miss a subsequent press when the player picks the tool up again.
-        if (!hasTool || inGui) {
+        if (!hasTool) {
             mouseButtonDownLastTick.clear();
         }
 
@@ -672,23 +684,20 @@ public class SurveySession {
     }
 
     /**
-     * Get the exact position the player is currently looking at on a block surface. Uses Minecraft's built-in raycast
-     * to find the targeted block and returns the precise hit location on its surface.
+     * Get the position of the block the player is looking at. Returns the block's grid coordinates, so that nodes are
+     * placed exactly on the targeted block's footprint regardless of which face the player clicked on.
      *
-     * @return the exact hit position as Vec3, or null if not looking at a block
+     * @return the block's grid position as Vec3, or null if not looking at a block
      */
     private Vec3 getLookedAtBlockPos(LocalPlayer player) {
-        // Use the player's pick() method which returns the block the player is looking at
-        // This is the standard Minecraft API for this purpose
-        // pick(double maxDistance, float partialTick, boolean includeFluids)
         HitResult hitResult = player.pick(5.0, 1.0F, false);
         if (hitResult == null || hitResult.getType() != HitResult.Type.BLOCK) {
             return null;
         }
 
-        // Get the exact hit location on the block surface (not the block center)
         BlockHitResult blockHit = (BlockHitResult)hitResult;
-        return blockHit.getLocation();
+        net.minecraft.core.BlockPos blockPos = blockHit.getBlockPos();
+        return new Vec3(blockPos.getX(), blockPos.getY(), blockPos.getZ());
     }
 
     /** Format a coordinate vector for display. */

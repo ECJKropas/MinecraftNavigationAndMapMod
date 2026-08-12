@@ -10,7 +10,7 @@
 
 # Wayfarer (越陌度阡)
 
-> Record, survey, and edit your road network in Minecraft — from the paths you walk to a complete road map.
+> Trace your steps, map your world.
 
 Wayfarer is a **client-side** Fabric mod that turns the roads you travel into a structured **node – segment – road** graph. You can auto-record while walking, or precisely survey with a handheld tool, then view and refine the entire network in a built-in browser editor or as an overlay on Xaero's World Map.
 
@@ -24,7 +24,6 @@ Because it's fully client-side, **you can use it on any server, Realms, or singl
 - **Smart trajectory simplification** — backtrack detection plus the Douglas–Peucker algorithm compress thousands of raw samples into the key turning points.
 - **Automatic graph building** — endpoints auto-snap and intersections auto-split, producing a true graph (not just a pile of lines).
 - **In-browser live editor** — Wayfarer starts a local HTTP server at `http://localhost:7891` and serves a full Leaflet map editor: drag nodes (axis-constrained), insert/split/merge segments, soft-delete intersections, undo/redo, all with **real-time two-way sync** to the game and optimistic-concurrency conflict protection.
-- **Chinese road classification** — G (national highway) / S (provincial) / Y (county) / X (township) / C (village) roads, color-coded with numbered badges on both the map overlay and the web editor.
 - **Xaero's World Map overlay** — automatically detected and overlaid via reflection; works with or without Xaero installed.
 - **One source, many versions** — a single codebase compiles for MC 1.20.1 and the 26.x series.
 
@@ -53,43 +52,23 @@ Because it's fully client-side, **you can use it on any server, Realms, or singl
 
 ## 🛠 Installation
 
-1. Install **Fabric Loader** (≥ 0.19.2).
-2. Install **malilib** for your Minecraft version.
-3. Download the Wayfarer JAR that matches your Minecraft version.
-4. Place it in your `.minecraft/mods/` folder.
-5. Launch the game.
-
 **Dependencies**
 - **malilib** (required) — config screen & key bindings
 - **Fabric API** (required)
 - **Xaero's World Map** (optional) — map overlay base layer
 - **Java 17+** (Java 25 for 26.x versions)
 
-## 🌐 Supported Versions
-
-| Minecraft | Mod version |
-| --- | --- |
-| 1.20.1 | 0.3.3 |
-| 26.1.1 | 0.3.3 |
-| 26.2 | 0.3.3 |
-
 ## 📂 Data & Storage
 
-- **Per-world storage** — each save/server gets its own `config/wayfarer/<world>/roads.json` (auto-migrated from older paths).
+- **Per-world storage** — each save/server gets its own `wayfarer/<world>/roads.json` (auto-migrated from older paths).
 - **Auto topology** — pass-through nodes with degree > 2 are split so pathfinding (Dijkstra / A*) runs directly.
 - **Orphan cleanup** — nodes with no connecting segment are removed automatically.
-- **GeoJSON export** — export the full network as a standard GeoJSON `FeatureCollection`.
-
-## 🔗 Links
-
-- 📖 Documentation / Wiki: `<wiki-url>`
-- 🐛 Report issues: `<issues-url>`
-- 💬 Discord / Community: `<discord-url>`
-- 📦 Source code: `<source-url>`
 
 ## 📜 License
 
 Released under **GPL-3.0-only**.
+
+*Wayfarer – because the road less travelled deserves to be drawn.*
 
 ---
 
@@ -138,39 +117,17 @@ Wayfarer 是一个**客户端侧**的 Fabric 模组，把你在游戏里走过�
 
 ## 🛠 安装
 
-1. 安装 **Fabric Loader**（≥ 0.19.2）。
-2. 安装对应 MC 版本的 **malilib** 前置。
-3. 下载与你的 Minecraft 版本匹配的 Wayfarer JAR。
-4. 放入 `.minecraft/mods/` 目录。
-5. 启动游戏。
-
 **依赖**
 - **malilib**（必需）—— 配置界面与按键绑定
 - **Fabric API**（必需）
 - **Xaero's World Map**（可选）—— 地图叠加底图
 - **Java 17+**（26.x 版本需要 Java 25）
 
-## 🌐 支持版本
-
-| Minecraft | 模组版本 |
-| --- | --- |
-| 1.20.1 | 0.3.3 |
-| 26.1.1 | 0.3.3 |
-| 26.2 | 0.3.3 |
-
 ## 📂 数据与存储
 
-- **按世界隔离** —— 每个存档 / 服务器独立 `config/wayfarer/<世界名>/roads.json`（自动从旧路径迁移）。
+- **按世界隔离** —— 每个存档 / 服务器独立 `wayfarer/<世界名>/roads.json`（自动从旧路径迁移）。
 - **图自动拓扑** —— 度数 > 2 的穿行节点自动拆为端点，确保 Dijkstra / A* 可直接运行。
 - **孤立节点清理** —— 自动删除无路段引用的节点。
-- **GeoJSON 导出** —— 完整路网可导出为标准 GeoJSON `FeatureCollection`。
-
-## 🔗 相关链接
-
-- 📖 文档 / Wiki：`<wiki-url>`
-- 🐛 反馈问题：`<issues-url>`
-- 💬 社区 / Discord：`<discord-url>`
-- 📦 源代码：`<source-url>`
 
 ## 📜 许可证
 

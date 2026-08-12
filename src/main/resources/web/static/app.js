@@ -320,7 +320,7 @@ function hideEditor() {
 }
 
 // ——— Map ———
-function initMap() {
+async function initMap() {
   map = L.map('map', {
     crs: L.CRS.Simple,
     minZoom: -4,
@@ -328,8 +328,8 @@ function initMap() {
     zoomControl: true
   }).setView([0, 0], 5);
   map.on('click', onMapClick);
-  loadConfig();
-  loadData();
+  await loadConfig();
+  await loadData();
   setInterval(loadDelta, 1000);
 
   // Global drag handlers (document-level to catch mouse outside map)
@@ -383,6 +383,7 @@ async function loadConfig() {
     if (cfg.maxZoom && typeof cfg.maxZoom === 'number') {
       map.options.maxZoom = cfg.maxZoom;
     }
+    buildStylesFromConfig(cfg);
   } catch (e) { /* use defaults */ }
 }
 
@@ -625,10 +626,49 @@ function renderDirectionArrows(sid, seg, pts) {
 }
 
 // ——— Road styling ———
-const ROAD_STYLES = {
-  G: { lineColor: '#DD3800', lineWeight: 5, badgeBg: '#DD0000', badgeBorder: '#FFFFFF', badgeColor: '#FFFFFF' },
-  S: { lineColor: '#E89200', lineWeight: 4.5, badgeBg: '#FFD700', badgeColor: '#000000' },
+let ROAD_STYLES = {
+  G: { lineColor: '#FFC000', lineWeight: 6, badgeBg: '#FFC000', badgeBorder: '#FFFFFF', badgeColor: '#000000' },
+  S: { lineColor: '#FFD700', lineWeight: 5, badgeBg: '#FFD700', badgeColor: '#000000' },
 };
+
+let CLASSIFICATION_WEIGHTS = {
+  X: { edge: 4.5, fill: 3.0, hover: { edge: 5, fill: 3.5 } },
+  Y: { edge: 3.5, fill: 2.5, hover: { edge: 4, fill: 3 } },
+  C: { edge: 4, fill: 2.5, hover: { edge: 5, fill: 3.5 } },
+};
+
+function hexToCssColor(hex) {
+  if (!hex) return '#FFFFFF';
+  return hex.startsWith('#') ? hex : '#' + hex;
+}
+
+function buildStylesFromConfig(cfg) {
+  if (!cfg || !cfg.classificationStyles) return;
+  const cs = cfg.classificationStyles;
+
+  if (cs.G) {
+    const c = hexToCssColor(cs.G.color);
+    ROAD_STYLES.G = { lineColor: c, lineWeight: cs.G.width || 6, badgeBg: c, badgeBorder: '#FFFFFF', badgeColor: '#000000' };
+  }
+  if (cs.S) {
+    const c = hexToCssColor(cs.S.color);
+    ROAD_STYLES.S = { lineColor: c, lineWeight: cs.S.width || 5, badgeBg: c, badgeColor: '#000000' };
+  }
+  if (cs.X) {
+    const w = cs.X.width || 3.5;
+    CLASSIFICATION_WEIGHTS.X = { edge: w + 1, fill: w, hover: { edge: w + 1.5, fill: w + 0.5 } };
+  }
+  if (cs.Y) {
+    const w = cs.Y.width || 3.0;
+    CLASSIFICATION_WEIGHTS.Y = { edge: w + 1, fill: w, hover: { edge: w + 1.5, fill: w + 0.5 } };
+  }
+  if (cs.C) {
+    const w = cs.C.width || 3.0;
+    const c = hexToCssColor(cs.C.color);
+    CLASSIFICATION_WEIGHTS.C = { edge: w + 1, fill: w, hover: { edge: w + 2, fill: w + 1 } };
+    CLASSIFICATION_WEIGHTS.C.fillColor = c;
+  }
+}
 
 let nodeMarkers = new Map();
 let segmentLines = new Map();
@@ -682,12 +722,12 @@ function renderAll() {
     const pts = buildPoints(seg);
     if (pts.length < 2) continue;
     const isSelected = selectedSegments.has(sid);
-    const eo = { color: '#BBBBBB', weight: isSelected ? 5 : 4, opacity: isSelected ? 1 : 0.5, smoothFactor: 0.2 };
-    const fo = { color: '#F8F8F8', weight: isSelected ? 3 : 2.5, opacity: isSelected ? 1 : 0.92, smoothFactor: 0.2 };
+    const eo = { color: '#BBBBBB', weight: isSelected ? 5.5 : 4.5, opacity: isSelected ? 1 : 0.5, smoothFactor: 0.2 };
+    const fo = { color: '#F8F8F8', weight: isSelected ? 3.5 : 3, opacity: isSelected ? 1 : 0.92, smoothFactor: 0.2 };
     const edge = L.polyline(pts, eo).addTo(map);
     const fill = L.polyline(pts, fo).addTo(map);
     [edge, fill].forEach(line => {
-      line.on('mouseover', () => { if (!isSelected) { edge.setStyle({ weight: 5, opacity: 0.7 }); fill.setStyle({ weight: 3.5 }); } });
+      line.on('mouseover', () => { if (!isSelected) { edge.setStyle({ weight: 5.5, opacity: 0.7 }); fill.setStyle({ weight: 4 }); } });
       line.on('mouseout', () => { if (!isSelected) { edge.setStyle(eo); fill.setStyle(fo); } });
       line.on('click', (e) => { L.DomEvent.stopPropagation(e); if (activeTool === 'point') { handlePointTool(e.latlng); return; } onSegmentClick(sid, e.originalEvent); });
     });
@@ -704,6 +744,7 @@ function renderAll() {
     const num = road.number || '';
     const styl = ROAD_STYLES[cls] || null;
     const isGorS = styl != null;
+    const cw = CLASSIFICATION_WEIGHTS[cls] || null;
 
     const allPts = [];
 
@@ -717,7 +758,7 @@ function renderAll() {
       const isSelected = selectedSegments.has(sid);
 
       if (isGorS) {
-        // Colored line
+        // Colored line for G and S
         const c = isSelected ? '#007AFF' : styl.lineColor;
         const opts = { color: c, weight: isSelected ? 6 : styl.lineWeight, opacity: isSelected ? 1 : 0.88, smoothFactor: 0.2 };
         const line = L.polyline(pts, opts).addTo(map);
@@ -726,14 +767,29 @@ function renderAll() {
         line.on('click', (e) => { L.DomEvent.stopPropagation(e); if (activeTool === 'point') { handlePointTool(e.latlng); return; } onSegmentClick(sid, e.originalEvent); });
         segmentLines.set(sid, line);
         renderDirectionArrows(sid, seg, pts);
-      } else {
-        // White fill + gray edge
-        const eo = { color: '#BBBBBB', weight: isSelected ? 5 : 4, opacity: isSelected ? 1 : 0.5, smoothFactor: 0.2 };
-        const fo = { color: '#F8F8F8', weight: isSelected ? 3 : 2.5, opacity: isSelected ? 1 : 0.92, smoothFactor: 0.2 };
+      } else if (cls === 'C') {
+        // Gray dual-layer for village roads: dark gray border + config-colored fill
+        const fillColor = (cw && cw.fillColor) ? cw.fillColor : '#AAAAAA';
+        const eo = { color: '#555555', weight: isSelected ? 5.5 : (cw ? cw.edge : 4), opacity: isSelected ? 1 : 0.75, smoothFactor: 0.2 };
+        const fo = { color: fillColor, weight: isSelected ? 3.5 : (cw ? cw.fill : 2.5), opacity: isSelected ? 1 : 0.85, smoothFactor: 0.2 };
         const edge = L.polyline(pts, eo).addTo(map);
         const fill = L.polyline(pts, fo).addTo(map);
         [edge, fill].forEach(line => {
-          line.on('mouseover', () => { if (!isSelected) { edge.setStyle({ weight: 5, opacity: 0.7 }); fill.setStyle({ weight: 3.5 }); } });
+          line.on('mouseover', () => { if (!isSelected) { edge.setStyle({ weight: cw ? cw.hover.edge : 5, opacity: 0.9 }); fill.setStyle({ weight: cw ? cw.hover.fill : 3.5, opacity: 0.95 }); } });
+          line.on('mouseout', () => { if (!isSelected) { edge.setStyle(eo); fill.setStyle(fo); } });
+          line.on('click', (e) => { L.DomEvent.stopPropagation(e); if (activeTool === 'point') { handlePointTool(e.latlng); return; } onSegmentClick(sid, e.originalEvent); });
+        });
+        segmentLines.set(sid, edge);
+        segmentFills.set(sid, fill);
+        renderDirectionArrows(sid, seg, pts);
+      } else {
+        // White fill + gray edge for X, Y, and unclassified
+        const eo = { color: '#BBBBBB', weight: isSelected ? 5.5 : (cw ? cw.edge : 4.5), opacity: isSelected ? 1 : 0.5, smoothFactor: 0.2 };
+        const fo = { color: '#F8F8F8', weight: isSelected ? 3.5 : (cw ? cw.fill : 3), opacity: isSelected ? 1 : 0.92, smoothFactor: 0.2 };
+        const edge = L.polyline(pts, eo).addTo(map);
+        const fill = L.polyline(pts, fo).addTo(map);
+        [edge, fill].forEach(line => {
+          line.on('mouseover', () => { if (!isSelected) { edge.setStyle({ weight: cw ? cw.hover.edge : 5.5, opacity: 0.7 }); fill.setStyle({ weight: cw ? cw.hover.fill : 4 }); } });
           line.on('mouseout', () => { if (!isSelected) { edge.setStyle(eo); fill.setStyle(fo); } });
           line.on('click', (e) => { L.DomEvent.stopPropagation(e); if (activeTool === 'point') { handlePointTool(e.latlng); return; } onSegmentClick(sid, e.originalEvent); });
         });
@@ -759,6 +815,21 @@ function renderAll() {
         <div style="background:${styl.badgeBg};${styl.badgeBorder ? 'border:1.5px solid ' + styl.badgeBorder + ';' : ''}color:${styl.badgeColor};font-size:11px;font-weight:700;padding:2px 7px;border-radius:4px;white-space:nowrap;letter-spacing:0.02em;line-height:1.3;">${badgeText}</div>`;
       if (showName) {
         labelHtml += `<div style="color:#999;font-size:10px;font-weight:400;text-shadow:0 0 2px #fff;white-space:nowrap;letter-spacing:0.01em;">${roadName}</div>`;
+      }
+      labelHtml += `</div>`;
+    } else if (cls === 'C') {
+      if (roadName) {
+        labelHtml = `<div style="position:absolute;transform:translate(-50%,-50%);display:flex;flex-direction:column;align-items:center;gap:2px;pointer-events:none;">
+          <div style="background:rgba(85,85,85,0.85);color:#fff;font-size:10px;font-weight:600;padding:1px 6px;border-radius:3px;white-space:nowrap;letter-spacing:0.02em;line-height:1.3;">C ${roadName}</div>
+        </div>`;
+      }
+    } else if (cls === 'X' || cls === 'Y') {
+      const badgeText = cls + (num || '');
+      const showName = roadName && roadName !== badgeText && roadName !== cls && roadName !== num;
+      labelHtml = `<div style="position:absolute;transform:translate(-50%,-50%);display:flex;flex-direction:column;align-items:center;gap:2px;pointer-events:none;">
+        <div style="background:#F8F8F8;border:1.5px solid #BBBBBB;color:#333;font-size:10px;font-weight:700;padding:1px 6px;border-radius:3px;white-space:nowrap;letter-spacing:0.02em;line-height:1.3;">${badgeText}</div>`;
+      if (showName) {
+        labelHtml += `<div style="color:#999;font-size:10px;font-weight:400;text-shadow:0 0 2px #fff,0 0 2px #fff;white-space:nowrap;letter-spacing:0.01em;">${roadName}</div>`;
       }
       labelHtml += `</div>`;
     } else if (roadName) {
@@ -898,9 +969,10 @@ function showSegmentEditor(sid) {
   const seg = roadStore.segments[sid];
   if (!seg) return;
   showEditor('segment-editor');
-  document.getElementById('seg-id').textContent = sid.substring(0, 8) + '...';
+  document.getElementById('seg-id').textContent = sid.substring(0, 4) + '...' + sid.substring(sid.length - 4);
   document.getElementById('seg-source').textContent = seg.source;
   document.getElementById('seg-status').textContent = seg.status;
+  document.getElementById('seg-direction').value = seg.direction || 'BIDIRECTIONAL';
 
   const road = seg.roadId ? roadStore.roads[seg.roadId] : null;
   document.getElementById('seg-road-name').value = road ? (road.name || '') : '';
@@ -961,6 +1033,26 @@ async function saveRoad() {
   const name = document.getElementById('seg-road-name').value;
   const classification = document.getElementById('seg-classification').value;
   const number = document.getElementById('seg-number').value;
+  const direction = document.getElementById('seg-direction').value;
+
+  // Save segment direction
+  if (seg.direction !== direction) {
+    editingEntityId = sid;
+    try {
+      const res = await fetch('/api/segments/' + sid + '/direction', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ direction, expectedVersion: seg.version || 0 })
+      });
+      if (res.ok) {
+        seg.direction = direction;
+      }
+    } catch (e) { showToast(I18N.t('toast.networkError'), 'error'); }
+    finally {
+      editingEntityId = null;
+    }
+  }
+
   const roadId = seg.roadId;
   if (roadId) {
     const road = roadStore.roads[roadId];
@@ -989,6 +1081,8 @@ async function saveRoad() {
       editingEntityId = null;
     }
   } else {
+    // Still render direction change even if no road linked
+    renderAll();
     showToast(I18N.t('toast.segmentNotLinked'), 'error');
   }
 }

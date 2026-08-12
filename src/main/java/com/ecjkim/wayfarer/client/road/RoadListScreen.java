@@ -17,7 +17,9 @@
 package com.ecjkim.wayfarer.client.road;
 
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 import java.util.function.Consumer;
 
@@ -96,6 +98,8 @@ public class RoadListScreen extends Screen {
     // Cache
     private final List<Road> filteredRoads = new ArrayList<>();
     private final List<Segment> allUnfiled = new ArrayList<>();
+    private final Map<String, Integer> marqueePhases = new HashMap<>();
+    private int marqueePhaseCounter = 0;
 
     // Buttons (set to null outside LIST mode)
     private Button newRoadBtn;
@@ -127,6 +131,11 @@ public class RoadListScreen extends Screen {
     @Override
     protected void init() {
         computeLayout();
+
+        // Reset marquee state so that scrolling starts from a clean state each time the screen opens
+        scrollTimeMs = 0;
+        marqueePhases.clear();
+        marqueePhaseCounter = 0;
 
         searchBox = new EditBox(this.font, colLeftX + 2, 10, colLeftW - 4, SEARCH_H, Component.literal("Search"));
         searchBox.setMaxLength(64);
@@ -323,7 +332,13 @@ public class RoadListScreen extends Screen {
 
             if (labelW > textW + 4) {
                 // Marquee scroll for overflowing names
-                drawMarqueeText(g, label, textX, py + 1, color, textW, labelW);
+                String phaseKey = road.getId().toString();
+                int phaseOffset = marqueePhases.computeIfAbsent(phaseKey, k -> {
+                    int p = marqueePhaseCounter * 1500;
+                    marqueePhaseCounter++;
+                    return p;
+                });
+                drawMarqueeText(g, label, textX, py + 1, color, textW, labelW, phaseOffset);
             } else {
                 g.drawString(this.font, label, textX, py + 1, color, false);
             }
@@ -765,11 +780,12 @@ public class RoadListScreen extends Screen {
 
     private String roadLabel(Road r) {
         StringBuilder sb = new StringBuilder();
-        if (r.getNumber() != null && !r.getNumber().isEmpty())
-            sb.append("[").append(r.getNumber()).append("] ");
+        sb.append("[");
         if (r.getClassification() != null && !r.getClassification().isEmpty())
-            sb.append(RoadMetadataScreen.getClassificationDisplay(r.getClassification())).append(" ");
-        sb.append(r.getName());
+            sb.append(r.getClassification(), 0, 1);
+        if (r.getNumber() != null && !r.getNumber().isEmpty())
+            sb.append(r.getNumber());
+        sb.append("] ").append(r.getName());
         return sb.toString();
     }
 
@@ -808,58 +824,63 @@ public class RoadListScreen extends Screen {
         }
     }
 
-    // ---- Marquee text ----
+    // ---- Marquee text (leftward, with gap between copies, pauses between cycles) ----
 
-    private void drawMarqueeText(GuiGraphics g, String text, int x, int y, int color, int visibleW, int fullW) {
+    private static final int MARQUEE_GAP_W = 20;
+    private static final long MARQUEE_WAIT_MS = 2000;
+
+    private void drawMarqueeText(GuiGraphics g, String text, int x, int y, int color, int visibleW, int fullW,
+        int phaseOffsetMs) {
         int overflow = fullW - visibleW;
         if (overflow <= 0) {
             g.drawString(this.font, text, x, y, color, false);
             return;
         }
 
-        int speed = 1;
-        long totalOffset = scrollTimeMs * speed / 1000L;
+        long elapsedMs = scrollTimeMs + phaseOffsetMs;
 
-        int startWrapped = (int)(((totalOffset - visibleW) % fullW + fullW) % fullW);
-        int endWrapped = (int)((totalOffset % fullW + fullW) % fullW);
+        int segmentW = fullW + MARQUEE_GAP_W;
+        long scrollMs = (long)segmentW * 1000L;
+        long totalPeriodMs = scrollMs + MARQUEE_WAIT_MS;
 
-        if (startWrapped <= endWrapped) {
-            int startCharIdx = findCharAtPixel(text, startWrapped);
-            int endCharIdx = findCharAtPixel(text, endWrapped);
-            if (startCharIdx < endCharIdx) {
-                int drawX = x + startWrapped - getCharPixel(text, startCharIdx);
-                int remainingVisible =
-                    (endWrapped - startWrapped) - (getCharPixel(text, endCharIdx) - getCharPixel(text, startCharIdx));
-                if (remainingVisible > 0 && drawX >= x && drawX + remainingVisible <= x + visibleW) {
-                    String subText = text.substring(startCharIdx, endCharIdx);
-                    subText = clipTextToWidth(subText, remainingVisible);
-                    g.drawString(this.font, subText, drawX, y, color, false);
-                }
-            }
+        long phase = elapsedMs % totalPeriodMs;
+
+        int offset;
+        if (phase < MARQUEE_WAIT_MS) {
+            offset = 0;
         } else {
-            int firstEndPx = fullW - startWrapped;
-            int firstStartIdx = findCharAtPixel(text, startWrapped);
-            int firstEndIdx = text.length();
-            int firstDrawX = x + startWrapped - getCharPixel(text, firstStartIdx);
-            int firstVisible = firstEndPx - (getCharPixel(text, firstStartIdx) - startWrapped);
-            if (firstVisible > 0 && firstDrawX >= x && firstDrawX + firstVisible <= x + visibleW) {
-                String subText = text.substring(firstStartIdx, firstEndIdx);
-                subText = clipTextToWidth(subText, firstVisible);
-                g.drawString(this.font, subText, firstDrawX, y, color, false);
-            }
-
-            int secondStartPx = 0;
-            int secondEndPx = endWrapped;
-            int secondStartIdx = 0;
-            int secondEndIdx = findCharAtPixel(text, secondEndPx);
-            int secondDrawX = x + firstEndPx;
-            int secondVisible = secondEndPx - getCharPixel(text, secondEndIdx);
-            if (secondVisible > 0 && secondDrawX >= x && secondDrawX + secondVisible <= x + visibleW) {
-                String subText = text.substring(secondStartIdx, secondEndIdx);
-                subText = clipTextToWidth(subText, secondVisible);
-                g.drawString(this.font, subText, secondDrawX, y, color, false);
-            }
+            offset = (int)((phase - MARQUEE_WAIT_MS) * segmentW / (double)scrollMs);
         }
+
+        int baseX = x - offset;
+
+        drawMarqueeCopy(g, text, baseX, x, x + visibleW, y, color);
+        drawMarqueeCopy(g, text, baseX + segmentW, x, x + visibleW, y, color);
+    }
+
+    private void drawMarqueeCopy(GuiGraphics g, String text, int textStartX, int visStart, int visEnd, int y,
+        int color) {
+        int textEndX = textStartX + this.font.width(text);
+
+        int overlapStart = Math.max(visStart, textStartX);
+        int overlapEnd = Math.min(visEnd, textEndX);
+
+        if (overlapStart >= overlapEnd) {
+            return;
+        }
+
+        int textPxStart = overlapStart - textStartX;
+        int textPxEnd = overlapEnd - textStartX;
+
+        int charStart = findCharAtPixel(text, textPxStart);
+        int charEnd = findCharAtPixel(text, textPxEnd);
+
+        if (charStart >= charEnd) {
+            return;
+        }
+
+        int drawX = textStartX + getCharPixel(text, charStart);
+        g.drawString(this.font, text.substring(charStart, charEnd), drawX, y, color, false);
     }
 
     private int getCharPixel(String text, int charIdx) {
@@ -881,19 +902,6 @@ public class RoadListScreen extends Screen {
             i++;
         }
         return i;
-    }
-
-    private String clipTextToWidth(String text, int maxWidth) {
-        int w = 0;
-        int i = 0;
-        while (i < text.length()) {
-            int cw = this.font.width(String.valueOf(text.charAt(i)));
-            if (w + cw > maxWidth)
-                break;
-            w += cw;
-            i++;
-        }
-        return text.substring(0, i);
     }
 
     // ---- Utility ----

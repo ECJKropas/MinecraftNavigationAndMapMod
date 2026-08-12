@@ -16,6 +16,8 @@
  */
 package com.ecjkim.wayfarer.client;
 
+import java.util.List;
+
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.player.LocalPlayer;
 import net.minecraft.network.chat.Component;
@@ -50,6 +52,7 @@ public class WayfarerClient implements ClientModInitializer {
     private final IntSet keysDownLastTick = new IntOpenHashSet();
     private boolean hadToolLastTick = false;
     private boolean worldInitialized = false;
+    private boolean wasInGuiLastTick = false;
 
     public static SurveySession getSurveySession() {
         return SURVEY_SESSION;
@@ -132,13 +135,27 @@ public class WayfarerClient implements ClientModInitializer {
         }
 
         if (client.screen != null) {
-            keysDownLastTick.clear();
             ROAD_MANAGER.tick(client);
             tickSurvey(client, client.getWindow().getWindow());
+            wasInGuiLastTick = true;
             return;
         }
 
+        // Transitioned from GUI → game: sync hotkey state so held keys don't
+        // generate false edge triggers on the first frame back.
         long window = client.getWindow().getWindow();
+        if (wasInGuiLastTick) {
+            keysDownLastTick.clear();
+            WayfarerConfig cfg = WayfarerConfig.getInstance();
+            for (String action : List.of("toggle_recording", "open_menu", "set_held_item_as_tool")) {
+                for (WayfarerConfig.HotkeyBind bind : cfg.getHotkeysForAction(action)) {
+                    int id = bind.key * 10000 + Math.max(0, bind.modifierKey);
+                    if (GLFW.glfwGetKey(window, bind.key) == GLFW.GLFW_PRESS)
+                        keysDownLastTick.add(id);
+                }
+            }
+        }
+        wasInGuiLastTick = false;
         WayfarerConfig config = WayfarerConfig.getInstance();
 
         for (WayfarerConfig.HotkeyBind bind : config.getHotkeysForAction("toggle_recording")) {

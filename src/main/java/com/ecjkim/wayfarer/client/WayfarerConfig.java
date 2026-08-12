@@ -80,6 +80,40 @@ public class WayfarerConfig {
         return WayfarerConfigs.Generic.SHOW_KEY_HINTS.getBooleanValue();
     }
 
+    public String getClassificationColor(char classification) {
+        switch (classification) {
+            case 'G':
+                return WayfarerConfigs.Generic.G_COLOR.getStringValue();
+            case 'S':
+                return WayfarerConfigs.Generic.S_COLOR.getStringValue();
+            case 'X':
+                return WayfarerConfigs.Generic.X_COLOR.getStringValue();
+            case 'Y':
+                return WayfarerConfigs.Generic.Y_COLOR.getStringValue();
+            case 'C':
+                return WayfarerConfigs.Generic.C_COLOR.getStringValue();
+            default:
+                return "FFFFFF";
+        }
+    }
+
+    public float getClassificationWidth(char classification) {
+        switch (classification) {
+            case 'G':
+                return (float)WayfarerConfigs.Generic.G_WIDTH.getDoubleValue();
+            case 'S':
+                return (float)WayfarerConfigs.Generic.S_WIDTH.getDoubleValue();
+            case 'X':
+                return (float)WayfarerConfigs.Generic.X_WIDTH.getDoubleValue();
+            case 'Y':
+                return (float)WayfarerConfigs.Generic.Y_WIDTH.getDoubleValue();
+            case 'C':
+                return (float)WayfarerConfigs.Generic.C_WIDTH.getDoubleValue();
+            default:
+                return 3.0f;
+        }
+    }
+
     public static WayfarerConfig getInstance() {
         if (instance == null) {
             instance = new WayfarerConfig();

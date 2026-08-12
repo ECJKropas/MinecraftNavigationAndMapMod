@@ -33,6 +33,7 @@ import java.util.logging.Logger;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
+import com.ecjkim.wayfarer.client.WayfarerConfig;
 import com.ecjkim.wayfarer.client.config.WayfarerConfigs;
 import com.ecjkim.wayfarer.client.road.data.RoadNetworkDatabase;
 import com.ecjkim.wayfarer.client.road.model.Direction;
@@ -95,6 +96,8 @@ public class WayfarerHttpServer implements Runnable {
         routes.add(new Route("POST", Pattern.compile("/api/split/([0-9a-f-]+)"), this::handleSplit));
         routes.add(new Route("POST", "/api/segments/intersection", this::handleSegmentIntersection));
         routes.add(new Route("POST", Pattern.compile("/api/segments/([0-9a-f-]+)/insert"), this::handleInsertNode));
+        routes.add(new Route("PATCH", Pattern.compile("/api/segments/([0-9a-f-]+)/direction"),
+            this::handleUpdateSegmentDirection));
         routes.add(new Route("PATCH", Pattern.compile("/api/roads/([0-9a-f-]+)"), this::handleUpdateRoad));
         routes.add(new Route("DELETE", Pattern.compile("/api/roads/([0-9a-f-]+)"), this::handleDeleteRoad));
         routes.add(new Route("POST", "/api/roads/restore", this::handleRestoreRoads));
@@ -254,6 +257,18 @@ public class WayfarerHttpServer implements Runnable {
     private void handleGetConfig(Request req) {
         JsonObject config = new JsonObject();
         config.addProperty("maxZoom", WayfarerConfigs.Generic.WEB_MAX_ZOOM.getIntegerValue());
+
+        WayfarerConfig cfg = WayfarerConfig.getInstance();
+        JsonObject styles = new JsonObject();
+        for (String cls : new String[] {"G", "S", "X", "Y", "C"}) {
+            char c = cls.charAt(0);
+            JsonObject style = new JsonObject();
+            style.addProperty("color", cfg.getClassificationColor(c));
+            style.addProperty("width", cfg.getClassificationWidth(c));
+            styles.add(cls, style);
+        }
+        config.add("classificationStyles", styles);
+
         sendJson(req.exchange, 200, config);
     }
 
@@ -802,6 +817,71 @@ public class WayfarerHttpServer implements Runnable {
         }
     }
 
+    private void handleUpdateSegmentDirection(Request req) {
+        String idStr = req.pathParams.getOrDefault("id", "");
+        UUID id;
+        try {
+            id = UUID.fromString(idStr);
+        } catch (IllegalArgumentException e) {
+            sendJson(req.exchange, 400, errorJson("Invalid segment ID"));
+            return;
+        }
+
+        if (req.body == null) {
+            sendJson(req.exchange, 400, errorJson("Missing request body"));
+            return;
+        }
+
+        try {
+            JsonObject body = JsonParser.parseString(req.body).getAsJsonObject();
+
+            if (!body.has("direction")) {
+                sendJson(req.exchange, 400, errorJson("Missing direction"));
+                return;
+            }
+            String dirStr = body.get("direction").getAsString();
+            Direction direction;
+            try {
+                direction = Direction.valueOf(dirStr);
+            } catch (IllegalArgumentException e) {
+                sendJson(req.exchange, 400, errorJson("Invalid direction: " + dirStr));
+                return;
+            }
+
+            if (!body.has("expectedVersion")) {
+                sendJson(req.exchange, 400, errorJson("Missing expectedVersion"));
+                return;
+            }
+            int expectedVersion = body.get("expectedVersion").getAsInt();
+
+            synchronized (database) {
+                Segment seg = database.getSegment(id);
+                if (seg == null) {
+                    sendJson(req.exchange, 404, errorJson("Segment not found"));
+                    return;
+                }
+
+                if (seg.getVersion() != expectedVersion) {
+                    JsonObject err = new JsonObject();
+                    err.addProperty("error", "Version conflict. Segment was modified in-game.");
+                    err.addProperty("currentVersion", seg.getVersion());
+                    sendJson(req.exchange, 409, err);
+                    return;
+                }
+
+                seg.setDirection(direction);
+                seg.setModifiedAt(System.currentTimeMillis());
+                database.saveToDisk();
+
+                JsonObject result = new JsonObject();
+                result.add("segment", GSON.toJsonTree(seg));
+                sendJson(req.exchange, 200, result);
+            }
+        } catch (Exception e) {
+            sendJson(req.exchange, 400, errorJson("Invalid JSON: " + e.getMessage()));
+        }
+    }
+
     private void handleUpdateRoad(Request req) {
         String idStr = req.pathParams.getOrDefault("id", "");
         UUID id;
@@ -853,11 +933,7 @@ public class WayfarerHttpServer implements Runnable {
                     changed = true;
                 }
                 if (body.has("classification")) {
-                    String cls = body.get("classification").getAsString();
-                    if (cls.length() > 1 && cls.matches("^[GSXYC].*")) {
-                        cls = cls.substring(0, 1);
-                    }
-                    existing.setClassification(cls);
+                    existing.setClassification(body.get("classification").getAsString());
                     changed = true;
                 }
                 if (body.has("number")) {

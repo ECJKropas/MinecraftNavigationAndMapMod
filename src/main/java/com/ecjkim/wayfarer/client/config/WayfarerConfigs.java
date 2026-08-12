@@ -70,10 +70,22 @@ public class WayfarerConfigs {
         public static final ConfigBoolean SHOW_KEY_HINTS =
             new ConfigBoolean("showKeyHints", true, "切换到 Survey 工具物品时显示按键提示（action bar）");
 
-        public static final ImmutableList<IConfigBase> OPTIONS =
-            ImmutableList.of(DEFAULT_CLASSIFICATION, AUTO_INTEGRAL, AUTO_SNAP_ENDPOINTS, RDP_EPSILON,
-                AUTO_DELETE_ORPHAN_NODES, WEB_MAX_ZOOM, AUTO_GRAPHIFY, TOOL_ITEM, TOOL_ITEM_ENABLED,
-                NODE_INDICATOR_ENABLED, NODE_INDICATOR_BEAM_HEIGHT, NODE_INDICATOR_BEAM_ALPHA, SHOW_KEY_HINTS);
+        // Classification colors (hex RGB without alpha prefix, e.g. "FFC000")
+        public static final ConfigString G_COLOR = new ConfigString("gColor", "FFC000", "国道颜色（十六进制，不含透明度前缀）");
+        public static final ConfigDouble G_WIDTH = new ConfigDouble("gWidth", 6.0, 1.0, 20.0, "国道线宽");
+        public static final ConfigString S_COLOR = new ConfigString("sColor", "FFD700", "省道颜色（十六进制，不含透明度前缀）");
+        public static final ConfigDouble S_WIDTH = new ConfigDouble("sWidth", 4.5, 1.0, 20.0, "省道线宽");
+        public static final ConfigString X_COLOR = new ConfigString("xColor", "FFFFFF", "乡道颜色（十六进制，不含透明度前缀）");
+        public static final ConfigDouble X_WIDTH = new ConfigDouble("xWidth", 3.5, 1.0, 20.0, "乡道线宽");
+        public static final ConfigString Y_COLOR = new ConfigString("yColor", "FFFFFF", "县道颜色（十六进制，不含透明度前缀）");
+        public static final ConfigDouble Y_WIDTH = new ConfigDouble("yWidth", 3.0, 1.0, 20.0, "县道线宽");
+        public static final ConfigString C_COLOR = new ConfigString("cColor", "888888", "村道颜色（十六进制，不含透明度前缀）");
+        public static final ConfigDouble C_WIDTH = new ConfigDouble("cWidth", 3.0, 1.0, 20.0, "村道线宽");
+
+        public static final ImmutableList<IConfigBase> OPTIONS = ImmutableList.of(DEFAULT_CLASSIFICATION, AUTO_INTEGRAL,
+            AUTO_SNAP_ENDPOINTS, RDP_EPSILON, AUTO_DELETE_ORPHAN_NODES, WEB_MAX_ZOOM, AUTO_GRAPHIFY, TOOL_ITEM,
+            TOOL_ITEM_ENABLED, NODE_INDICATOR_ENABLED, NODE_INDICATOR_BEAM_HEIGHT, NODE_INDICATOR_BEAM_ALPHA,
+            SHOW_KEY_HINTS, G_COLOR, G_WIDTH, S_COLOR, S_WIDTH, X_COLOR, X_WIDTH, Y_COLOR, Y_WIDTH, C_COLOR, C_WIDTH);
     }
 
     public static List<IConfigBase> getAllConfigs() {

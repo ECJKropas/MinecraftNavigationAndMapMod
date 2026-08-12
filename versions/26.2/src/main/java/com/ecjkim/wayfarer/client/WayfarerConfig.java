@@ -51,6 +51,17 @@ public class WayfarerConfig {
     public String toolItem = "minecraft:wheat_seeds";
     public boolean toolItemEnabled = true;
 
+    public String gColor = "FFC000";
+    public double gWidth = 6.0;
+    public String sColor = "FFD700";
+    public double sWidth = 4.5;
+    public String xColor = "FFFFFF";
+    public double xWidth = 3.5;
+    public String yColor = "FFFFFF";
+    public double yWidth = 3.0;
+    public String cColor = "888888";
+    public double cWidth = 3.0;
+
     private WayfarerConfig() {}
 
     // -- Live getters --
@@ -85,6 +96,28 @@ public class WayfarerConfig {
 
     public String getToolItem() {
         return toolItem;
+    }
+
+    public String getClassificationColor(char classification) {
+        return switch (classification) {
+            case 'G' -> gColor;
+            case 'S' -> sColor;
+            case 'X' -> xColor;
+            case 'Y' -> yColor;
+            case 'C' -> cColor;
+            default -> "FFFFFF";
+        };
+    }
+
+    public float getClassificationWidth(char classification) {
+        return (float) switch (classification) {
+            case 'G' -> gWidth;
+            case 'S' -> sWidth;
+            case 'X' -> xWidth;
+            case 'Y' -> yWidth;
+            case 'C' -> cWidth;
+            default -> 3.0;
+        };
     }
 
     public static WayfarerConfig getInstance() {

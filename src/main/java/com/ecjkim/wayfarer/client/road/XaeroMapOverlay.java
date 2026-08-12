@@ -34,6 +34,7 @@ import com.mojang.blaze3d.vertex.VertexFormat;
 
 import net.fabricmc.fabric.api.client.screen.v1.ScreenEvents;
 
+import com.ecjkim.wayfarer.client.WayfarerConfig;
 import com.ecjkim.wayfarer.client.road.data.RoadNetworkDatabase;
 import com.ecjkim.wayfarer.client.road.model.Node;
 import com.ecjkim.wayfarer.client.road.model.Road;
@@ -260,25 +261,17 @@ public final class XaeroMapOverlay {
     private static int classificationColor(String classification) {
         if (classification == null || classification.isEmpty())
             return 0xFFFFFFFF;
-        switch (classification.charAt(0)) {
-            case 'G':
-                return 0xFFFF8800;
-            case 'S':
-                return 0xFFFFFF00;
-            case 'X':
-                return 0xFF00FF00;
-            case 'Y':
-                return 0xFF4488FF;
-            case 'C':
-                return 0xFF888888;
-            default:
-                return 0xFFFFFFFF;
+        try {
+            String hex = WayfarerConfig.getInstance().getClassificationColor(classification.charAt(0));
+            return 0xFF000000 | Integer.parseInt(hex, 16);
+        } catch (NumberFormatException e) {
+            return 0xFFFFFFFF;
         }
     }
 
     private static float classificationLineWidth(String classification) {
         if (classification == null || classification.isEmpty())
             return 3.0f;
-        return classification.charAt(0) == 'G' ? 6.0f : (classification.charAt(0) == 'S' ? 4.5f : 3.0f);
+        return WayfarerConfig.getInstance().getClassificationWidth(classification.charAt(0));
     }
 }
