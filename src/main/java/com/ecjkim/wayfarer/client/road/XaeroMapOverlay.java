@@ -263,7 +263,14 @@ public final class XaeroMapOverlay {
             return 0xFFFFFFFF;
         try {
             String hex = WayfarerConfig.getInstance().getClassificationColor(classification.charAt(0));
-            return 0xFF000000 | Integer.parseInt(hex, 16);
+            if (hex.startsWith("#")) {
+                hex = hex.substring(1);
+            }
+            // ConfigColor returns "#AARRGGBB" (8 hex digits including alpha); legacy 6-digit RGB is opaque
+            if (hex.length() == 6) {
+                hex = "FF" + hex;
+            }
+            return (int)Long.parseLong(hex, 16);
         } catch (NumberFormatException e) {
             return 0xFFFFFFFF;
         }

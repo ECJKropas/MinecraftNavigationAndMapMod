@@ -26,6 +26,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
+import com.ecjkim.wayfarer.client.config.WayfarerConfigs;
 import com.ecjkim.wayfarer.client.config.WayfarerHotkeys;
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
@@ -51,15 +52,10 @@ public class WayfarerConfig {
     public String toolItem = "minecraft:wheat_seeds";
     public boolean toolItemEnabled = true;
 
-    public String gColor = "FFC000";
     public double gWidth = 6.0;
-    public String sColor = "FFD700";
     public double sWidth = 4.5;
-    public String xColor = "FFFFFF";
     public double xWidth = 3.5;
-    public String yColor = "FFFFFF";
     public double yWidth = 3.0;
-    public String cColor = "888888";
     public double cWidth = 3.0;
 
     private WayfarerConfig() {}
@@ -99,13 +95,15 @@ public class WayfarerConfig {
     }
 
     public String getClassificationColor(char classification) {
+        // Colors are managed by the malilib ConfigColor entries (with color picker) in WayfarerConfigs.Generic.
+        // getStringValue() returns "#AARRGGBB" (8 hex digits including alpha).
         return switch (classification) {
-            case 'G' -> gColor;
-            case 'S' -> sColor;
-            case 'X' -> xColor;
-            case 'Y' -> yColor;
-            case 'C' -> cColor;
-            default -> "FFFFFF";
+            case 'G' -> WayfarerConfigs.Generic.G_COLOR.getStringValue();
+            case 'S' -> WayfarerConfigs.Generic.S_COLOR.getStringValue();
+            case 'X' -> WayfarerConfigs.Generic.X_COLOR.getStringValue();
+            case 'Y' -> WayfarerConfigs.Generic.Y_COLOR.getStringValue();
+            case 'C' -> WayfarerConfigs.Generic.C_COLOR.getStringValue();
+            default -> "#FFFFFFFF";
         };
     }
 

@@ -22,10 +22,12 @@ import com.ecjkim.wayfarer.client.config.WayfarerConfigs;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
+import com.google.gson.JsonPrimitive;
 
 import fi.dy.masa.malilib.config.ConfigManager;
 import fi.dy.masa.malilib.config.IConfigBase;
 import fi.dy.masa.malilib.config.IConfigHandler;
+import fi.dy.masa.malilib.config.options.ConfigColor;
 import fi.dy.masa.malilib.interfaces.IInitializationHandler;
 import fi.dy.masa.malilib.util.FileUtils;
 
@@ -54,7 +56,16 @@ public class WayfarerInitHandler implements IInitializationHandler {
                 JsonObject root = element.getAsJsonObject();
                 for (IConfigBase cfg : WayfarerConfigs.getAllConfigs()) {
                     if (root.has(cfg.getName())) {
-                        cfg.setValueFromJsonElement(root.get(cfg.getName()));
+                        JsonElement el = root.get(cfg.getName());
+                        // Migrate legacy ConfigString color values (6-digit hex without '#' prefix, e.g. "FFC000")
+                        // to the ConfigColor "#AARRGGBB" format so existing configs keep their colors.
+                        if (cfg instanceof ConfigColor && el.isJsonPrimitive()) {
+                            String s = el.getAsString();
+                            if (!s.startsWith("#") && !s.startsWith("0x") && s.matches("[0-9a-fA-F]{6}")) {
+                                el = new JsonPrimitive("#" + s + "FF");
+                            }
+                        }
+                        cfg.setValueFromJsonElement(el);
                     }
                 }
             } catch (Exception e) {

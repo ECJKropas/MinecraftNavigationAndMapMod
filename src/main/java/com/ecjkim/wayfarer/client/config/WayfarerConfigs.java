@@ -22,6 +22,7 @@ import com.google.common.collect.ImmutableList;
 
 import fi.dy.masa.malilib.config.IConfigBase;
 import fi.dy.masa.malilib.config.options.ConfigBoolean;
+import fi.dy.masa.malilib.config.options.ConfigColor;
 import fi.dy.masa.malilib.config.options.ConfigDouble;
 import fi.dy.masa.malilib.config.options.ConfigInteger;
 import fi.dy.masa.malilib.config.options.ConfigOptionList;
@@ -70,16 +71,16 @@ public class WayfarerConfigs {
         public static final ConfigBoolean SHOW_KEY_HINTS =
             new ConfigBoolean("showKeyHints", true, "切换到 Survey 工具物品时显示按键提示（action bar）");
 
-        // Classification colors (hex RGB without alpha prefix, e.g. "FFC000")
-        public static final ConfigString G_COLOR = new ConfigString("gColor", "FFC000", "国道颜色（十六进制，不含透明度前缀）");
+        // Classification colors (ConfigColor, "#AARRGGBB" format with alpha channel)
+        public static final ConfigColor G_COLOR = new ConfigColor("gColor", "#FFC000FF", "国道颜色");
         public static final ConfigDouble G_WIDTH = new ConfigDouble("gWidth", 6.0, 1.0, 20.0, "国道线宽");
-        public static final ConfigString S_COLOR = new ConfigString("sColor", "FFD700", "省道颜色（十六进制，不含透明度前缀）");
+        public static final ConfigColor S_COLOR = new ConfigColor("sColor", "#FFD700FF", "省道颜色");
         public static final ConfigDouble S_WIDTH = new ConfigDouble("sWidth", 4.5, 1.0, 20.0, "省道线宽");
-        public static final ConfigString X_COLOR = new ConfigString("xColor", "FFFFFF", "乡道颜色（十六进制，不含透明度前缀）");
+        public static final ConfigColor X_COLOR = new ConfigColor("xColor", "#FFFFFFFF", "乡道颜色");
         public static final ConfigDouble X_WIDTH = new ConfigDouble("xWidth", 3.5, 1.0, 20.0, "乡道线宽");
-        public static final ConfigString Y_COLOR = new ConfigString("yColor", "FFFFFF", "县道颜色（十六进制，不含透明度前缀）");
+        public static final ConfigColor Y_COLOR = new ConfigColor("yColor", "#FFFFFFFF", "县道颜色");
         public static final ConfigDouble Y_WIDTH = new ConfigDouble("yWidth", 3.0, 1.0, 20.0, "县道线宽");
-        public static final ConfigString C_COLOR = new ConfigString("cColor", "888888", "村道颜色（十六进制，不含透明度前缀）");
+        public static final ConfigColor C_COLOR = new ConfigColor("cColor", "#888888FF", "村道颜色");
         public static final ConfigDouble C_WIDTH = new ConfigDouble("cWidth", 3.0, 1.0, 20.0, "村道线宽");
 
         public static final ImmutableList<IConfigBase> OPTIONS = ImmutableList.of(DEFAULT_CLASSIFICATION, AUTO_INTEGRAL,

@@ -263,13 +263,28 @@ public class WayfarerHttpServer implements Runnable {
         for (String cls : new String[] {"G", "S", "X", "Y", "C"}) {
             char c = cls.charAt(0);
             JsonObject style = new JsonObject();
-            style.addProperty("color", cfg.getClassificationColor(c));
+            style.addProperty("color", toRgbHex(cfg.getClassificationColor(c)));
             style.addProperty("width", cfg.getClassificationWidth(c));
             styles.add(cls, style);
         }
         config.add("classificationStyles", styles);
 
         sendJson(req.exchange, 200, config);
+    }
+
+    /**
+     * Converts a ConfigColor string ("#AARRGGBB") to a 6-digit RGB hex string (no '#' prefix) for the web frontend. The
+     * alpha channel is dropped to keep the output compatible with the existing frontend color handling.
+     */
+    private static String toRgbHex(String argbHex) {
+        if (argbHex == null) {
+            return "FFFFFF";
+        }
+        String hex = argbHex.startsWith("#") ? argbHex.substring(1) : argbHex;
+        if (hex.length() == 8) {
+            hex = hex.substring(2); // AARRGGBB -> RRGGBB
+        }
+        return hex;
     }
 
     private void handleGetRoads(Request req) {
