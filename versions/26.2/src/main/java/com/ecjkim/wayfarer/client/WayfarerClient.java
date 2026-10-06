@@ -26,11 +26,13 @@ import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientTickEvents;
 
 import com.ecjkim.wayfarer.client.render.NodeIndicatorRenderer;
 import com.ecjkim.wayfarer.client.render.SurveyHud;
+import com.ecjkim.wayfarer.client.render.NavHudRenderer;
 import com.ecjkim.wayfarer.client.road.RoadMetadataScreen;
 import com.ecjkim.wayfarer.client.road.RoadRecordingManager;
 import com.ecjkim.wayfarer.client.road.XaeroMapOverlay;
 import com.ecjkim.wayfarer.client.road.data.RoadNetworkDatabase;
 import com.ecjkim.wayfarer.client.road.model.Segment;
+import com.ecjkim.wayfarer.client.road.nav.NavigationSession;
 import com.ecjkim.wayfarer.client.road.record.SurveySession;
 import com.ecjkim.wayfarer.client.road.server.WayfarerHttpServer;
 
@@ -44,6 +46,7 @@ public class WayfarerClient implements ClientModInitializer {
     private static final SurveySession SURVEY_SESSION = new SurveySession();
     private static volatile WayfarerHttpServer httpServer;
     private static volatile Thread httpThread;
+    private static final NavigationSession NAVIGATION_SESSION = new NavigationSession(RoadNetworkDatabase.getInstance());
 
     private final IntSet keysDownLastTick = new IntOpenHashSet();
     private boolean hadToolLastTick = false;
@@ -54,6 +57,8 @@ public class WayfarerClient implements ClientModInitializer {
         return SURVEY_SESSION;
     }
 
+    public static NavigationSession getNavigationSession() { return NAVIGATION_SESSION; }
+
     @Override
     public void onInitializeClient() {
         startHttpServer();
@@ -61,6 +66,7 @@ public class WayfarerClient implements ClientModInitializer {
         XaeroMapOverlay.register();
         NodeIndicatorRenderer.register();
         SurveyHud.register();
+        NavHudRenderer.register();
         ClientLifecycleEvents.CLIENT_STOPPING.register(client -> {
             stopHttpServer();
             RoadNetworkDatabase.getInstance().saveToDisk();
@@ -109,6 +115,7 @@ public class WayfarerClient implements ClientModInitializer {
     }
 
     private void handleClientTick(Minecraft client) {
+        if (client.player != null) NAVIGATION_SESSION.updatePlayer(client.player.getX(), client.player.getZ());
         // Detect world join to switch storage to the per-world file
         if (client.level != null && !worldInitialized) {
             initForWorld(client);

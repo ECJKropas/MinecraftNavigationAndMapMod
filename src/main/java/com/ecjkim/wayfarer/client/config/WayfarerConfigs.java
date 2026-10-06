@@ -32,6 +32,19 @@ public class WayfarerConfigs {
     public static final int CURRENT_VERSION = 1;
 
     public static class Generic {
+        public static final ConfigDouble NAV_SNAP_RADIUS = new ConfigDouble("navSnapRadius", 32.0, 1.0, 256.0,
+            "导航起点和终点的道路节点吸附半径");
+        public static final ConfigDouble NAV_REROUTE_THRESHOLD = new ConfigDouble("navRerouteThreshold", 8.0, 1.0,
+            128.0, "偏离路线后自动重新规划的距离");
+        public static final ConfigDouble NAV_ARRIVAL_RADIUS = new ConfigDouble("navArrivalRadius", 5.0, 1.0, 64.0,
+            "进入终点后的到达判定半径");
+        public static final ConfigDouble NAV_DISTANCE_GATE = new ConfigDouble("navDistanceGate", 200.0, 0.0, 10000.0,
+            "启用道路等级偏好的直线距离阈值");
+        public static final ConfigDouble NAV_SPEED_G = new ConfigDouble("navSpeedG", 5.5, 0.1, 100.0, "国道导航速度");
+        public static final ConfigDouble NAV_SPEED_S = new ConfigDouble("navSpeedS", 5.0, 0.1, 100.0, "省道导航速度");
+        public static final ConfigDouble NAV_SPEED_Y = new ConfigDouble("navSpeedY", 4.5, 0.1, 100.0, "县道导航速度");
+        public static final ConfigDouble NAV_SPEED_X = new ConfigDouble("navSpeedX", 4.0, 0.1, 100.0, "乡道导航速度");
+        public static final ConfigDouble NAV_SPEED_C = new ConfigDouble("navSpeedC", 3.5, 0.1, 100.0, "村道导航速度");
         public static final ConfigOptionList DEFAULT_CLASSIFICATION =
             new ConfigOptionList("defaultClassification", ClassificationEntry.NONE, "新建道路时默认使用的分级代码");
 
@@ -83,7 +96,9 @@ public class WayfarerConfigs {
         public static final ConfigColor C_COLOR = new ConfigColor("cColor", "#888888FF", "村道颜色");
         public static final ConfigDouble C_WIDTH = new ConfigDouble("cWidth", 3.0, 1.0, 20.0, "村道线宽");
 
-        public static final ImmutableList<IConfigBase> OPTIONS = ImmutableList.of(DEFAULT_CLASSIFICATION, AUTO_INTEGRAL,
+        public static final ImmutableList<IConfigBase> OPTIONS = ImmutableList.of(NAV_SNAP_RADIUS, NAV_REROUTE_THRESHOLD,
+            NAV_ARRIVAL_RADIUS, NAV_DISTANCE_GATE, NAV_SPEED_G, NAV_SPEED_S, NAV_SPEED_Y, NAV_SPEED_X, NAV_SPEED_C,
+            DEFAULT_CLASSIFICATION, AUTO_INTEGRAL,
             AUTO_SNAP_ENDPOINTS, RDP_EPSILON, AUTO_DELETE_ORPHAN_NODES, WEB_MAX_ZOOM, AUTO_GRAPHIFY, TOOL_ITEM,
             TOOL_ITEM_ENABLED, NODE_INDICATOR_ENABLED, NODE_INDICATOR_BEAM_HEIGHT, NODE_INDICATOR_BEAM_ALPHA,
             SHOW_KEY_HINTS, G_COLOR, G_WIDTH, S_COLOR, S_WIDTH, X_COLOR, X_WIDTH, Y_COLOR, Y_WIDTH, C_COLOR, C_WIDTH);

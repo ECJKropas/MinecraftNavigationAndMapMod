@@ -28,12 +28,14 @@ import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientTickEvents;
 
 import com.ecjkim.wayfarer.client.render.NodeIndicatorRenderer;
 import com.ecjkim.wayfarer.client.render.SurveyHud;
+import com.ecjkim.wayfarer.client.render.NavHudRenderer;
 import com.ecjkim.wayfarer.client.render.SurveyRenderer;
 import com.ecjkim.wayfarer.client.road.RoadMetadataScreen;
 import com.ecjkim.wayfarer.client.road.RoadRecordingManager;
 import com.ecjkim.wayfarer.client.road.XaeroMapOverlay;
 import com.ecjkim.wayfarer.client.road.data.RoadNetworkDatabase;
 import com.ecjkim.wayfarer.client.road.model.Segment;
+import com.ecjkim.wayfarer.client.road.nav.NavigationSession;
 import com.ecjkim.wayfarer.client.road.record.SurveySession;
 import com.ecjkim.wayfarer.client.road.server.WayfarerHttpServer;
 
@@ -48,6 +50,8 @@ public class WayfarerClient implements ClientModInitializer {
     private static final SurveySession SURVEY_SESSION = new SurveySession();
     private static volatile WayfarerHttpServer httpServer;
     private static volatile Thread httpThread;
+    private static final NavigationSession NAVIGATION_SESSION =
+        new NavigationSession(RoadNetworkDatabase.getInstance());
 
     private final IntSet keysDownLastTick = new IntOpenHashSet();
     private boolean hadToolLastTick = false;
@@ -57,6 +61,8 @@ public class WayfarerClient implements ClientModInitializer {
     public static SurveySession getSurveySession() {
         return SURVEY_SESSION;
     }
+
+    public static NavigationSession getNavigationSession() { return NAVIGATION_SESSION; }
 
     @Override
     public void onInitializeClient() {
@@ -68,6 +74,7 @@ public class WayfarerClient implements ClientModInitializer {
         NodeIndicatorRenderer.register();
         SurveyRenderer.register();
         SurveyHud.register();
+        NavHudRenderer.register();
         ClientLifecycleEvents.CLIENT_STOPPING.register(client -> {
             stopHttpServer();
             RoadNetworkDatabase.getInstance().saveToDisk();
@@ -126,6 +133,9 @@ public class WayfarerClient implements ClientModInitializer {
     }
 
     private void handleClientTick(Minecraft client) {
+        if (client.player != null) {
+            NAVIGATION_SESSION.updatePlayer(client.player.getX(), client.player.getZ());
+        }
         // Detect world join to switch storage to the per-world file
         if (client.level != null && !worldInitialized) {
             initForWorld(client);
@@ -147,7 +157,7 @@ public class WayfarerClient implements ClientModInitializer {
         if (wasInGuiLastTick) {
             keysDownLastTick.clear();
             WayfarerConfig cfg = WayfarerConfig.getInstance();
-            for (String action : List.of("toggle_recording", "open_menu", "set_held_item_as_tool")) {
+            for (String action : List.of("toggle_recording", "open_menu", "set_held_item_as_tool", "navigation")) {
                 for (WayfarerConfig.HotkeyBind bind : cfg.getHotkeysForAction(action)) {
                     int id = bind.key * 10000 + Math.max(0, bind.modifierKey);
                     if (GLFW.glfwGetKey(window, bind.key) == GLFW.GLFW_PRESS)
@@ -175,6 +185,14 @@ public class WayfarerClient implements ClientModInitializer {
         for (WayfarerConfig.HotkeyBind bind : config.getHotkeysForAction("set_held_item_as_tool")) {
             if (consumeHotkey(window, bind)) {
                 handleSetHeldItemAsTool(client);
+                break;
+            }
+        }
+
+        for (WayfarerConfig.HotkeyBind bind : config.getHotkeysForAction("navigation")) {
+            if (consumeHotkey(window, bind)) {
+                NAVIGATION_SESSION.stop();
+                if (client.player != null) client.player.displayClientMessage(Component.literal("导航已取消"), false);
                 break;
             }
         }

@@ -80,6 +80,22 @@ public class WayfarerConfig {
         return WayfarerConfigs.Generic.SHOW_KEY_HINTS.getBooleanValue();
     }
 
+    public double getNavSnapRadius() { return WayfarerConfigs.Generic.NAV_SNAP_RADIUS.getDoubleValue(); }
+    public double getNavRerouteThreshold() { return WayfarerConfigs.Generic.NAV_REROUTE_THRESHOLD.getDoubleValue(); }
+    public double getNavArrivalRadius() { return WayfarerConfigs.Generic.NAV_ARRIVAL_RADIUS.getDoubleValue(); }
+    public double getNavDistanceGate() { return WayfarerConfigs.Generic.NAV_DISTANCE_GATE.getDoubleValue(); }
+
+    public double getNavigationSpeed(char classification) {
+        switch (classification) {
+            case 'G': return WayfarerConfigs.Generic.NAV_SPEED_G.getDoubleValue();
+            case 'S': return WayfarerConfigs.Generic.NAV_SPEED_S.getDoubleValue();
+            case 'Y': return WayfarerConfigs.Generic.NAV_SPEED_Y.getDoubleValue();
+            case 'X': return WayfarerConfigs.Generic.NAV_SPEED_X.getDoubleValue();
+            case 'C': return WayfarerConfigs.Generic.NAV_SPEED_C.getDoubleValue();
+            default: return 4.3D;
+        }
+    }
+
     public String getClassificationColor(char classification) {
         switch (classification) {
             case 'G':
@@ -138,6 +154,9 @@ public class WayfarerConfig {
         }
         if ("set_held_item_as_tool".equals(action)) {
             return List.of(new HotkeyBind(WayfarerHotkeys.SET_HELD_ITEM_AS_TOOL));
+        }
+        if ("navigation".equals(action)) {
+            return List.of(new HotkeyBind(WayfarerHotkeys.NAVIGATION));
         }
         return List.of();
     }

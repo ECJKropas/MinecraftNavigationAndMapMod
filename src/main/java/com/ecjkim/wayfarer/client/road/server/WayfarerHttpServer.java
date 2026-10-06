@@ -34,12 +34,15 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 import com.ecjkim.wayfarer.client.WayfarerConfig;
+import com.ecjkim.wayfarer.client.WayfarerClient;
 import com.ecjkim.wayfarer.client.config.WayfarerConfigs;
 import com.ecjkim.wayfarer.client.road.data.RoadNetworkDatabase;
 import com.ecjkim.wayfarer.client.road.model.Direction;
 import com.ecjkim.wayfarer.client.road.model.Node;
 import com.ecjkim.wayfarer.client.road.model.Road;
 import com.ecjkim.wayfarer.client.road.model.Segment;
+import com.ecjkim.wayfarer.client.road.nav.NavigationSession;
+import com.ecjkim.wayfarer.client.road.nav.Route;
 import com.ecjkim.wayfarer.client.road.model.Source;
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
@@ -81,6 +84,9 @@ public class WayfarerHttpServer implements Runnable {
     private void registerRoutes() {
         routes.add(new Route("GET", "/", this::serveIndexHtml));
         routes.add(new Route("GET", "/api/config", this::handleGetConfig));
+        routes.add(new Route("GET", "/api/nav/state", this::handleGetNavigationState));
+        routes.add(new Route("POST", "/api/nav/start", this::handleStartNavigation));
+        routes.add(new Route("POST", "/api/nav/stop", this::handleStopNavigation));
         routes.add(new Route("GET", Pattern.compile("/static/(.+)"), this::serveStaticFile));
         routes.add(new Route("GET", "/api/roads", this::handleGetRoads));
         routes.add(new Route("GET", Pattern.compile("/api/roads/delta(?:\\?.*)?"), this::handleGetDelta));
@@ -253,6 +259,64 @@ public class WayfarerHttpServer implements Runnable {
     }
 
     // -------- API handlers --------
+
+    private NavigationSession navigation() { return WayfarerClient.getNavigationSession(); }
+
+    private void handleStartNavigation(Request req) {
+        if (req.body == null) {
+            sendJson(req.exchange, 400, errorJson("Missing request body"));
+            return;
+        }
+        try {
+            JsonObject body = JsonParser.parseString(req.body).getAsJsonObject();
+            if (!body.has("x") || !body.has("z")) throw new IllegalArgumentException("Missing x or z");
+            NavigationSession.Result result = navigation().start(body.get("x").getAsDouble(), body.get("z").getAsDouble());
+            sendJson(req.exchange, result.success() ? 200 : 422, navigationJson(result.snapshot(), result.error()));
+        } catch (RuntimeException e) {
+            sendJson(req.exchange, 400, errorJson("Invalid navigation request: " + e.getMessage()));
+        }
+    }
+
+    private void handleGetNavigationState(Request req) {
+        sendJson(req.exchange, 200, navigationJson(navigation().snapshot(), null));
+    }
+
+    private void handleStopNavigation(Request req) {
+        navigation().stop();
+        sendJson(req.exchange, 200, navigationJson(navigation().snapshot(), null));
+    }
+
+    private JsonObject navigationJson(NavigationSession.Snapshot snapshot, String error) {
+        JsonObject result = new JsonObject();
+        result.addProperty("ok", error == null);
+        result.addProperty("state", snapshot.state().name());
+        result.addProperty("playerX", snapshot.playerX());
+        result.addProperty("playerZ", snapshot.playerZ());
+        result.addProperty("remainingDistance", snapshot.remainingDistance());
+        if (error != null) result.addProperty("error", error);
+        if (snapshot.destination() != null) {
+            JsonObject destination = new JsonObject();
+            destination.addProperty("x", snapshot.destination().getX());
+            destination.addProperty("z", snapshot.destination().getZ());
+            result.add("destination", destination);
+        }
+        com.ecjkim.wayfarer.client.road.nav.Route route = snapshot.route();
+        if (route != null) {
+            result.addProperty("etaSeconds", route.getEtaSeconds());
+            JsonArray coordinates = new JsonArray();
+            JsonArray nodes = new JsonArray();
+            for (Node node : route.getNodes()) {
+                JsonArray coordinate = new JsonArray();
+                coordinate.add(node.getX());
+                coordinate.add(node.getZ());
+                coordinates.add(coordinate);
+                nodes.add(GSON.toJsonTree(node));
+            }
+            result.add("coordinates", coordinates);
+            result.add("nodes", nodes);
+        }
+        return result;
+    }
 
     private void handleGetConfig(Request req) {
         JsonObject config = new JsonObject();

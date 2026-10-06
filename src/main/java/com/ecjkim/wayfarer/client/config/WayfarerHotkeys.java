@@ -27,7 +27,8 @@ public class WayfarerHotkeys {
     public static final ConfigHotkey OPEN_MENU = new ConfigHotkey("openMenu", "N", "打开导航菜单");
     public static final ConfigHotkey SET_HELD_ITEM_AS_TOOL =
         new ConfigHotkey("setHeldItemAsTool", "LEFT_CONTROL,LEFT_ALT,T", "将当前手持物品设为 Survey 工具");
+    public static final ConfigHotkey NAVIGATION = new ConfigHotkey("navigation", "G", "停止当前导航");
 
     public static final List<ConfigHotkey> HOTKEY_LIST =
-        ImmutableList.of(TOGGLE_RECORDING, OPEN_MENU, SET_HELD_ITEM_AS_TOOL);
+        ImmutableList.of(TOGGLE_RECORDING, OPEN_MENU, SET_HELD_ITEM_AS_TOOL, NAVIGATION);
 }

@@ -5,6 +5,8 @@ const SCALE = 128.0;
 let map, selectedSegments = new Set(), selectedNodeId = null, selectedSegmentId = null;
 let roadStore = { nodes:{}, segments:{}, roads:{} };
 let activeTool = null;          // 'move' | 'point' | 'merge' | 'fenhe' | 'softdelete' | null
+let navigationPickMode = false;
+let navigationLayer = null;
 let toolbarMode = 'compact';   // 'compact' | 'detailed'
 let mergeFirstNodeId = null;   // first node selected in merge tool
 const TOOL_TOLERANCE_PX = 12;  // pixel tolerance for point tool segment detection
@@ -331,6 +333,7 @@ async function initMap() {
   await loadConfig();
   await loadData();
   setInterval(loadDelta, 1000);
+  setInterval(refreshNavigation, 1000);
 
   // Global drag handlers (document-level to catch mouse outside map)
   document.addEventListener('mousemove', onGlobalMouseMove);
@@ -903,11 +906,40 @@ function renderAll() {
 
 // ——— Interactions ———
 function onMapClick(e) {
+  if (navigationPickMode) {
+    navigationPickMode = false;
+    startNavigation(e.latlng.lng * SCALE, e.latlng.lat * SCALE);
+    return;
+  }
   if (activeTool === 'point') {
     handlePointTool(e.latlng);
     return;
   }
   clearSelection();
+}
+
+async function startNavigation(x, z) {
+  try {
+    const res = await fetch('/api/nav/start', {method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({x, z})});
+    const data = await res.json();
+    if (!res.ok || !data.ok) { showToast('导航失败: ' + (data.error || '无可达路线'), 'error'); return; }
+    renderNavigation(data);
+  } catch (e) { showToast('导航请求失败: ' + e.message, 'error'); }
+}
+
+function renderNavigation(data) {
+  if (navigationLayer) map.removeLayer(navigationLayer);
+  if (data.coordinates && data.coordinates.length > 1) {
+    navigationLayer = L.polyline(data.coordinates.map(c => mc2latlng(c[0], c[1])), {color: '#007AFF', weight: 5, opacity: 0.85}).addTo(map);
+  }
+}
+
+async function refreshNavigation() {
+  try {
+    const data = await (await fetch('/api/nav/state')).json();
+    if (data.state === 'ACTIVE' && data.coordinates) renderNavigation(data);
+    if (data.state === 'IDLE' && navigationLayer) { map.removeLayer(navigationLayer); navigationLayer = null; }
+  } catch (e) { /* server may be restarting */ }
 }
 
 function onNodeClick(nid, event) {
@@ -1138,6 +1170,19 @@ function initToolbar() {
   document.getElementById('tool-merge').addEventListener('click', () => toggleTool('merge'));
   document.getElementById('tool-fenhe').addEventListener('click', () => toggleTool('fenhe'));
   document.getElementById('tool-softdelete').addEventListener('click', () => toggleTool('softdelete'));
+  document.getElementById('tool-navigation').addEventListener('click', () => {
+    const typed = prompt('输入目的地 X,Z，留空后在地图上点选：');
+    if (typed && typed.includes(',')) {
+      const parts = typed.split(',').map(Number);
+      if (parts.length === 2 && parts.every(Number.isFinite)) { startNavigation(parts[0], parts[1]); return; }
+    }
+    navigationPickMode = true;
+    showToast('请在地图上点击目的地');
+  });
+  document.getElementById('tool-navigation-stop').addEventListener('click', async () => {
+    await fetch('/api/nav/stop', {method: 'POST'});
+    if (navigationLayer) { map.removeLayer(navigationLayer); navigationLayer = null; }
+  });
   document.getElementById('tool-undo').addEventListener('click', undo);
   document.getElementById('tool-redo').addEventListener('click', redo);
   document.getElementById('tool-mode-toggle').addEventListener('click', toggleToolbarMode);

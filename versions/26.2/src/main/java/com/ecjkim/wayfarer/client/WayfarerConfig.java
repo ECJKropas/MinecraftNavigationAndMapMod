@@ -51,6 +51,15 @@ public class WayfarerConfig {
     public Map<String, List<HotkeyBind>> hotkeys = defaultHotkeys();
     public String toolItem = "minecraft:wheat_seeds";
     public boolean toolItemEnabled = true;
+    public double navSnapRadius = 32.0;
+    public double navRerouteThreshold = 8.0;
+    public double navArrivalRadius = 5.0;
+    public double navDistanceGate = 200.0;
+    public double navSpeedG = 5.5;
+    public double navSpeedS = 5.0;
+    public double navSpeedY = 4.5;
+    public double navSpeedX = 4.0;
+    public double navSpeedC = 3.5;
 
     public double gWidth = 6.0;
     public double sWidth = 4.5;
@@ -76,6 +85,21 @@ public class WayfarerConfig {
 
     public double getRdpEpsilon() {
         return rdpEpsilon;
+    }
+
+    public double getNavSnapRadius() { return navSnapRadius; }
+    public double getNavRerouteThreshold() { return navRerouteThreshold; }
+    public double getNavArrivalRadius() { return navArrivalRadius; }
+    public double getNavDistanceGate() { return navDistanceGate; }
+    public double getNavigationSpeed(char classification) {
+        return switch (classification) {
+            case 'G' -> navSpeedG;
+            case 'S' -> navSpeedS;
+            case 'Y' -> navSpeedY;
+            case 'X' -> navSpeedX;
+            case 'C' -> navSpeedC;
+            default -> 4.3D;
+        };
     }
 
     public boolean isAutoDeleteOrphanNodes() {
