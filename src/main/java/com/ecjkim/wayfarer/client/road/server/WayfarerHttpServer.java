@@ -446,6 +446,7 @@ public class WayfarerHttpServer implements Runnable {
         result.addProperty("offRoute", snapshot.offRoute());
         result.addProperty("headingTurn", snapshot.headingTurn().name());
         result.addProperty("currentRoadDistance", snapshot.currentRoadDistance());
+        result.addProperty("destinationSide", snapshot.destinationSide().name());
         if (snapshot.nextTurn() != null) {
             JsonObject nextTurn = new JsonObject();
             nextTurn.addProperty("type", snapshot.nextTurn().type().name());

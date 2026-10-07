@@ -52,6 +52,7 @@ public final class NavigationSession {
     private double playerZ;
     private float playerYaw;
     private boolean playerKnown;
+    private Guidance.Turn destinationSide = Guidance.Turn.STRAIGHT;
     private Guidance.RerouteState rerouteState = Guidance.RerouteState.INITIAL;
     private String error;
     private long arrivedAt;
@@ -80,6 +81,7 @@ public final class NavigationSession {
         // destination is taken from the route's real endpoint instead. Arrival and rerouting both target that node.
         destination = Guidance.destination(route);
         rerouteState = Guidance.RerouteState.INITIAL;
+        destinationSide = Guidance.Turn.STRAIGHT;
         error = null;
         state = State.ACTIVE;
         return new Result(true, null, snapshot());
@@ -104,6 +106,8 @@ public final class NavigationSession {
         if (reading.arrived()) {
             state = State.ARRIVED;
             arrivedAt = System.currentTimeMillis();
+            destinationSide = destination == null ? Guidance.Turn.STRAIGHT
+                : Guidance.relativeDirection(playerX, playerZ, destination.getX(), destination.getZ(), playerYaw);
             rerouteState = Guidance.RerouteState.INITIAL;
             return;
         }
@@ -132,6 +136,7 @@ public final class NavigationSession {
             route = result.route();
             destination = Guidance.destination(route);
             rerouteState = Guidance.RerouteState.INITIAL;
+            destinationSide = Guidance.Turn.STRAIGHT;
             error = null;
         }
     }
@@ -141,17 +146,19 @@ public final class NavigationSession {
         route = null;
         destination = null;
         rerouteState = Guidance.RerouteState.INITIAL;
+        destinationSide = Guidance.Turn.STRAIGHT;
         error = null;
     }
 
     public synchronized Snapshot snapshot() {
         Guidance.Reading reading = route == null ? null : Guidance.read(route, playerX, playerZ, playerYaw, thresholds);
+        double distanceToJunction = reading == null ? 0D
+            : reading.nextTurn() == null ? reading.remainingDistance() : reading.nextTurn().distance();
         return new Snapshot(state, route, playerX, playerZ, playerKnown, destination,
             reading == null ? 0D : reading.remainingDistance(), reading == null ? 0D : reading.remainingTime(),
             reading == null ? null : reading.nextTurn(),
-            reading == null ? Guidance.Turn.STRAIGHT : reading.heading().turn(),
-            reading == null ? 0D : reading.heading().roadDistance(), playerYaw, reading != null && reading.offRoute(),
-            error);
+            reading == null ? Guidance.Turn.STRAIGHT : reading.heading().turn(), distanceToJunction, playerYaw,
+            destinationSide, reading != null && reading.offRoute(), error);
     }
 
     private Result fail(String message) {
@@ -159,6 +166,7 @@ public final class NavigationSession {
         route = null;
         destination = null;
         rerouteState = Guidance.RerouteState.INITIAL;
+        destinationSide = Guidance.Turn.STRAIGHT;
         error = message;
         return new Result(false, message, snapshot());
     }
@@ -172,6 +180,7 @@ public final class NavigationSession {
 
     public record Snapshot(State state, Route route, double playerX, double playerZ, boolean playerKnown,
         Node destination, double remainingDistance, double remainingTime, Guidance.NextTurn nextTurn,
-        Guidance.Turn headingTurn, double currentRoadDistance, float playerYaw, boolean offRoute, String error) {
+        Guidance.Turn headingTurn, double currentRoadDistance, float playerYaw, Guidance.Turn destinationSide,
+        boolean offRoute, String error) {
     }
 }

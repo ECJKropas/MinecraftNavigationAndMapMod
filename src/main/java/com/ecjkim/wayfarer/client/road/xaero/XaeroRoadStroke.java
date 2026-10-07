@@ -67,8 +67,8 @@ public final class XaeroRoadStroke {
         draw(pose, element, scale, poseX, poseY, 1.0f, element.color());
     }
 
-    public void draw(PoseStack pose, XaeroPolyline element, double scale, double poseX, double poseY,
-        float widthScale, int colorOverride) {
+    public void draw(PoseStack pose, XaeroPolyline element, double scale, double poseX, double poseY, float widthScale,
+        int colorOverride) {
         if (!isUsable(scale) || !isUsable(poseX) || !isUsable(poseY) || element.vertexCount() < 2) {
             return;
         }
@@ -78,8 +78,8 @@ public final class XaeroRoadStroke {
         // A road's width is a property of the road on the ground, so it tracks the zoom down to a floor: below that it
         // would vanish, and a map that stops showing roads at some zoom is a map with a hole in it.
         double pixelsPerBlock = Math.sqrt(Math.abs(pixelsPerBlockX * pixelsPerBlockZ));
-        double halfWidth = Math.max(XaeroRoadStyle.MIN_HALF_WIDTH_PX,
-            element.widthBlocks() * widthScale * pixelsPerBlock / 2.0);
+        double halfWidth =
+            Math.max(XaeroRoadStyle.MIN_HALF_WIDTH_PX, element.widthBlocks() * widthScale * pixelsPerBlock / 2.0);
 
         double anchorX = element.anchorX();
         double anchorZ = element.anchorZ();

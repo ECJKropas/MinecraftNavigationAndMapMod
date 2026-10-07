@@ -6,10 +6,14 @@ wayfarer:
   open_road_list: 打开路线列表（N）
   nav:
     arrived: 已到达目的地
+    destination_left: 目的地在左侧
+    destination_right: 目的地在右侧
+    destination_ahead: 目的地在前方
+    destination_behind: 目的地在身后
     cancelled: 导航已取消
     continue_road: 沿当前道路前行 %.0f 格
     turn_in: "（%.0f 格后）"
-    hud: "%s  |  剩余 %.1f 格  ETA %.0f 秒"
+    hud: "%s  |  剩余 %.0f 格  ETA %.0f 秒"
     turn:
       left: 左转
       right: 右转

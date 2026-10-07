@@ -151,12 +151,18 @@ public class WayfarerConfig {
         if (classification == null || classification.isEmpty())
             return WayfarerConfigs.Generic.XAERO_SHOW_UNCLASSIFIED.getBooleanValue();
         switch (classification.charAt(0)) {
-            case 'G': return WayfarerConfigs.Generic.XAERO_SHOW_G.getBooleanValue();
-            case 'S': return WayfarerConfigs.Generic.XAERO_SHOW_S.getBooleanValue();
-            case 'X': return WayfarerConfigs.Generic.XAERO_SHOW_X.getBooleanValue();
-            case 'Y': return WayfarerConfigs.Generic.XAERO_SHOW_Y.getBooleanValue();
-            case 'C': return WayfarerConfigs.Generic.XAERO_SHOW_C.getBooleanValue();
-            default: return WayfarerConfigs.Generic.XAERO_SHOW_UNCLASSIFIED.getBooleanValue();
+            case 'G':
+                return WayfarerConfigs.Generic.XAERO_SHOW_G.getBooleanValue();
+            case 'S':
+                return WayfarerConfigs.Generic.XAERO_SHOW_S.getBooleanValue();
+            case 'X':
+                return WayfarerConfigs.Generic.XAERO_SHOW_X.getBooleanValue();
+            case 'Y':
+                return WayfarerConfigs.Generic.XAERO_SHOW_Y.getBooleanValue();
+            case 'C':
+                return WayfarerConfigs.Generic.XAERO_SHOW_C.getBooleanValue();
+            default:
+                return WayfarerConfigs.Generic.XAERO_SHOW_UNCLASSIFIED.getBooleanValue();
         }
     }
 

@@ -72,8 +72,10 @@ public final class LocationSnapper {
         SegmentEndpoints endpoints = nearestSegmentEndpoints(database, x, z, radius);
         if (endpoints != null) {
             List<Node> fallback = new ArrayList<>(2);
-            if (endpoints.a() != null) fallback.add(endpoints.a());
-            if (endpoints.b() != null) fallback.add(endpoints.b());
+            if (endpoints.a() != null)
+                fallback.add(endpoints.a());
+            if (endpoints.b() != null)
+                fallback.add(endpoints.b());
             fallback.sort(Comparator.comparing(n -> n.getId() == null ? "" : n.getId().toString()));
             return fallback;
         }

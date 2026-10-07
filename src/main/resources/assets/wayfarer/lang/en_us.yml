@@ -6,10 +6,14 @@ wayfarer:
   open_road_list: Open road list (N)
   nav:
     arrived: Arrived at destination
+    destination_left: Destination is on the left
+    destination_right: Destination is on the right
+    destination_ahead: Destination is ahead
+    destination_behind: Destination is behind
     cancelled: Navigation cancelled
     continue_road: Continue on the current road for %.0f blocks
     turn_in: " (in %.0f blocks)"
-    hud: "%s  |  %.1f blocks left  ETA %.0f s"
+    hud: "%s  |  %.0f blocks left  ETA %.0f s"
     turn:
       left: Turn left
       right: Turn right

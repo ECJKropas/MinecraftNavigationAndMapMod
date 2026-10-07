@@ -155,14 +155,15 @@ public final class XaeroRoadProvider extends ElementRenderProvider<XaeroRoadElem
         if (segment == null || !seen.add(segment.getId())) {
             return;
         }
-        if (!XaeroRoadStyle.isVisible(classification)) return;
+        if (!XaeroRoadStyle.isVisible(classification))
+            return;
         String roadName = null;
         if (segment.getRoadId() != null) {
             Road road = database.getRoad(segment.getRoadId());
             roadName = road == null ? null : road.getName();
         }
-        XaeroRoadElement element = XaeroRoadElement.of(segment, database.getNodesForSegment(segment.getId()),
-            classification, roadName);
+        XaeroRoadElement element =
+            XaeroRoadElement.of(segment, database.getNodesForSegment(segment.getId()), classification, roadName);
         if (element != null) {
             all.add(element);
         }

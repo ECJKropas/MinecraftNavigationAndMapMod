@@ -408,19 +408,15 @@ function renderCoordinateGrid() {
   const maxZ = Math.ceil((-bounds.getSouth() * SCALE) / spacing) * spacing;
   const lineStyle = { color: spacing === 16 ? '#64748B' : '#475569', weight: spacing === 16 ? 0.7 : 1.1,
     opacity: spacing === 16 ? 0.28 : 0.38, className: 'wayfarer-grid-line', interactive: false, pane: 'wayfarer-grid' };
-  const labelStyleX = { className: 'wayfarer-grid-label wayfarer-grid-label-x', iconSize: [0, 0], iconAnchor: [0, 0] };
-  const labelStyleZ = { className: 'wayfarer-grid-label wayfarer-grid-label-z', iconSize: [0, 0], iconAnchor: [0, 0] };
-  const visibleBounds = map.getBounds();
-  const labelZ = Math.ceil((-visibleBounds.getNorth() * SCALE) / spacing) * spacing;
-  const labelX = Math.ceil((visibleBounds.getWest() * SCALE) / spacing) * spacing;
+  const labelStyle = { className: 'wayfarer-grid-label', iconSize: [0, 0], iconAnchor: [0, 0] };
   for (let x = minX; x <= maxX; x += spacing) {
     L.polyline([mc2latlng(x, minZ), mc2latlng(x, maxZ)], lineStyle).addTo(gridLayer);
-    L.marker(mc2latlng(x, labelZ), { icon: L.divIcon({ ...labelStyleX, html: 'X ' + x }),
+    L.marker(mc2latlng(x, minZ), { icon: L.divIcon({ ...labelStyle, html: 'X ' + x }),
       interactive: false, pane: 'wayfarer-grid' }).addTo(gridLayer);
   }
   for (let z = minZ; z <= maxZ; z += spacing) {
     L.polyline([mc2latlng(minX, z), mc2latlng(maxX, z)], lineStyle).addTo(gridLayer);
-    L.marker(mc2latlng(labelX, z), { icon: L.divIcon({ ...labelStyleZ, html: 'Z ' + z }),
+    L.marker(mc2latlng(minX, z), { icon: L.divIcon({ ...labelStyle, html: 'Z ' + z }),
       interactive: false, pane: 'wayfarer-grid' }).addTo(gridLayer);
   }
 }
@@ -1412,7 +1408,17 @@ function updateNavPanel(data) {
   const turnIco = document.getElementById('nav-turn-ico');
   const turnTxt = document.getElementById('nav-turn-txt');
   const turnDist = document.getElementById('nav-turn-dist');
-  if (data.nextTurn) {
+  if (data.state === 'ARRIVED' && data.destinationSide) {
+    const m = {
+      LEFT: ['fa-arrow-left', 'nav.destinationLeft'],
+      RIGHT: ['fa-arrow-right', 'nav.destinationRight'],
+      UTURN: ['fa-arrow-down', 'nav.destinationBehind'],
+      STRAIGHT: ['fa-arrow-up', 'nav.destinationAhead']
+    }[data.destinationSide] || ['fa-location-dot', 'nav.arrived'];
+    turnIco.innerHTML = '<i class="fa-solid ' + m[0] + '"></i>';
+    turnTxt.textContent = I18N.t(m[1]);
+    turnDist.textContent = '';
+  } else if (data.nextTurn) {
     const m = {
       LEFT: ['fa-arrow-left', 'nav.turnLeft'],
       RIGHT: ['fa-arrow-right', 'nav.turnRight'],

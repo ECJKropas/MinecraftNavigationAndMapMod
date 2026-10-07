@@ -108,9 +108,10 @@ public final class XaeroRoadElement implements XaeroPolyline {
         double labelX = (x[mid] + x[next]) / 2.0;
         double labelZ = (z[mid] + z[next]) / 2.0;
         double angle = Math.atan2(z[next] - z[mid], x[next] - x[mid]);
-        if (angle > Math.PI / 2 || angle < -Math.PI / 2) angle += Math.PI;
-        return new XaeroRoadElement(segment.getId(), x, z, color, width, x[0], z[0], minX, maxX, minZ, maxZ,
-            roadName, classification, labelX, labelZ, angle);
+        if (angle > Math.PI / 2 || angle < -Math.PI / 2)
+            angle += Math.PI;
+        return new XaeroRoadElement(segment.getId(), x, z, color, width, x[0], z[0], minX, maxX, minZ, maxZ, roadName,
+            classification, labelX, labelZ, angle);
     }
 
     public UUID segmentId() {
@@ -163,11 +164,25 @@ public final class XaeroRoadElement implements XaeroPolyline {
         return maxZ;
     }
 
-    public String roadName() { return roadName; }
-    public String classification() { return classification; }
-    public double labelX() { return labelX; }
-    public double labelZ() { return labelZ; }
-    public double labelAngle() { return labelAngle; }
+    public String roadName() {
+        return roadName;
+    }
+
+    public String classification() {
+        return classification;
+    }
+
+    public double labelX() {
+        return labelX;
+    }
+
+    public double labelZ() {
+        return labelZ;
+    }
+
+    public double labelAngle() {
+        return labelAngle;
+    }
 
     /**
      * Whether the whole element lies outside a world rectangle.

@@ -77,14 +77,14 @@ public final class XaeroRouteRenderer extends ElementRenderer<XaeroRouteElement,
         MultiTextureRenderTypeRendererProvider textureProvider, boolean inMenu) {}
 
     @Override
-    public void renderElementShadow(XaeroRouteElement element, boolean hovered, float screenSizeBasedScale, double fracX,
-        double fracY, ElementRenderInfo info, GuiGraphics graphics, MultiBufferSource.BufferSource buffers,
-        MultiTextureRenderTypeRendererProvider textureProvider) {}
+    public void renderElementShadow(XaeroRouteElement element, boolean hovered, float screenSizeBasedScale,
+        double fracX, double fracY, ElementRenderInfo info, GuiGraphics graphics,
+        MultiBufferSource.BufferSource buffers, MultiTextureRenderTypeRendererProvider textureProvider) {}
 
     @Override
     public boolean renderElement(XaeroRouteElement element, boolean hovered, double depth, float screenSizeBasedScale,
-        double fracX, double fracY, ElementRenderInfo info, GuiGraphics graphics, MultiBufferSource.BufferSource buffers,
-        MultiTextureRenderTypeRendererProvider textureProvider) {
+        double fracX, double fracY, ElementRenderInfo info, GuiGraphics graphics,
+        MultiBufferSource.BufferSource buffers, MultiTextureRenderTypeRendererProvider textureProvider) {
         this.graphics = graphics;
         try {
             PoseStack pose = graphics.pose();

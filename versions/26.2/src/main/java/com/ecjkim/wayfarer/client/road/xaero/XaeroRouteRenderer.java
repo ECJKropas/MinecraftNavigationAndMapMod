@@ -77,8 +77,8 @@ public final class XaeroRouteRenderer extends ElementRenderer<XaeroRouteElement,
         MultiTextureRenderTypeRendererProvider textureProvider, boolean inMenu) {}
 
     @Override
-    public void renderElementShadow(XaeroRouteElement element, boolean hovered, float screenSizeBasedScale, double fracX,
-        double fracY, ElementRenderInfo info, MapElementGraphics graphics, XaeroBufferProvider buffers,
+    public void renderElementShadow(XaeroRouteElement element, boolean hovered, float screenSizeBasedScale,
+        double fracX, double fracY, ElementRenderInfo info, MapElementGraphics graphics, XaeroBufferProvider buffers,
         MultiTextureRenderTypeRendererProvider textureProvider) {}
 
     @Override

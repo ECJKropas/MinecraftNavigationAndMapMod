@@ -43,7 +43,7 @@ public final class NavHudRenderer {
         String text;
         int color;
         if (snapshot.state() == NavigationSession.State.ARRIVED) {
-            text = I18n.get("wayfarer.nav.arrived");
+            text = arrivalText(snapshot.destinationSide());
             color = 0xFF55FF55;
         } else {
             String turn = turnText(snapshot.headingTurn());
@@ -70,6 +70,15 @@ public final class NavHudRenderer {
             case RIGHT -> I18n.get("wayfarer.nav.turn.right");
             case UTURN -> I18n.get("wayfarer.nav.turn.uturn");
             case STRAIGHT -> I18n.get("wayfarer.nav.turn.straight");
+        };
+    }
+
+    private static String arrivalText(Guidance.Turn side) {
+        return switch (side) {
+            case LEFT -> I18n.get("wayfarer.nav.destination_left");
+            case RIGHT -> I18n.get("wayfarer.nav.destination_right");
+            case UTURN -> I18n.get("wayfarer.nav.destination_behind");
+            case STRAIGHT -> I18n.get("wayfarer.nav.destination_ahead");
         };
     }
 }

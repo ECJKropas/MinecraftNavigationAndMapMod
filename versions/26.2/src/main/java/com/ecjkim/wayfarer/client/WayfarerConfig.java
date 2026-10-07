@@ -121,7 +121,8 @@ public class WayfarerConfig {
     }
 
     public boolean isXaeroClassificationVisible(String classification) {
-        if (classification == null || classification.isEmpty()) return xaeroShowUnclassified;
+        if (classification == null || classification.isEmpty())
+            return xaeroShowUnclassified;
         return switch (classification.charAt(0)) {
             case 'G' -> xaeroShowG;
             case 'S' -> xaeroShowS;

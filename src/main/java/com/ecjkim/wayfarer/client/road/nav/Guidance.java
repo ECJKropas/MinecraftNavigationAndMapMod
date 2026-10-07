@@ -224,6 +224,26 @@ public final class Guidance {
         return new Heading(turn, roadDistance);
     }
 
+    /** Classifies a destination relative to the player's view direction. */
+    public static Turn relativeDirection(double fromX, double fromZ, double toX, double toZ, float playerYaw) {
+        double targetX = toX - fromX;
+        double targetZ = toZ - fromZ;
+        double targetLength = Math.hypot(targetX, targetZ);
+        if (targetLength <= 0D)
+            return Turn.STRAIGHT;
+        double yaw = Math.toRadians(playerYaw);
+        double facingX = -Math.sin(yaw);
+        double facingZ = Math.cos(yaw);
+        targetX /= targetLength;
+        targetZ /= targetLength;
+        double cos = facingX * targetX + facingZ * targetZ;
+        if (cos >= STRAIGHT_COS)
+            return Turn.STRAIGHT;
+        if (cos <= UTURN_COS)
+            return Turn.UTURN;
+        return facingX * targetZ - facingZ * targetX > 0D ? Turn.RIGHT : Turn.LEFT;
+    }
+
     /**
      * Classifies the bend at {@code vertex}: {@code previous -> vertex -> next}. With Minecraft's axes (+X east, +Z
      * south) a positive cross product of the incoming and outgoing heading means a right turn.

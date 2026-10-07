@@ -24,9 +24,9 @@ import com.ecjkim.wayfarer.client.road.model.Node;
  * The active navigation route, as a single map element.
  *
  * <p>
- * Built fresh each render pass from {@link com.ecjkim.wayfarer.client.road.nav.NavigationSession#snapshot()} -- the route
- * is short and changes as the player walks or the session reroutes, so unlike the road layer it is not cached behind a
- * mutation stamp. Geometry is a flat copy of the route nodes, for the same thread-safety reason as
+ * Built fresh each render pass from {@link com.ecjkim.wayfarer.client.road.nav.NavigationSession#snapshot()} -- the
+ * route is short and changes as the player walks or the session reroutes, so unlike the road layer it is not cached
+ * behind a mutation stamp. Geometry is a flat copy of the route nodes, for the same thread-safety reason as
  * {@link XaeroRoadElement}: the map is drawn on the client thread while the in-game tick moves the player.
  */
 public final class XaeroRouteElement implements XaeroPolyline {
@@ -125,7 +125,8 @@ public final class XaeroRouteElement implements XaeroPolyline {
 
     /**
      * Whether the whole element lies outside a world rectangle. A polyline that crosses the view with both ends beyond
-     * it has no vertex inside, so a box test (not a vertex test) is what keeps the most visible roads from being dropped.
+     * it has no vertex inside, so a box test (not a vertex test) is what keeps the most visible roads from being
+     * dropped.
      */
     public boolean outside(double minX, double minZ, double maxX, double maxZ) {
         return this.maxX < minX || this.minX > maxX || this.maxZ < minZ || this.minZ > maxZ;
