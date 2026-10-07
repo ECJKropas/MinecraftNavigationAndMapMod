@@ -178,10 +178,7 @@ const I18N = {
       'perf.culled': '视口裁剪',
       'perf.simplified': '折线抽稀',
 
-      // Editing — snap & batch (C3)
-      'edit.snap.title': '吸附网格',
-      'edit.snap.on': '已开启吸附',
-      'edit.snap.off': '已关闭吸附',
+      // Editing — batch (C3)
       'edit.deleteSelected': '删除选中 {n}',
       'edit.batchTitle': '批量操作'
     },
@@ -360,10 +357,7 @@ const I18N = {
       'perf.culled': 'Viewport cull',
       'perf.simplified': 'Simplify',
 
-      // Editing — snap & batch (C3)
-      'edit.snap.title': 'Snap to grid',
-      'edit.snap.on': 'Snap on',
-      'edit.snap.off': 'Snap off',
+      // Editing — batch (C3)
       'edit.deleteSelected': 'Delete {n}',
       'edit.batchTitle': 'Batch'
     }

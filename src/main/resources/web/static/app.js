@@ -11,7 +11,6 @@ let navMode = 'WALK';                 // 'WALK' | 'DRIVE' — sent to server (C1
 let navMarkers = { start: null, end: null, player: null };
 let navActive = false;
 let viewportDirty = true;            // C2: re-cull only when needed
-let snapToGrid = false;             // C3: snap node edits to integer grid
 let renderedSegmentCount = 0;       // C2: perf indicator
 let totalSegmentCount = 0;
 let toolbarMode = 'compact';   // 'compact' | 'detailed'
@@ -414,11 +413,16 @@ function segmentInView(pts) {
   if (!map || !pts.length) return true;
   let minLat = Infinity, maxLat = -Infinity, minLng = Infinity, maxLng = -Infinity;
   for (const p of pts) {
-    if (p.lat < minLat) minLat = p.lat;
-    if (p.lat > maxLat) maxLat = p.lat;
-    if (p.lng < minLng) minLng = p.lng;
-    if (p.lng > maxLng) maxLng = p.lng;
+    // Callers hand in either mc2latlng() tuples ([lat, lng]) or LatLng-like objects, so accept both shapes.
+    const lat = Array.isArray(p) ? p[0] : p.lat;
+    const lng = Array.isArray(p) ? p[1] : p.lng;
+    if (!isFinite(lat) || !isFinite(lng)) continue;
+    if (lat < minLat) minLat = lat;
+    if (lat > maxLat) maxLat = lat;
+    if (lng < minLng) minLng = lng;
+    if (lng > maxLng) maxLng = lng;
   }
+  if (minLat === Infinity) return true;
   const b = map.getBounds();
   return !(maxLat < b.getSouth() || minLat > b.getNorth() || maxLng < b.getWest() || minLng > b.getEast());
 }
@@ -1201,9 +1205,8 @@ function onSegmentClick(sid, event) {
 
 function onNodeDragEnd(nid, marker) {
   const latlng = marker.getLatLng();
-  let x = latlng.lng * SCALE;
-  let z = latlng.lat * SCALE;
-  if (snapToGrid) { x = Math.round(x); z = Math.round(z); }
+  const x = latlng.lng * SCALE;
+  const z = latlng.lat * SCALE;
   const node = roadStore.nodes[nid];
   if (!node) return;
   pushUndo();
@@ -1375,15 +1378,7 @@ async function mergeSegments() {
   else showToast(I18N.t('toast.mergeFailed'), 'error');
 }
 
-// ——— Part C3: snap-to-grid + batch delete ———
-function toggleSnap() {
-  snapToGrid = !snapToGrid;
-  const el = document.getElementById('snap-toggle');
-  el.classList.toggle('active', snapToGrid);
-  el.title = snapToGrid ? I18N.t('edit.snap.on') : I18N.t('edit.snap.off');
-  showToast(snapToGrid ? I18N.t('edit.snap.on') : I18N.t('edit.snap.off'));
-}
-
+// ——— Part C3: batch delete ———
 async function deleteSelectedSegments() {
   if (selectedSegments.size === 0) return;
   const ids = [...selectedSegments];
@@ -1459,7 +1454,6 @@ function initToolbar() {
     b.addEventListener('click', () => { navMode = b.dataset.mode; if (navActive) updateNavPanel({}); });
   });
   document.getElementById('tool-navigation-stop').addEventListener('click', cancelNavigation);
-  document.getElementById('snap-toggle').addEventListener('click', toggleSnap);
   document.getElementById('batch-delete').addEventListener('click', deleteSelectedSegments);
   document.getElementById('tool-undo').addEventListener('click', undo);
   document.getElementById('tool-redo').addEventListener('click', redo);
@@ -1619,9 +1613,8 @@ function findNearestIntersection(latlng) {
 async function insertNodeOnSegment(segId, insertIndex, latlng) {
   const seg = roadStore.segments[segId];
   if (!seg) return;
-  let x = latlng.lng * SCALE;
-  let z = latlng.lat * SCALE;
-  if (snapToGrid) { x = Math.round(x); z = Math.round(z); }
+  const x = latlng.lng * SCALE;
+  const z = latlng.lat * SCALE;
   try {
     pushUndo();
     const res = await fetch('/api/segments/' + segId + '/insert', {
