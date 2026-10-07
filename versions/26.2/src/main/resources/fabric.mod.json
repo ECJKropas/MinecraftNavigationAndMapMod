@@ -21,6 +21,7 @@
     "fabric-lifecycle-events-v1": "*",
     "fabric-key-mapping-api-v1": "*"
   },
+  "mixins": ["wayfarer.mixins.json"],
   "custom": {
     "modmenu": {
       "links": {

@@ -2,9 +2,11 @@
   "required": true,
   "minVersion": "0.8",
   "package": "com.ecjkim.wayfarer.client.mixin",
-  "compatibilityLevel": "JAVA_21",
+  "compatibilityLevel": "JAVA_25",
   "refmap": "wayfarer.refmap.json",
-  "client": [],
+  "client": [
+    "BlockInteractionMixin"
+  ],
   "injectors": {
     "defaultRequire": 1
   }
