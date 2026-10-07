@@ -43,14 +43,19 @@ public final class XaeroRouteProvider extends ElementRenderProvider<XaeroRouteEl
 
     @Override
     public void begin(ElementRenderLocation location, XaeroRoadContext context) {
-        XaeroViewState.beginPass();
+        // Xaero does not expose the minimap viewport through the same view-info
+        // callback as the world map. Do not replace the world-map view state
+        // while rendering the minimap.
+        if (location == ElementRenderLocation.WORLD_MAP) {
+            XaeroViewState.beginPass();
+        }
         current = null;
         NavigationSession session = WayfarerClient.getNavigationSession();
         if (session != null) {
             NavigationSession.Snapshot snap = session.snapshot();
             if (snap.state() == NavigationSession.State.ACTIVE && snap.route() != null) {
                 XaeroRouteElement el = XaeroRouteElement.of(snap.route().getNodes(), ROUTE_COLOR, ROUTE_WIDTH);
-                if (el != null && inView(el)) {
+                if (el != null && inView(location, el)) {
                     current = el;
                 }
             }
@@ -58,7 +63,10 @@ public final class XaeroRouteProvider extends ElementRenderProvider<XaeroRouteEl
         index = 0;
     }
 
-    private static boolean inView(XaeroRouteElement el) {
+    private static boolean inView(ElementRenderLocation location, XaeroRouteElement el) {
+        if (location == ElementRenderLocation.IN_MINIMAP || location == ElementRenderLocation.OVER_MINIMAP) {
+            return true;
+        }
         if (!XaeroViewState.isValid()) {
             return true;
         }
