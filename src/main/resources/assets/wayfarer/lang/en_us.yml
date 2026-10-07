@@ -4,6 +4,27 @@ wayfarer:
     settings: Settings
   toggle_road_recording: Toggle road recording
   open_road_list: Open road list (N)
+  nav:
+    arrived: Arrived at destination
+    cancelled: Navigation cancelled
+    continue_road: Continue on the current road for %.0f blocks
+    turn_in: " (in %.0f blocks)"
+    hud: "%s  |  %.1f blocks left  ETA %.0f s"
+    turn:
+      left: Turn left
+      right: Turn right
+      uturn: U-turn
+      straight: Go straight
+  layer:
+    xaero_base: Xaero World Map
+    road_network: Road Network
+    administrative: Administrative Areas
+    poi: Points of Interest
+  xaero:
+    route_name: Wayfarer Route
+    open_web_editor: Open in web editor
+    copy_coordinates: Copy coordinates
+    delete_segment: Delete this segment
   road:
     gui:
       title: Road List
@@ -61,7 +82,7 @@ wayfarer:
         field_number: Number
         classification_default: Classification
         classification_number: Classification / Number
-        hint: Classification & number are optional. If name is blank, it defaults to 「classification+number」.
+        hint: Classification & number are optional. If name is blank, it defaults to "classification+number".
         button_save: Save
         button_cancel_edit: Discard Changes
         button_cancel: Cancel
@@ -74,45 +95,52 @@ wayfarer:
         button_discard: Discard
         segment_left_unfiled: Segment saved as unfiled, can be assigned later in road list.
     survey:
-        paused: Survey recording paused (data preserved). Press ESC again to resume.
-        resumed: "Survey recording resumed (%d nodes)"
-        tool_ready: Survey tool ready.
-        hint_idle: "Survey [LMB+Block] Start | [Ctrl+Scroll] Direction type"
-        hint_recording: "Survey [LMB+Block] End | [RMB+Block] Waypoint | [Ctrl+Scroll] Direction"
-        hint_paused: "Survey [Pick up tool] Resume recording"
-        direction: "Survey direction type: %s"
-        direction_type:
-          bidirectional: Bidirectional
-          forward: "Start → End"
-          backward: "End → Start"
-        tool_removed_paused: Tool removed, Survey recording paused (data preserved).
-        tool_resumed: "Tool picked up, Survey recording resumed (%d nodes)"
-        integrity_failed: Data integrity check failed, Survey recording cancelled.
-        recording_started_node: "Survey recording started (node %s)"
-        recording_started_snapped: Survey recording started (snapped to existing node)
-        recording_started_hotkey: Survey recording started (hotkey)
-        recording_started: Road recording started.
-        node_inserted_to_segment: "New node inserted to segment[%s]"
-        waypoint_placed: "Waypoint #%d placed @ %s"
-        waypoint_snapped: "Snapped to existing node #%d @ %s"
-        too_few_nodes: Too few nodes, recording cancelled.
-        too_few_points_cancel: Too few track points, this road recording cancelled.
-        save_failed_not_ended: Save failed, Survey recording not ended.
-        road_saved: "Road saved: %s"
-        segment_discarded: Segment discarded, recording data deleted.
-        recording_ended: Road recording stopped, select or create a road to save.
-        already_recording: Survey already recording
-        not_recording: Survey not recording
-        nothing_to_cancel: Nothing to cancel
-        recording_cancelled: Survey recording cancelled
-        tool_cleared_empty: Tool item slot is empty, Survey tool setting cleared.
-        tool_set: "Held item set as Survey tool: %s"
-        in_survey_mode: Already in Survey mode, please switch items and retry
+      paused: Survey recording paused (data preserved). Press ESC again to resume.
+      resumed: "Survey recording resumed (%d nodes)"
+      tool_ready: Survey tool ready.
+      tool_ready_hint: Survey tool ready. Left-click air to start, right-click to place waypoints, left-click a node to finish.
+      hint_idle: "Survey [LMB+Block] Start | [Ctrl+Scroll] Direction type"
+      hint_recording: "Survey [LMB+Block] End | [RMB+Block] Waypoint | [Ctrl+Scroll] Direction"
+      hint_paused: "Survey [Pick up tool] Resume recording"
+      direction: "Survey direction type: %s"
+      direction_type:
+        bidirectional: Bidirectional
+        forward: "Start → End"
+        backward: "End → Start"
+      tool_removed_paused: Tool removed, Survey recording paused (data preserved).
+      tool_resumed: "Tool picked up, Survey recording resumed (%d nodes)"
+      tool_resumed_plain: Tool picked up, Survey recording resumed.
+      integrity_failed: Data integrity check failed, Survey recording cancelled.
+      recording_started_node: "Survey recording started (node %s)"
+      recording_started_snapped: Survey recording started (snapped to existing node)
+      recording_started_hotkey: Survey recording started (hotkey)
+      recording_started: Road recording started.
+      recording_started_hint: Survey recording started. Right-click to place waypoints, left-click to finish.
+      click_air_to_start: Click empty air to start recording
+      node_inserted_to_segment: "New node inserted to segment[%s]"
+      waypoint_placed: "Waypoint #%d placed @ %s"
+      waypoint_snapped: "Snapped to existing node #%d @ %s"
+      waypoint_placed_simple: "Waypoint placed (%d)"
+      waypoint_snapped_simple: "Snapped to existing node (%d)"
+      too_few_nodes: Too few nodes, recording cancelled.
+      too_few_points_cancel: Too few track points, this road recording cancelled.
+      save_failed_not_ended: Save failed, Survey recording not ended.
+      road_saved: "Road saved: %s"
+      segment_discarded: Segment discarded, recording data deleted.
+      recording_ended: Road recording stopped, select or create a road to save.
+      already_recording: Survey already recording
+      not_recording: Survey not recording
+      nothing_to_cancel: Nothing to cancel
+      recording_cancelled: Survey recording cancelled
+      tool_cleared_empty: Tool item slot is empty, Survey tool setting cleared.
+      tool_set: "Held item set as Survey tool: %s"
+      in_survey_mode: Already in Survey mode, please switch items and retry
 category:
   wayfarer: Wayfarer
 
 classification:
   none: Unclassified
+  default: Classification
   national: National (G)
   highway: Highway (G)
   provincial: Provincial (S)
@@ -123,10 +151,91 @@ classification:
 
 wayfarer.gui.title.configs: Wayfarer Settings
 
+# --- Config display names (malilib translates the raw config name) ---
+navSnapRadius: Navigation Snap Radius
+navRerouteThreshold: Reroute Threshold
+navArrivalRadius: Arrival Radius
+navDistanceGate: Class Preference Distance
+navSpeedG: National Road Speed
+navSpeedS: Provincial Road Speed
+navSpeedY: County Road Speed
+navSpeedX: Township Road Speed
+navSpeedC: Village Road Speed
 defaultClassification: Default Classification
-tileProviderMode: Tile Provider Mode
+autoIntegral: Auto Round Coordinates
+autoSnapEndpoints: Auto Snap Endpoints
 rdpEpsilon: RDP Epsilon
-nodeIndicatorBeamAlpha: Node indicator beam alpha
-showKeyHints: Show key hints
+autoDeleteOrphanNodes: Auto Delete Orphan Nodes
+webMaxZoom: Web Max Zoom Level
+autoGraphify: Auto Graphify
+toolItem: Survey Tool Item
+toolItemEnabled: Enable Tool Item Detection
+nodeIndicatorEnabled: Node Indicator
+nodeIndicatorBeamHeight: Beam Height
+nodeIndicatorBeamAlpha: Beam Alpha
+showKeyHints: Show Key Hints
+gColor: National Road Color
+gWidth: National Road Width
+sColor: Provincial Road Color
+sWidth: Provincial Road Width
+xColor: Township Road Color
+xWidth: Township Road Width
+yColor: County Road Color
+yWidth: County Road Width
+cColor: Village Road Color
+cWidth: Village Road Width
+xaeroShowG: Xaero Show National
+xaeroShowS: Xaero Show Provincial
+xaeroShowX: Xaero Show Township
+xaeroShowY: Xaero Show County
+xaeroShowC: Xaero Show Village
+xaeroShowUnclassified: Xaero Show Unclassified
 toggleRecording: Toggle Recording
 openMenu: Open Menu
+setHeldItemAsTool: Set Held Item As Tool
+navigation: Stop Navigation
+
+# --- Config tooltips (malilib looks up "config.comment.<lowercased name>") ---
+config:
+  comment:
+    navsnapradius: Snap radius used to attach navigation start/end to nearby road nodes
+    navreroutethreshold: Distance off-route that triggers automatic re-routing
+    navarrivalradius: Radius that counts as having reached the destination
+    navdistancegate: Straight-line distance threshold above which road class preference applies
+    navspeedg: Navigation speed on national roads (blocks/second)
+    navspeeds: Navigation speed on provincial roads (blocks/second)
+    navspeedy: Navigation speed on county roads (blocks/second)
+    navspeedx: Navigation speed on township roads (blocks/second)
+    navspeedc: Navigation speed on village roads (blocks/second)
+    defaultclassification: Classification applied by default when creating a new road
+    autointegral: Whether recorded node coordinates are automatically rounded to whole blocks on all three axes
+    autosnapendpoints: Snap the start/end of a recording to an existing node within rdpEpsilon, otherwise insert a new node at the closest point on a segment
+    rdpepsilon: Douglas-Peucker simplification tolerance in blocks; higher values simplify more aggressively
+    autodeleteorphannodes: Automatically delete nodes that are no longer referenced by any segment after every edit
+    webmaxzoom: Maximum zoom level of the web map (10-20, default 10); higher values zoom in further
+    autographify: Turns the road network into a graph in the informatics sense (every node with degree > 2 becomes an endpoint) so Dijkstra / A* can run on endpoints directly
+    toolitem: "Survey tool item, e.g. minecraft:wheat_seeds, minecraft:wheat_seeds@0 or minecraft:wheat_seeds@0{NBT}"
+    toolitemenabled: Whether held-item detection for Survey mode is enabled; when off, holding the tool does nothing
+    nodeindicatorbeamheight: Height of the node indicator beam in blocks
+    nodeindicatorbeamalpha: Alpha of the node indicator beam (0-1)
+    showkeyhints: Show the key hint in the action bar when switching to the Survey tool item
+    gcolor: Draw color of national roads on the map
+    gwidth: Draw width of national roads on the map
+    scolor: Draw color of provincial roads on the map
+    swidth: Draw width of provincial roads on the map
+    xcolor: Draw color of township roads on the map
+    xwidth: Draw width of township roads on the map
+    ycolor: Draw color of county roads on the map
+    ywidth: Draw width of county roads on the map
+    ccolor: Draw color of village roads on the map
+    cwidth: Draw width of village roads on the map
+    xaeroshowg: Show national roads on the Xaero world map
+    xaeroshows: Show provincial roads on the Xaero world map
+    xaeroshowx: Show township roads on the Xaero world map
+    xaeroshowy: Show county roads on the Xaero world map
+    xaeroshowc: Show village roads on the Xaero world map
+    xaeroshowunclassified: Show unclassified roads on the Xaero world map
+    togglerecording: Start or stop automatic road recording
+    openmenu: Open the Wayfarer navigation menu
+    sethelditemastool: Set the currently held item as the Survey tool
+    navigation: Stop the navigation that is currently running

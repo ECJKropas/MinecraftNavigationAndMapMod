@@ -34,6 +34,23 @@ const I18N = {
       'toolbar.contract.label': '收起',
       'toolbar.language.title': '切换语言',
       'toolbar.language.label': 'EN',
+      'toolbar.navigation.title': '以当前地图中心为目的地',
+      'toolbar.navigationStop.title': '取消导航',
+      'toolbar.navigationStop.label': '取消导航',
+
+      // Map HUD
+      'map.north': '北',
+      'map.compass.title': '北向',
+      'map.zoomIdle': '缩放 —',
+      'map.zoom': '缩放 Z{zoom} · {scale}',
+      'map.scale.blocksPerPixel': '{n} 格/像素',
+      'map.scale.pixelsPerBlock': '{n} 像素/格',
+      'map.baseMap.notLoaded': '底图未加载 · 当前仅显示道路',
+      'map.baseMap.needExport': '底图未加载 · 请先导出 Xaero PNG',
+      'map.baseMap.loaded': 'Xaero 底图 · {n} 张',
+
+      // Common
+      'common.separator': '：',
 
       // Editor - No selection
       'editor.noSelection': '点击节点或路段查看属性',
@@ -53,13 +70,13 @@ const I18N = {
       'editor.segment.id': 'ID',
       'editor.segment.classification': '等级',
       'editor.segment.classification.none': '—',
-      'editor.segment.classification.G国道': '国道',
-      'editor.segment.classification.G高速': '高速',
-      'editor.segment.classification.S省道': '省道',
-      'editor.segment.classification.S高架': '高架',
-      'editor.segment.classification.X乡道': '乡道',
-      'editor.segment.classification.Y县道': '县道',
-      'editor.segment.classification.C村道': '村道',
+      'editor.segment.classification.national': '国道',
+      'editor.segment.classification.highway': '高速',
+      'editor.segment.classification.provincial': '省道',
+      'editor.segment.classification.elevated': '高架',
+      'editor.segment.classification.township': '乡道',
+      'editor.segment.classification.county': '县道',
+      'editor.segment.classification.village': '村道',
       'editor.segment.number': '编号',
       'editor.segment.number.placeholder': '如 107',
       'editor.segment.roadName': '道路名',
@@ -87,6 +104,9 @@ const I18N = {
       'toast.saveFailed': '保存失败',
       'toast.deleteFailed': '删除失败',
       'toast.unknownError': '未知错误',
+      'toast.err.unsupported': '该节点不支持软删除',
+      'toast.err.road_mismatch': '软删除失败，有不同名路段',
+      'toast.err.not_found': '未找到该节点',
 
       // Toasts - Node
       'toast.nodeSaved': '节点已保存',
@@ -190,6 +210,12 @@ const I18N = {
       'nav.unnamedRoad': '未命名道路',
       'nav.markCenter': '目的地',
       'nav.startPoint': '起点',
+      'nav.requestFailed': '导航请求失败',
+      'nav.err.DESTINATION_NOT_NEAR_ROAD': '终点不在道路附近，请点在道路线上',
+      'nav.err.START_NOT_NEAR_ROAD': '你当前位置离道路太远，走到路上再试',
+      'nav.err.NO_ROAD': '附近没有道路节点',
+      'nav.err.NO_ROUTE': '道路之间不连通（路口处节点未合并）',
+      'nav.err.INVALID_INPUT': '坐标无效',
 
       // Performance indicator (C2)
       'perf.rendered': '已渲染 {n} / {total} 段',
@@ -242,6 +268,23 @@ const I18N = {
       'toolbar.contract.label': 'Collapse',
       'toolbar.language.title': 'Change Language',
       'toolbar.language.label': '中',
+      'toolbar.navigation.title': 'Use current map center as destination',
+      'toolbar.navigationStop.title': 'Cancel navigation',
+      'toolbar.navigationStop.label': 'Cancel',
+
+      // Map HUD
+      'map.north': 'N',
+      'map.compass.title': 'North',
+      'map.zoomIdle': 'Zoom —',
+      'map.zoom': 'Zoom Z{zoom} · {scale}',
+      'map.scale.blocksPerPixel': '{n} blocks/px',
+      'map.scale.pixelsPerBlock': '{n} px/block',
+      'map.baseMap.notLoaded': 'Base map not loaded · showing roads only',
+      'map.baseMap.needExport': 'Base map not loaded · export Xaero PNG first',
+      'map.baseMap.loaded': 'Xaero base map · {n} tiles',
+
+      // Common
+      'common.separator': ': ',
 
       // Editor - No selection
       'editor.noSelection': 'Click a node or segment to view properties',
@@ -261,13 +304,13 @@ const I18N = {
       'editor.segment.id': 'ID',
       'editor.segment.classification': 'Class',
       'editor.segment.classification.none': '—',
-      'editor.segment.classification.G国道': 'National Highway',
-      'editor.segment.classification.G高速': 'Expressway',
-      'editor.segment.classification.S省道': 'Provincial Highway',
-      'editor.segment.classification.S高架': 'Elevated Road',
-      'editor.segment.classification.X乡道': 'Township Road',
-      'editor.segment.classification.Y县道': 'County Road',
-      'editor.segment.classification.C村道': 'Village Road',
+      'editor.segment.classification.national': 'National Highway',
+      'editor.segment.classification.highway': 'Expressway',
+      'editor.segment.classification.provincial': 'Provincial Highway',
+      'editor.segment.classification.elevated': 'Elevated Road',
+      'editor.segment.classification.township': 'Township Road',
+      'editor.segment.classification.county': 'County Road',
+      'editor.segment.classification.village': 'Village Road',
       'editor.segment.number': 'Number',
       'editor.segment.number.placeholder': 'e.g. 107',
       'editor.segment.roadName': 'Road Name',
@@ -295,6 +338,9 @@ const I18N = {
       'toast.saveFailed': 'Save failed',
       'toast.deleteFailed': 'Delete failed',
       'toast.unknownError': 'Unknown error',
+      'toast.err.unsupported': 'This node does not support soft delete',
+      'toast.err.road_mismatch': 'Soft delete failed: segments belong to different roads',
+      'toast.err.not_found': 'Node not found',
 
       // Toasts - Node
       'toast.nodeSaved': 'Node saved',
@@ -398,6 +444,12 @@ const I18N = {
       'nav.unnamedRoad': 'Unnamed road',
       'nav.markCenter': 'Destination',
       'nav.startPoint': 'Start',
+      'nav.requestFailed': 'Navigation request failed',
+      'nav.err.DESTINATION_NOT_NEAR_ROAD': 'Destination is not near a road, pick a point on a road line',
+      'nav.err.START_NOT_NEAR_ROAD': 'You are too far from any road, walk onto a road and retry',
+      'nav.err.NO_ROAD': 'No road node nearby',
+      'nav.err.NO_ROUTE': 'Roads are not connected (junction nodes not merged)',
+      'nav.err.INVALID_INPUT': 'Invalid coordinates',
 
       // Performance indicator (C2)
       'perf.rendered': 'Rendered {n} / {total}',

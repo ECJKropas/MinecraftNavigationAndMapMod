@@ -100,9 +100,13 @@ public final class Guidance {
     public record NextTurn(Turn type, double distance, Node node) {
     }
 
+    /** The direction of the road under the player compared with the player's current view direction. */
+    public record Heading(Turn turn, double roadDistance) {
+    }
+
     /** Everything a consumer needs for one frame, derived in a single pass over the route. */
-    public record Reading(Projection projection, NextTurn nextTurn, double remainingDistance, double remainingTime,
-        boolean offRoute, boolean arrived) {
+    public record Reading(Projection projection, NextTurn nextTurn, Heading heading, double remainingDistance,
+        double remainingTime, boolean offRoute, boolean arrived) {
     }
 
     /**
@@ -190,6 +194,36 @@ public final class Guidance {
         return null;
     }
 
+    /** Compares the current route segment with the player's view direction. Minecraft yaw 0 faces +Z. */
+    public static Heading heading(Route route, Projection projection, float playerYaw) {
+        if (route == null || projection == null || route.getNodes().size() < 2)
+            return new Heading(Turn.STRAIGHT, 0D);
+        int segment = Math.max(0, Math.min(projection.segmentIndex(), route.getNodes().size() - 2));
+        Node from = route.getNodes().get(segment);
+        Node to = route.getNodes().get(segment + 1);
+        double roadX = to.getX() - from.getX();
+        double roadZ = to.getZ() - from.getZ();
+        double roadLength = Math.hypot(roadX, roadZ);
+        if (roadLength <= 0D)
+            return new Heading(Turn.STRAIGHT, 0D);
+        double yaw = Math.toRadians(playerYaw);
+        double facingX = -Math.sin(yaw);
+        double facingZ = Math.cos(yaw);
+        roadX /= roadLength;
+        roadZ /= roadLength;
+        double cos = facingX * roadX + facingZ * roadZ;
+        Turn turn;
+        if (cos >= STRAIGHT_COS)
+            turn = Turn.STRAIGHT;
+        else if (cos <= UTURN_COS)
+            turn = Turn.UTURN;
+        else
+            turn = facingX * roadZ - facingZ * roadX > 0D ? Turn.RIGHT : Turn.LEFT;
+        double roadDistance = route.getEdgeLengths().isEmpty() ? 0D
+            : Math.max(0D, route.getEdgeLengths().get(segment) * (1D - projection.segmentFraction()));
+        return new Heading(turn, roadDistance);
+    }
+
     /**
      * Classifies the bend at {@code vertex}: {@code previous -> vertex -> next}. With Minecraft's axes (+X east, +Z
      * south) a positive cross product of the incoming and outgoing heading means a right turn.
@@ -250,11 +284,16 @@ public final class Guidance {
      * off-route flag and arrival flag.
      */
     public static Reading read(Route route, double x, double z, Thresholds thresholds) {
+        return read(route, x, z, 0F, thresholds);
+    }
+
+    public static Reading read(Route route, double x, double z, float playerYaw, Thresholds thresholds) {
         Projection projection = project(route, x, z);
         double remaining = projection.remainingDistance();
-        return new Reading(projection, nextTurn(route, projection.alongDistance()), remaining,
-            remainingTime(route, remaining), isOffRoute(projection, thresholds.rerouteDistance()),
-            hasArrived(route, x, z, thresholds.arrivalRadius()));
+        NextTurn nextTurn = nextTurn(route, projection.alongDistance());
+        Heading heading = heading(route, projection, playerYaw);
+        return new Reading(projection, nextTurn, heading, remaining, remainingTime(route, remaining),
+            isOffRoute(projection, thresholds.rerouteDistance()), hasArrived(route, x, z, thresholds.arrivalRadius()));
     }
 
     /**

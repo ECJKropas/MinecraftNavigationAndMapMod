@@ -4,6 +4,27 @@ wayfarer:
     settings: 设置
   toggle_road_recording: 切换道路记录
   open_road_list: 打开路线列表（N）
+  nav:
+    arrived: 已到达目的地
+    cancelled: 导航已取消
+    continue_road: 沿当前道路前行 %.0f 格
+    turn_in: "（%.0f 格后）"
+    hud: "%s  |  剩余 %.1f 格  ETA %.0f 秒"
+    turn:
+      left: 左转
+      right: 右转
+      uturn: 掉头
+      straight: 直行
+  layer:
+    xaero_base: Xaero 世界地图
+    road_network: 道路路网
+    administrative: 行政区域
+    poi: 兴趣点
+  xaero:
+    route_name: Wayfarer 路线
+    open_web_editor: 定位到网页编辑器
+    copy_coordinates: 复制坐标
+    delete_segment: 删除该路段
   road:
     gui:
       title: 路线列表
@@ -74,45 +95,52 @@ wayfarer:
         button_discard: 放弃
         segment_left_unfiled: 路段已保存为未归档，可稍后在道路列表中关联。
     survey:
-        paused: Survey 录制已暂停（数据保留）。再次按 ESC 继续录制。
-        resumed: "Survey 录制继续 (%d 个节点)"
-        tool_ready: Survey 工具就绪。
-        hint_idle: "Survey [LMB+方块] 开始录制 | [Ctrl+滚轮] 切换方向类型"
-        hint_recording: "Survey [LMB+方块] 结束 | [RMB+方块] 路径点 | [Ctrl+滚轮] 方向"
-        hint_paused: "Survey [拾取工具] 继续录制"
-        direction: "Survey 方向类型: %s"
-        direction_type:
-          bidirectional: 双向
-          forward: "起点→终点"
-          backward: "终点→起点"
-        tool_removed_paused: 工具已离手，Survey 录制暂停（数据保留）。
-        tool_resumed: "工具已切回，Survey 录制继续 (%d 个节点)"
-        integrity_failed: 数据校验失败，Survey 录制已取消。
-        recording_started_node: "Survey 录制已开始（节点 %s）"
-        recording_started_snapped: Survey 录制已开始（吸附到现有节点）
-        recording_started_hotkey: Survey 录制已开始（快捷键）
-        recording_started: 道路记录已开始。
-        node_inserted_to_segment: "已插入新节点到路段[%s]"
-        waypoint_placed: "已放置路径点 #%d @ %s"
-        waypoint_snapped: "已吸附到现有节点 #%d @ %s"
-        too_few_nodes: 节点太少，已取消录制。
-        too_few_points_cancel: 记录点太少，已取消这次道路记录。
-        save_failed_not_ended: 保存失败，Survey 录制未结束。
-        road_saved: "道路已保存: %s"
-        segment_discarded: 路段已放弃，录制数据已删除。
-        recording_ended: 道路记录已停止，选择或创建道路后保存。
-        already_recording: Survey 已在录制中
-        not_recording: Survey 未在录制中
-        nothing_to_cancel: 没有可取消的录制
-        recording_cancelled: Survey 录制已取消
-        tool_cleared_empty: 手持物品为空，已清除 Survey 工具设置。
-        tool_set: "已将手持物品设为 Survey 工具: %s"
-        in_survey_mode: 正在 Survey 模式，请切换手中物品后重试
+      paused: Survey 录制已暂停（数据保留）。再次按 ESC 继续录制。
+      resumed: "Survey 录制继续 (%d 个节点)"
+      tool_ready: Survey 工具就绪。
+      tool_ready_hint: Survey 工具就绪：左键点击空地开始录制，右键放置路径点，左键点击节点结束录制。
+      hint_idle: "Survey [LMB+方块] 开始录制 | [Ctrl+滚轮] 切换方向类型"
+      hint_recording: "Survey [LMB+方块] 结束 | [RMB+方块] 路径点 | [Ctrl+滚轮] 方向"
+      hint_paused: "Survey [拾取工具] 继续录制"
+      direction: "Survey 方向类型: %s"
+      direction_type:
+        bidirectional: 双向
+        forward: "起点→终点"
+        backward: "终点→起点"
+      tool_removed_paused: 工具已离手，Survey 录制暂停（数据保留）。
+      tool_resumed: "工具已切回，Survey 录制继续 (%d 个节点)"
+      tool_resumed_plain: 工具已切回，Survey 录制继续。
+      integrity_failed: 数据校验失败，Survey 录制已取消。
+      recording_started_node: "Survey 录制已开始（节点 %s）"
+      recording_started_snapped: Survey 录制已开始（吸附到现有节点）
+      recording_started_hotkey: Survey 录制已开始（快捷键）
+      recording_started: 道路记录已开始。
+      recording_started_hint: Survey 录制已开始，右键放置路径点，左键结束录制。
+      click_air_to_start: 点击空地开始录制
+      node_inserted_to_segment: "已插入新节点到路段[%s]"
+      waypoint_placed: "已放置路径点 #%d @ %s"
+      waypoint_snapped: "已吸附到现有节点 #%d @ %s"
+      waypoint_placed_simple: "已放置路径点 (%d)"
+      waypoint_snapped_simple: "已吸附到现有节点 (%d)"
+      too_few_nodes: 节点太少，已取消录制。
+      too_few_points_cancel: 记录点太少，已取消这次道路记录。
+      save_failed_not_ended: 保存失败，Survey 录制未结束。
+      road_saved: "道路已保存: %s"
+      segment_discarded: 路段已放弃，录制数据已删除。
+      recording_ended: 道路记录已停止，选择或创建道路后保存。
+      already_recording: Survey 已在录制中
+      not_recording: Survey 未在录制中
+      nothing_to_cancel: 没有可取消的录制
+      recording_cancelled: Survey 录制已取消
+      tool_cleared_empty: 手持物品为空，已清除 Survey 工具设置。
+      tool_set: "已将手持物品设为 Survey 工具: %s"
+      in_survey_mode: 正在 Survey 模式，请切换手中物品后重试
 category:
   wayfarer: Wayfarer
 
 classification:
   none: 未分类
+  default: 道路分级
   national: 国道 (G)
   highway: 高速 (G)
   provincial: 省道 (S)
@@ -123,10 +151,91 @@ classification:
 
 wayfarer.gui.title.configs: Wayfarer 设置
 
+# --- Config display names (malilib translates the raw config name) ---
+navSnapRadius: 导航吸附半径
+navRerouteThreshold: 偏航重规划阈值
+navArrivalRadius: 到达判定半径
+navDistanceGate: 等级偏好距离阈值
+navSpeedG: 国道导航速度
+navSpeedS: 省道导航速度
+navSpeedY: 县道导航速度
+navSpeedX: 乡道导航速度
+navSpeedC: 村道导航速度
 defaultClassification: 默认分级代码
-tileProviderMode: 地图瓦片提供者模式
-rdpEpsilon: RDP简化容差
-nodeIndicatorBeamAlpha: 节点指示物光柱透明度
-showKeyHints: 开启按键提示
+autoIntegral: 坐标自动取整
+autoSnapEndpoints: 端点自动吸附
+rdpEpsilon: RDP 简化容差
+autoDeleteOrphanNodes: 自动删除孤立节点
+webMaxZoom: 网页最大缩放等级
+autoGraphify: 自动图化
+toolItem: Survey 工具物品
+toolItemEnabled: 启用工具物品检测
+nodeIndicatorEnabled: 节点指示物
+nodeIndicatorBeamHeight: 光柱高度
+nodeIndicatorBeamAlpha: 光柱透明度
+showKeyHints: 显示按键提示
+gColor: 国道颜色
+gWidth: 国道线宽
+sColor: 省道颜色
+sWidth: 省道线宽
+xColor: 乡道颜色
+xWidth: 乡道线宽
+yColor: 县道颜色
+yWidth: 县道线宽
+cColor: 村道颜色
+cWidth: 村道线宽
+xaeroShowG: Xaero 显示国道
+xaeroShowS: Xaero 显示省道
+xaeroShowX: Xaero 显示乡道
+xaeroShowY: Xaero 显示县道
+xaeroShowC: Xaero 显示村道
+xaeroShowUnclassified: Xaero 显示未分类道路
 toggleRecording: 切换道路录制
 openMenu: 打开导航菜单
+setHeldItemAsTool: 设为 Survey 工具
+navigation: 停止当前导航
+
+# --- Config tooltips (malilib looks up "config.comment.<lowercased name>") ---
+config:
+  comment:
+    navsnapradius: 导航起点和终点的道路节点吸附半径
+    navreroutethreshold: 偏离路线后自动重新规划的距离
+    navarrivalradius: 进入终点后的到达判定半径
+    navdistancegate: 启用道路等级偏好的直线距离阈值
+    navspeedg: 国道导航速度（格/秒）
+    navspeeds: 省道导航速度（格/秒）
+    navspeedy: 县道导航速度（格/秒）
+    navspeedx: 乡道导航速度（格/秒）
+    navspeedc: 村道导航速度（格/秒）
+    defaultclassification: 新建道路时默认使用的分级代码
+    autointegral: 录制道路时是否自动将节点坐标取整（三轴均舍入到整数），默认开启
+    autosnapendpoints: 录制结束时自动吸附首尾端点：先找 rdpEpsilon 范围内的现有节点，再找路段折线的垂足插入，均无可创建新节点
+    rdpepsilon: RDP 简化容差（格数），值越大简化越激进
+    autodeleteorphannodes: 开启后每次增删改节点后自动删除没有路段连接的孤立节点
+    webmaxzoom: 网页端地图最大放大等级（10-20，默认10），数值越高可放大越近
+    autographify: 自动将道路网转化为信息学意义上的图（所有度数>2的节点均为端点），消除被穿越的非端节点，确保 Dijkstra / A* 等算法可直接基于端点运行。默认开启
+    toolitem: "Survey 模式工具物品，格式: minecraft:wheat_seeds 或 minecraft:wheat_seeds@0 或 minecraft:wheat_seeds@0{NBT}"
+    toolitemenabled: 是否启用 Survey 工具物品检测。关闭后手持工具也不会触发 Survey 模式
+    nodeindicatorbeamheight: 节点指示物光柱高度（格数）
+    nodeindicatorbeamalpha: 节点指示物光柱透明度（0-1）
+    showkeyhints: 切换到 Survey 工具物品时显示按键提示（action bar）
+    gcolor: 国道在地图上的绘制颜色
+    gwidth: 国道在地图上的绘制线宽
+    scolor: 省道在地图上的绘制颜色
+    swidth: 省道在地图上的绘制线宽
+    xcolor: 乡道在地图上的绘制颜色
+    xwidth: 乡道在地图上的绘制线宽
+    ycolor: 县道在地图上的绘制颜色
+    ywidth: 县道在地图上的绘制线宽
+    ccolor: 村道在地图上的绘制颜色
+    cwidth: 村道在地图上的绘制线宽
+    xaeroshowg: 在 Xaero 世界地图上显示国道
+    xaeroshows: 在 Xaero 世界地图上显示省道
+    xaeroshowx: 在 Xaero 世界地图上显示乡道
+    xaeroshowy: 在 Xaero 世界地图上显示县道
+    xaeroshowc: 在 Xaero 世界地图上显示村道
+    xaeroshowunclassified: 在 Xaero 世界地图上显示未分类道路
+    togglerecording: 按下时开始或停止自动记录道路
+    openmenu: 打开 Wayfarer 导航菜单
+    sethelditemastool: 将当前手持物品设为 Survey 工具
+    navigation: 停止当前正在进行的导航

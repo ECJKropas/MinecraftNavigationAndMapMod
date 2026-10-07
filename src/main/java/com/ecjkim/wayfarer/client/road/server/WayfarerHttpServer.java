@@ -16,12 +16,20 @@
  */
 package com.ecjkim.wayfarer.client.road.server;
 
+import java.awt.image.BufferedImage;
+import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.net.InetSocketAddress;
+import java.net.URLDecoder;
+import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -32,6 +40,10 @@ import java.util.logging.Level;
 import java.util.logging.Logger;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+
+import javax.imageio.ImageIO;
+
+import net.minecraft.client.Minecraft;
 
 import com.ecjkim.wayfarer.client.WayfarerClient;
 import com.ecjkim.wayfarer.client.WayfarerConfig;
@@ -64,6 +76,7 @@ public class WayfarerHttpServer implements Runnable {
     private static final Gson GSON = new GsonBuilder().setPrettyPrinting().create();
     private static final int DEFAULT_PORT = 7891;
     private static final int FALLBACK_PORT = 7892;
+    private static final Pattern XAERO_EXPORT_TILE = Pattern.compile("^\\d+_\\d+_x(-?\\d+)_z(-?\\d+)\\.png$");
 
     private final RoadNetworkDatabase database;
     private final List<Route> routes = new ArrayList<>();
@@ -85,6 +98,8 @@ public class WayfarerHttpServer implements Runnable {
         routes.add(new Route("GET", "/", this::serveIndexHtml));
         routes.add(new Route("GET", "/api/config", this::handleGetConfig));
         routes.add(new Route("GET", "/api/nav/state", this::handleGetNavigationState));
+        routes.add(new Route("GET", "/api/map/xaero", this::handleGetXaeroMap));
+        routes.add(new Route("GET", "/api/map/xaero/tile", this::handleGetXaeroTile));
         routes.add(new Route("POST", "/api/nav/start", this::handleStartNavigation));
         routes.add(new Route("POST", "/api/nav/stop", this::handleStopNavigation));
         routes.add(new Route("GET", Pattern.compile("/static/(.+)"), this::serveStaticFile));
@@ -291,16 +306,146 @@ public class WayfarerHttpServer implements Runnable {
         sendJson(req.exchange, 200, navigationJson(navigation().snapshot(), null));
     }
 
+    /** Finds the newest Xaero PNG export under the active Minecraft game directory. */
+    private Path findLatestXaeroExport() {
+        List<Path> roots = new ArrayList<>();
+        try {
+            roots.add(Minecraft.getInstance().gameDirectory.toPath().resolve("map exports"));
+        } catch (RuntimeException ignored) {
+            // The client may not be fully initialized during an early HTTP request.
+        }
+        roots.add(Paths.get("run-obsuscated", "map exports"));
+        roots.add(Paths.get("map exports"));
+
+        Path newest = null;
+        long newestTime = Long.MIN_VALUE;
+        for (Path root : roots) {
+            if (!Files.isDirectory(root))
+                continue;
+            try (var children = Files.list(root)) {
+                for (Path child : children.filter(Files::isDirectory).toList()) {
+                    boolean hasPng;
+                    try (var files = Files.list(child)) {
+                        hasPng =
+                            files.anyMatch(path -> XAERO_EXPORT_TILE.matcher(path.getFileName().toString()).matches());
+                    }
+                    if (!hasPng)
+                        continue;
+                    long modified = Files.getLastModifiedTime(child).toMillis();
+                    if (newest == null || modified > newestTime
+                        || modified == newestTime && child.toString().compareTo(newest.toString()) > 0) {
+                        newest = child;
+                        newestTime = modified;
+                    }
+                }
+            } catch (IOException e) {
+                LOGGER.log(Level.FINE, "Cannot inspect Xaero export directory {0}: {1}",
+                    new Object[] {root, e.getMessage()});
+            }
+        }
+        return newest;
+    }
+
+    private void handleGetXaeroMap(Request req) {
+        Path export = findLatestXaeroExport();
+        JsonObject result = new JsonObject();
+        result.addProperty("available", export != null);
+        if (export == null) {
+            sendJson(req.exchange, 200, result);
+            return;
+        }
+        result.addProperty("exportName", export.getFileName().toString());
+        JsonArray tiles = new JsonArray();
+        try (var files = Files.list(export)) {
+            files.filter(Files::isRegularFile).sorted(Comparator.comparing(path -> path.getFileName().toString()))
+                .forEach(file -> {
+                    Matcher matcher = XAERO_EXPORT_TILE.matcher(file.getFileName().toString());
+                    if (!matcher.matches())
+                        return;
+                    JsonObject tile = new JsonObject();
+                    tile.addProperty("file", file.getFileName().toString());
+                    tile.addProperty("x", Long.parseLong(matcher.group(1)));
+                    tile.addProperty("z", Long.parseLong(matcher.group(2)));
+                    int width = 1024;
+                    int height = 1024;
+                    try {
+                        var image = ImageIO.read(file.toFile());
+                        if (image != null) {
+                            width = image.getWidth();
+                            height = image.getHeight();
+                        }
+                    } catch (IOException ignored) {
+                        // The browser can still use the Xaero export's standard 1024x1024 tile size.
+                    }
+                    tile.addProperty("width", width);
+                    tile.addProperty("height", height);
+                    tile.addProperty("url", "/api/map/xaero/tile?file="
+                        + URLEncoder.encode(file.getFileName().toString(), StandardCharsets.UTF_8));
+                    tiles.add(tile);
+                });
+        } catch (IOException e) {
+            sendJson(req.exchange, 500, errorJson("Cannot read Xaero export: " + e.getMessage()));
+            return;
+        }
+        result.add("tiles", tiles);
+        sendJson(req.exchange, 200, result);
+    }
+
+    private void handleGetXaeroTile(Request req) {
+        Path export = findLatestXaeroExport();
+        String rawFile = req.query.get("file");
+        if (export == null || rawFile == null) {
+            sendResponse(req.exchange, 404, "text/plain; charset=utf-8", "Xaero export not found");
+            return;
+        }
+        String fileName = URLDecoder.decode(rawFile, StandardCharsets.UTF_8);
+        if (!XAERO_EXPORT_TILE.matcher(fileName).matches()) {
+            sendResponse(req.exchange, 400, "text/plain; charset=utf-8", "Invalid Xaero tile name");
+            return;
+        }
+        Path tile = export.resolve(fileName).normalize();
+        if (!tile.getParent().equals(export) || !Files.isRegularFile(tile)) {
+            sendResponse(req.exchange, 404, "text/plain; charset=utf-8", "Xaero tile not found");
+            return;
+        }
+        try {
+            sendBytes(req.exchange, 200, "image/png", transparentBlackPixels(tile));
+        } catch (IOException e) {
+            sendResponse(req.exchange, 500, "text/plain; charset=utf-8", "Cannot read Xaero tile");
+        }
+    }
+
+    /** Converts Xaero's pure-black unexplored pixels to transparent pixels without modifying the export on disk. */
+    private static byte[] transparentBlackPixels(Path tile) throws IOException {
+        BufferedImage source = ImageIO.read(tile.toFile());
+        if (source == null)
+            return Files.readAllBytes(tile);
+        BufferedImage converted = new BufferedImage(source.getWidth(), source.getHeight(), BufferedImage.TYPE_INT_ARGB);
+        for (int y = 0; y < source.getHeight(); y++) {
+            for (int x = 0; x < source.getWidth(); x++) {
+                int argb = source.getRGB(x, y);
+                converted.setRGB(x, y, (argb & 0x00FFFFFF) == 0 ? 0x00000000 : 0xFF000000 | (argb & 0x00FFFFFF));
+            }
+        }
+        ByteArrayOutputStream output = new ByteArrayOutputStream();
+        ImageIO.write(converted, "png", output);
+        return output.toByteArray();
+    }
+
     private JsonObject navigationJson(NavigationSession.Snapshot snapshot, String error) {
         JsonObject result = new JsonObject();
         result.addProperty("ok", error == null);
         result.addProperty("state", snapshot.state().name());
         result.addProperty("playerX", snapshot.playerX());
         result.addProperty("playerZ", snapshot.playerZ());
+        result.addProperty("playerKnown", snapshot.playerKnown());
+        result.addProperty("playerYaw", snapshot.playerYaw());
         result.addProperty("remainingDistance", snapshot.remainingDistance());
         // Guidance fields, purely additive: every pre-existing field keeps its name and meaning.
         result.addProperty("remainingTime", snapshot.remainingTime());
         result.addProperty("offRoute", snapshot.offRoute());
+        result.addProperty("headingTurn", snapshot.headingTurn().name());
+        result.addProperty("currentRoadDistance", snapshot.currentRoadDistance());
         if (snapshot.nextTurn() != null) {
             JsonObject nextTurn = new JsonObject();
             nextTurn.addProperty("type", snapshot.nextTurn().type().name());
@@ -1115,8 +1260,11 @@ public class WayfarerHttpServer implements Runnable {
     // -------- Response helpers --------
 
     private static void sendResponse(HttpExchange exchange, int status, String contentType, String body) {
+        sendBytes(exchange, status, contentType, body.getBytes(StandardCharsets.UTF_8));
+    }
+
+    private static void sendBytes(HttpExchange exchange, int status, String contentType, byte[] data) {
         try {
-            byte[] data = body.getBytes(StandardCharsets.UTF_8);
             exchange.getResponseHeaders().set("Content-Type", contentType);
             exchange.getResponseHeaders().set("Access-Control-Allow-Origin", "*");
             exchange.sendResponseHeaders(status, data.length);

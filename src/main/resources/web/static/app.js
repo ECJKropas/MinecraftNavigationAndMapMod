@@ -1,5 +1,5 @@
 // Wayfarer Road Editor — Apple-style frontend
-// MC coords (X, Z) map to Leaflet [lat=Z/128, lng=X/128]
+// Minecraft +Z points south, while Leaflet's positive latitude points north: [lat=-Z/128, lng=X/128].
 
 const SCALE = 128.0;
 let map, selectedSegments = new Set(), selectedNodeId = null, selectedSegmentId = null;
@@ -11,10 +11,13 @@ let plannedDest = null;           // 已规划但未开始的目的地 {x,z}
 let plannedRouteLayer = null;     // 规划预览的路线图层
 let pointInfoPopup = null;        // Leaflet 点击信息弹窗
 let navigationLayer = null;
+let playerMarker = null;
+let gridLayer = null;
 let navMode = 'WALK';                 // 'WALK' | 'DRIVE' — sent to server (C1)
 let navMarkers = { start: null, end: null, player: null };
 let navActive = false;
 let viewportDirty = true;            // C2: re-cull only when needed
+let initialViewportSet = false;
 let renderedSegmentCount = 0;       // C2: perf indicator
 let totalSegmentCount = 0;
 let toolbarMode = 'compact';   // 'compact' | 'detailed'
@@ -349,9 +352,18 @@ async function initMap() {
     maxZoom: 20,
     zoomControl: true
   }).setView([0, 0], 5);
+  // Keep utility layers independent from the editor's default overlay pane. In particular, road fills must never cover
+  // the active navigation route after a viewport redraw.
+  map.createPane('wayfarer-grid').style.zIndex = 250;
+  map.createPane('wayfarer-base-map').style.zIndex = 180;
+  map.createPane('wayfarer-navigation').style.zIndex = 650;
+  map.createPane('wayfarer-player').style.zIndex = 700;
   map.on('click', onMapClick);
   await loadConfig();
   await loadData();
+  await loadXaeroBaseMap();
+  renderMapHud();
+  renderCoordinateGrid();
   setInterval(loadDelta, 1000);
   setInterval(refreshNavigation, 1000);
 
@@ -360,8 +372,103 @@ async function initMap() {
   document.addEventListener('mouseup', onGlobalMouseUp);
 
   // C2: re-cull only after the viewport actually changed
-  map.on('moveend', () => { viewportDirty = true; maybeRender(); });
-  map.on('zoomend', () => { viewportDirty = true; maybeRender(); });
+  map.on('moveend', () => { viewportDirty = true; maybeRender(); renderCoordinateGrid(); renderMapHud(); });
+  map.on('zoomend', () => { viewportDirty = true; maybeRender(); renderCoordinateGrid(); renderMapHud(); });
+}
+
+function renderMapHud() {
+  if (!map) return;
+  const zoom = map.getZoom();
+  const pixelsPerBlock = Math.pow(2, zoom) / SCALE;
+  let blocksPerPixel = 1 / pixelsPerBlock;
+  const scaleText = blocksPerPixel >= 1
+    ? I18N.t('map.scale.blocksPerPixel', { n: Math.round(blocksPerPixel) })
+    : I18N.t('map.scale.pixelsPerBlock', { n: (1 / blocksPerPixel).toFixed(1) });
+  const el = document.getElementById('map-zoom-info');
+  if (el) el.textContent = I18N.t('map.zoom', { zoom: zoom.toFixed(1), scale: scaleText });
+}
+
+function gridSpacingBlocks() {
+  const pixelsPerBlock = Math.pow(2, map.getZoom()) / SCALE;
+  // Select one useful grid family at a time: chunks, 16-chunk regions, or 256-chunk regions.
+  if (pixelsPerBlock * 16 >= 18) return 16;
+  if (pixelsPerBlock * 256 >= 18) return 256;
+  return 4096;
+}
+
+function renderCoordinateGrid() {
+  if (!map) return;
+  if (gridLayer) map.removeLayer(gridLayer);
+  gridLayer = L.layerGroup([], { pane: 'wayfarer-grid' }).addTo(map);
+  const spacing = gridSpacingBlocks();
+  const bounds = map.getBounds().pad(0.12);
+  const minX = Math.floor((bounds.getWest() * SCALE) / spacing) * spacing;
+  const maxX = Math.ceil((bounds.getEast() * SCALE) / spacing) * spacing;
+  const minZ = Math.floor((-bounds.getNorth() * SCALE) / spacing) * spacing;
+  const maxZ = Math.ceil((-bounds.getSouth() * SCALE) / spacing) * spacing;
+  const lineStyle = { color: spacing === 16 ? '#64748B' : '#475569', weight: spacing === 16 ? 0.7 : 1.1,
+    opacity: spacing === 16 ? 0.28 : 0.38, className: 'wayfarer-grid-line', interactive: false, pane: 'wayfarer-grid' };
+  const labelStyleX = { className: 'wayfarer-grid-label wayfarer-grid-label-x', iconSize: [0, 0], iconAnchor: [0, 0] };
+  const labelStyleZ = { className: 'wayfarer-grid-label wayfarer-grid-label-z', iconSize: [0, 0], iconAnchor: [0, 0] };
+  const visibleBounds = map.getBounds();
+  const labelZ = Math.ceil((-visibleBounds.getNorth() * SCALE) / spacing) * spacing;
+  const labelX = Math.ceil((visibleBounds.getWest() * SCALE) / spacing) * spacing;
+  for (let x = minX; x <= maxX; x += spacing) {
+    L.polyline([mc2latlng(x, minZ), mc2latlng(x, maxZ)], lineStyle).addTo(gridLayer);
+    L.marker(mc2latlng(x, labelZ), { icon: L.divIcon({ ...labelStyleX, html: 'X ' + x }),
+      interactive: false, pane: 'wayfarer-grid' }).addTo(gridLayer);
+  }
+  for (let z = minZ; z <= maxZ; z += spacing) {
+    L.polyline([mc2latlng(minX, z), mc2latlng(maxX, z)], lineStyle).addTo(gridLayer);
+    L.marker(mc2latlng(labelX, z), { icon: L.divIcon({ ...labelStyleZ, html: 'Z ' + z }),
+      interactive: false, pane: 'wayfarer-grid' }).addTo(gridLayer);
+  }
+}
+
+let xaeroBaseLayer = null;
+let xaeroTileCount = 0;
+
+function updateBaseMapStatus() {
+  const status = document.getElementById('base-map-status');
+  if (!status) return;
+  const span = status.querySelector('span');
+  if (xaeroBaseLayer && xaeroTileCount > 0) {
+    status.classList.add('loaded');
+    status.querySelector('i').className = 'fa-solid fa-map';
+    span.textContent = I18N.t('map.baseMap.loaded', { n: xaeroTileCount });
+  } else {
+    status.classList.remove('loaded');
+    status.querySelector('i').className = 'fa-solid fa-layer-group';
+    span.textContent = I18N.t('map.baseMap.needExport');
+  }
+}
+
+async function loadXaeroBaseMap() {
+  const status = document.getElementById('base-map-status');
+  try {
+    const res = await fetch('/api/map/xaero');
+    if (!res.ok) throw new Error('Xaero export endpoint unavailable');
+    const data = await res.json();
+    if (!data.available || !data.tiles || data.tiles.length === 0) {
+      if (status) status.querySelector('span').textContent = I18N.t('map.baseMap.needExport');
+      return;
+    }
+    if (xaeroBaseLayer) map.removeLayer(xaeroBaseLayer);
+    xaeroBaseLayer = L.layerGroup([], { pane: 'wayfarer-base-map' }).addTo(map);
+    for (const tile of data.tiles) {
+      const x = Number(tile.x), z = Number(tile.z);
+      const width = Number(tile.width || 1024), height = Number(tile.height || 1024);
+      if (![x, z, width, height].every(Number.isFinite)) continue;
+      const bounds = [mc2latlng(x, z + height), mc2latlng(x + width, z)];
+      L.imageOverlay(tile.url, bounds, {
+        opacity: 0.88, interactive: false, pane: 'wayfarer-base-map', crossOrigin: true
+      }).addTo(xaeroBaseLayer);
+    }
+    xaeroTileCount = data.tiles.length;
+    updateBaseMapStatus();
+  } catch (e) {
+    if (status) status.querySelector('span').textContent = I18N.t('map.baseMap.needExport');
+  }
 }
 
 function onGlobalMouseMove(e) {
@@ -375,7 +482,7 @@ function onGlobalMouseMove(e) {
   const cp = L.point(mcX - rect.left, mcY - rect.top);
   const ll = map.containerPointToLatLng(cp);
   let newX = ll.lng * SCALE;
-  let newZ = ll.lat * SCALE;
+  let newZ = -ll.lat * SCALE;
 
   if (ds.axisDx != null) {
     // Project mouse position onto the axis line through start position
@@ -414,7 +521,7 @@ async function loadConfig() {
   } catch (e) { /* use defaults */ }
 }
 
-function mc2latlng(x, z) { return [z / SCALE, x / SCALE]; }
+function mc2latlng(x, z) { return [-z / SCALE, x / SCALE]; }
 
 // ——— Part C2: viewport culling + polyline simplification ———
 function pointInView(lat, lng) {
@@ -476,7 +583,10 @@ function perpendicularDistance(p, a, b) {
 // True when any of the entities just synced from the server falls inside the current map view.
 function changedEntitiesInView(data) {
   if (!map) return true;
-  if (data.nodes) for (const n of data.nodes) { if (pointInView(n.z / SCALE, n.x / SCALE)) return true; }
+  if (data.nodes) for (const n of data.nodes) {
+    const ll = mc2latlng(n.x, n.z);
+    if (pointInView(ll[0], ll[1])) return true;
+  }
   if (data.segments) for (const s of data.segments) {
     if (!s.nodeIds) continue;
     let minLat = Infinity, maxLat = -Infinity, minLng = Infinity, maxLng = -Infinity, ok = false;
@@ -484,7 +594,7 @@ function changedEntitiesInView(data) {
       const n = roadStore.nodes[nid];
       if (!n) continue;
       ok = true;
-      const lat = n.z / SCALE, lng = n.x / SCALE;
+      const lat = mc2latlng(n.x, n.z)[0], lng = mc2latlng(n.x, n.z)[1];
       if (lat < minLat) minLat = lat; if (lat > maxLat) maxLat = lat;
       if (lng < minLng) minLng = lng; if (lng > maxLng) maxLng = lng;
     }
@@ -496,6 +606,17 @@ function changedEntitiesInView(data) {
 // Only re-cull/re-draw when the viewport moved or an edit touched a visible segment.
 function maybeRender() {
   if (viewportDirty) { renderAll(); viewportDirty = false; }
+}
+
+function fitMapToRoadsOnce() {
+  if (initialViewportSet || !map) return;
+  const points = [];
+  for (const node of Object.values(roadStore.nodes)) {
+    if (typeof node.x === 'number' && typeof node.z === 'number') points.push(mc2latlng(node.x, node.z));
+  }
+  if (points.length === 0) return;
+  map.fitBounds(L.latLngBounds(points), { padding: [60, 60], maxZoom: 8, animate: false });
+  initialViewportSet = true;
 }
 
 // ——— Data ———
@@ -523,6 +644,7 @@ async function loadData() {
         roadStore.roads = data.roads;
       }
     }
+    fitMapToRoadsOnce();
     renderAll();
   } catch (e) { showToast(I18N.t('toast.loadFailed') + ': ' + e.message, 'error'); }
 }
@@ -579,10 +701,15 @@ async function loadDelta() {
 }
 
 // ——— Conflict resolution ———
+function storeEntity(entityId, entityType, data) {
+  if (entityType === 'node') roadStore.nodes[entityId] = data;
+  else if (entityType === 'segment') roadStore.segments[entityId] = data;
+  else if (entityType === 'road') roadStore.roads[entityId] = data;
+}
+
 async function handleConflict(entityId, entityType, serverData, clientData) {
-  const entityTypeKey = entityType === '节点' ? 'entity.node' : entityType === '路段' ? 'entity.segment' : 'entity.road';
-  const entityTypeStr = I18N.t(entityTypeKey);
-  
+  const entityTypeStr = I18N.t('entity.' + entityType);
+
   const message = I18N.t('sheet.conflict.message', {
     entityType: entityTypeStr,
     serverVersion: serverData.version,
@@ -594,13 +721,7 @@ async function handleConflict(entityId, entityType, serverData, clientData) {
     I18N.t('sheet.conflict.optionR'));
 
   if (choice === null) {
-    if (entityType === '节点') {
-      roadStore.nodes[entityId] = serverData;
-    } else if (entityType === '路段') {
-      roadStore.segments[entityId] = serverData;
-    } else if (entityType === '道路') {
-      roadStore.roads[entityId] = serverData;
-    }
+    storeEntity(entityId, entityType, serverData);
     renderAll();
     showToast(I18N.t('toast.acceptedGameVersion'), 'info');
     return 'accepted';
@@ -608,13 +729,7 @@ async function handleConflict(entityId, entityType, serverData, clientData) {
 
   const choiceLower = choice.toLowerCase();
   if (choiceLower === 'a' || choiceLower === 'accept') {
-    if (entityType === '节点') {
-      roadStore.nodes[entityId] = serverData;
-    } else if (entityType === '路段') {
-      roadStore.segments[entityId] = serverData;
-    } else if (entityType === '道路') {
-      roadStore.roads[entityId] = serverData;
-    }
+    storeEntity(entityId, entityType, serverData);
     renderAll();
     showToast(I18N.t('toast.acceptedGameVersion'), 'info');
     return 'accepted';
@@ -671,7 +786,7 @@ function renderDirectionArrows(sid, seg, pts) {
   const cumDist = [0];
   for (let i = 1; i < pts.length; i++) {
     const dx = (pts[i].lng - pts[i - 1].lng) * SCALE;
-    const dz = (pts[i].lat - pts[i - 1].lat) * SCALE;
+    const dz = -(pts[i].lat - pts[i - 1].lat) * SCALE;
     cumDist.push(cumDist[i - 1] + Math.sqrt(dx * dx + dz * dz));
   }
   const totalLen = cumDist[cumDist.length - 1];
@@ -706,8 +821,8 @@ function renderDirectionArrows(sid, seg, pts) {
     // Convert to screen bearing: dx=lng (E-W), dz=lat (N-S in Leaflet)
     const dLng = p2.lng - p1.lng;
     const dLat = p2.lat - p1.lat;
-    // In Leaflet CRS.Simple, lng maps to MC X, lat maps to MC Z
-    // Bearing: atan2(dLng, dLat) gives angle from north, clockwise
+    // Leaflet lng maps to MC X and positive lat maps to Minecraft north (-Z).
+    // Bearing: atan2(dLng, dLat) gives angle from north, clockwise.
     let bearing = Math.atan2(dLng, dLat) * 180 / Math.PI;
 
     if (direction === 'BACKWARD') {
@@ -971,7 +1086,8 @@ function renderAll() {
     const fill = node.source === 'AUTO' ? '#aeaeb2'
       : node.cornerType === 'SHARP' ? '#FF3B30' : '#007AFF';
     const isMergeTarget = activeTool === 'merge' && nid === mergeFirstNodeId;
-    if (!pointInView(node.z / SCALE, node.x / SCALE)) continue;
+    const nodeLL = mc2latlng(node.x, node.z);
+    if (!pointInView(nodeLL[0], nodeLL[1])) continue;
     const marker = L.circleMarker(mc2latlng(node.x, node.z), {
       radius: isMergeTarget ? 7 : 5,
       fillColor: isMergeTarget ? '#FFD60A' : fill,
@@ -979,6 +1095,7 @@ function renderAll() {
       weight: isMergeTarget ? 3.5 : 2.5,
       fillOpacity: 0.92,
     }).addTo(map);
+    if (marker._path) marker._path.classList.add('wf-node-marker');   // 导航模式下仅视觉隐藏，仍可点击
     if (activeTool === 'move') {
       marker._path.style.cursor = 'grab';
       L.DomEvent.on(marker._path, 'mousedown', (e) => {
@@ -998,7 +1115,7 @@ function renderAll() {
           const ll = map.containerPointToLatLng(cp);
           const axes = getNodeDragAxes(nid);
           if (axes.length > 0) {
-            const best = pickAxisFromMouse(axes, node, ll.lng * SCALE, ll.lat * SCALE);
+            const best = pickAxisFromMouse(axes, node, ll.lng * SCALE, -ll.lat * SCALE);
             axisDx = best.dx; axisDz = best.dz;
           }
         }
@@ -1041,7 +1158,7 @@ function onMapClick(e) {
 
 // ——— Part C1: Navigation ———
 function latlng2mc(latlng) {
-  return { x: latlng.lng * SCALE, z: latlng.lat * SCALE };
+  return { x: latlng.lng * SCALE, z: -latlng.lat * SCALE };
 }
 
 // ——— 导航模式：点地图任意处 → 信息卡（直线距离 / 附近道路 / 到这去）———
@@ -1084,6 +1201,15 @@ function closePointInfo() {
   pendingPoint = null;
 }
 
+// Classification is persisted as a locale-native code (see the #seg-classification options).
+// Reuse the already-localized <option> labels instead of keeping a second translation table here.
+function classificationLabel(code) {
+  const sel = document.getElementById('seg-classification');
+  const opt = sel && Array.from(sel.options).find(o => o.value === code);
+  if (opt) return opt.textContent;
+  return code || I18N.t('editor.segment.classification.none');
+}
+
 // 找出点附近一定半径内的道路（按到路段折线的距离），返回路名列表（最多 5 条）
 function nearbyRoads(x, z, radius) {
   const found = [];
@@ -1102,7 +1228,10 @@ function nearbyRoads(x, z, radius) {
     if (minD <= radius && seg.roadId && !seen.has(seg.roadId)) {
       seen.add(seg.roadId);
       const road = roadStore.roads[seg.roadId];
-      const name = road && (road.name || (road.classification + ' ' + (road.number || '')).trim());
+      const fallback = road
+        ? ((road.classification ? classificationLabel(road.classification) + ' ' : '') + (road.number || '')).trim()
+        : '';
+      const name = road && (road.name || fallback);
       found.push({ d: minD, name: name || I18N.t('nav.unnamedRoad') });
     }
   }
@@ -1136,13 +1265,13 @@ async function planRoute(x, z) {
     // 规划后立刻复位后端会话，避免真正激活导航；等用户点「开始导航」再 start
     fetch('/api/nav/stop', { method: 'POST' }).catch(() => {});
     if (!res.ok || !data.ok) {
-      showToast(I18N.t('nav.planFailed') + '：' + routeErrorHint(data.error), 'error');
+      showToast(I18N.t('nav.planFailed') + I18N.t('common.separator') + routeErrorHint(data.error), 'error');
       return;
     }
     plannedDest = { x, z };
     renderPlannedRoute(data);
     showRouteSummary(data);
-  } catch (e) { showToast('规划失败: ' + e.message, 'error'); }
+  } catch (e) { showToast(I18N.t('nav.planFailed') + I18N.t('common.separator') + e.message, 'error'); }
 }
 
 function renderPlannedRoute(data) {
@@ -1183,16 +1312,22 @@ function hideRouteSummary() {
   document.getElementById('route-summary').classList.remove('visible');
 }
 
-// 把后端路由失败码翻译成人话，便于定位是「离道路太远」还是「路网不连通」
+// Maps a backend route failure code to a localized hint.
 function routeErrorHint(code) {
-  const map = {
-    DESTINATION_NOT_NEAR_ROAD: '终点不在道路附近，请点在道路线上',
-    START_NOT_NEAR_ROAD: '你当前位置离道路太远，走到路上再试',
-    NO_ROAD: '附近没有道路节点',
-    NO_ROUTE: '道路之间不连通（路口处节点未合并）',
-    INVALID_INPUT: '坐标无效'
-  };
-  return map[code] || (code || '未知错误');
+  const key = code ? ('nav.err.' + code) : null;
+  if (key) {
+    const text = I18N.t(key);
+    if (text !== key) return text;
+  }
+  return code || I18N.t('toast.unknownError');
+}
+
+// Maps a backend error code to a localized message, falling back to the raw code.
+function errorMessage(code) {
+  if (!code) return I18N.t('toast.unknownError');
+  const key = 'toast.err.' + code;
+  const text = I18N.t(key);
+  return text !== key ? text : code;
 }
 
 async function startNavigation(x, z) {
@@ -1206,46 +1341,55 @@ async function startNavigation(x, z) {
     });
     const data = await res.json();
     if (!res.ok || !data.ok) {
-      showToast(I18N.t('nav.noRoute') + '：' + routeErrorHint(data.error), 'error');
+      showToast(I18N.t('nav.noRoute') + I18N.t('common.separator') + routeErrorHint(data.error), 'error');
       return;
     }
     navActive = true;
     showNavPanel();
     renderNavigation(data);
     updateNavPanel(data);
-  } catch (e) { showToast('导航请求失败: ' + e.message, 'error'); }
+  } catch (e) { showToast(I18N.t('nav.requestFailed') + I18N.t('common.separator') + e.message, 'error'); }
 }
 
 function clearNavLayers() {
   if (navigationLayer) { map.removeLayer(navigationLayer); navigationLayer = null; }
-  for (const k of ['start', 'end', 'player']) {
+  for (const k of ['start', 'end']) {
     if (navMarkers[k]) { map.removeLayer(navMarkers[k]); navMarkers[k] = null; }
   }
 }
 
+function updatePlayerMarker(data) {
+  if (!map || data.playerKnown === false || typeof data.playerX !== 'number' || typeof data.playerZ !== 'number') return;
+  if (playerMarker) map.removeLayer(playerMarker);
+  const yaw = typeof data.playerYaw === 'number' ? data.playerYaw : 0;
+  playerMarker = L.marker(mc2latlng(data.playerX, data.playerZ), {
+    icon: L.divIcon({
+      className: 'wayfarer-player-arrow',
+      html: '<div style="transform:rotate(' + (yaw + 180) + 'deg)"></div>',
+      iconSize: [24, 24], iconAnchor: [12, 12]
+    }), interactive: false, zIndexOffset: 1000, pane: 'wayfarer-player'
+  }).addTo(map);
+}
+
 function renderNavigation(data) {
   clearNavLayers();
+  updatePlayerMarker(data);
   const coords = (data.coordinates && data.coordinates.length > 1) ? data.coordinates : null;
   if (coords) {
     const pts = coords.map(c => mc2latlng(c[0], c[1]));
     navigationLayer = L.polyline(pts, {
-      color: '#007AFF', weight: 5, opacity: 0.9, lineCap: 'round', lineJoin: 'round'
+      color: '#007AFF', weight: 5, opacity: 0.95, lineCap: 'round', lineJoin: 'round', pane: 'wayfarer-navigation'
     }).addTo(map);
   }
   const dest = data.destination;
   if (dest) {
     navMarkers.end = L.circleMarker(mc2latlng(dest.x, dest.z), {
-      radius: 7, color: '#fff', weight: 3, fillColor: '#FF3B30', fillOpacity: 1
+      radius: 7, color: '#fff', weight: 3, fillColor: '#FF3B30', fillOpacity: 1, pane: 'wayfarer-navigation'
     }).addTo(map);
   }
   if (coords) {
     navMarkers.start = L.circleMarker(mc2latlng(coords[0][0], coords[0][1]), {
-      radius: 6, color: '#fff', weight: 3, fillColor: '#34C759', fillOpacity: 1
-    }).addTo(map);
-  }
-  if (typeof data.playerX === 'number' && typeof data.playerZ === 'number') {
-    navMarkers.player = L.circleMarker(mc2latlng(data.playerX, data.playerZ), {
-      radius: 5, color: '#fff', weight: 2, fillColor: '#007AFF', fillOpacity: 0.95
+      radius: 6, color: '#fff', weight: 3, fillColor: '#34C759', fillOpacity: 1, pane: 'wayfarer-navigation'
     }).addTo(map);
   }
 }
@@ -1328,6 +1472,7 @@ async function refreshNavigation() {
   try {
     const res = await fetch('/api/nav/state');
     const data = await res.json();
+    updatePlayerMarker(data);
     if (data.state === 'IDLE') {
       if (navActive) { navActive = false; clearNavLayers(); hideNavPanel(); }
       return;
@@ -1374,7 +1519,7 @@ function onSegmentClick(sid, event) {
 function onNodeDragEnd(nid, marker) {
   const latlng = marker.getLatLng();
   const x = latlng.lng * SCALE;
-  const z = latlng.lat * SCALE;
+  const z = -latlng.lat * SCALE;
   const node = roadStore.nodes[nid];
   if (!node) return;
   pushUndo();
@@ -1671,6 +1816,9 @@ function enterMode(mode) {
   const tb = document.getElementById('toolbar');
   tb.classList.remove('mode-nav', 'mode-edit');
   tb.classList.add(mode === 'edit' ? 'mode-edit' : 'mode-nav');
+  // 导航模式下用 body 类隐藏道路节点标记（仅视觉，仍可点击）
+  document.body.classList.toggle('nav-mode', mode === 'navigation');
+  document.body.classList.toggle('edit-mode', mode === 'edit');
 
   if (mode === 'navigation') {
     setActiveTool(null);   // 关键修复：退出编辑时取消所有工具选择
@@ -1808,7 +1956,7 @@ function findNearestIntersection(latlng) {
           if (!nb1 || !nb2) continue;
           const pt = lineIntersection(na1.x, na1.z, na2.x, na2.z, nb1.x, nb1.z, nb2.x, nb2.z);
           if (!pt) continue;
-          const intPt = map.latLngToContainerPoint(L.latLng(pt.z / SCALE, pt.x / SCALE));
+          const intPt = map.latLngToContainerPoint(L.latLng(...mc2latlng(pt.x, pt.z)));
           const dist = clickPt.distanceTo(intPt);
           if (dist < bestDist) {
             bestDist = dist;
@@ -1829,7 +1977,7 @@ async function insertNodeOnSegment(segId, insertIndex, latlng) {
   const seg = roadStore.segments[segId];
   if (!seg) return;
   const x = latlng.lng * SCALE;
-  const z = latlng.lat * SCALE;
+  const z = -latlng.lat * SCALE;
   try {
     pushUndo();
     const res = await fetch('/api/segments/' + segId + '/insert', {
@@ -2028,8 +2176,7 @@ async function handleSoftDeleteTool(nid) {
     });
     const data = await res.json();
     if (!res.ok || !data.ok) {
-      const msg = data.message || data.error || I18N.t('toast.unknownError');
-      showToolToast(msg);
+      showToolToast(errorMessage(data.error));
       return;
     }
     clearSelection();
@@ -2182,6 +2329,10 @@ function updateDynamicI18n() {
   
   // Re-apply all data-i18n attributes
   I18N.applyToDOM();
+
+  // Map HUD text is composed imperatively, so rebuild it from the new language.
+  renderMapHud();
+  updateBaseMapStatus();
 
   // Mode switch pill label/icon are set imperatively — refresh them too.
   updateModeSwitch();

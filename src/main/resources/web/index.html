@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Wayfarer — 道路编辑器</title>
+<title>Wayfarer</title>
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" />
 <style>
@@ -53,6 +53,53 @@ body::before {
   transition:left 260ms cubic-bezier(0.22,1,0.36,1);
 }
 .leaflet-container { background:transparent !important; }
+
+/* Browser map orientation/status HUD. The actual terrain provider can replace the status later without moving the
+   navigation controls. */
+#map-hud {
+  position:fixed; top:14px; right:18px; z-index:80;
+  display:flex; flex-direction:column; align-items:flex-end; gap:7px;
+  pointer-events:none; font-size:11px; font-weight:600; color:var(--text-secondary);
+}
+.map-hud-chip {
+  display:flex; align-items:center; gap:7px; padding:7px 10px;
+  background:var(--glass-bg); backdrop-filter:var(--glass-blur); -webkit-backdrop-filter:var(--glass-blur);
+  border:1px solid var(--glass-border); border-radius:11px;
+  box-shadow:var(--shadow-sm), var(--glass-inset); white-space:nowrap;
+}
+#map-compass { color:var(--text-primary); }
+#map-compass .compass-needle { color:var(--red); font-size:15px; line-height:1; }
+#map-zoom-info { font-variant-numeric:tabular-nums; }
+#base-map-status { color:#9a5b00; background:rgba(255,248,230,.78); }
+#base-map-status i { color:#ff9500; }
+#base-map-status.loaded { color:#216e39; background:rgba(232,250,237,.82); }
+#base-map-status.loaded i { color:#34c759; }
+.wayfarer-grid-label {
+  color:rgba(70,70,75,.68); font-size:10px; font-weight:600;
+  text-shadow:0 0 3px rgba(255,255,255,.95); white-space:nowrap;
+  pointer-events:none;
+}
+.wayfarer-grid-label-x { transform:translate(-50%, 4px); }
+.wayfarer-grid-label-z { transform:translate(4px, -50%); }
+.wayfarer-grid-line { pointer-events:none; }
+
+.wayfarer-player-arrow {
+  width: 24px !important; height: 24px !important; position: relative;
+  filter: drop-shadow(0 1px 2px rgba(0,0,0,.35));
+}
+.wayfarer-player-arrow > div {
+  width: 24px; height: 24px; position: relative;
+}
+.wayfarer-player-arrow > div::before {
+  content: ''; position: absolute; left: 5px; top: 1px;
+  border-left: 7px solid transparent; border-right: 7px solid transparent;
+  border-bottom: 19px solid #007AFF;
+}
+.wayfarer-player-arrow > div::after {
+  content: ''; position: absolute; left: 9px; top: 8px;
+  width: 6px; height: 10px; border-radius: 3px; background: #fff;
+  opacity: .9;
+}
 
 .constrain-popup {
   position:absolute; left:100%;
@@ -441,10 +488,23 @@ button.danger:active { background:#B3201A; }
 #toolbar.mode-nav .constrain-popup { display:none !important; }
 #toolbar.mode-nav .toolbar-divider { display:none; }
 
+/* 导航模式：仅视觉隐藏道路节点标记（仍保留点击命中） */
+body.nav-mode .wf-node-marker {
+  opacity: 0 !important;
+  pointer-events: all !important;
+}
+
 </style>
 </head>
 <body>
 <div id="map"></div>
+<div id="map-hud">
+  <div id="map-compass" class="map-hud-chip" data-i18n-title="map.compass.title">
+    <span class="compass-needle">▲</span><span data-i18n="map.north">N</span>
+  </div>
+  <div id="map-zoom-info" class="map-hud-chip" data-i18n="map.zoomIdle">Zoom —</div>
+  <div id="base-map-status" class="map-hud-chip"><i class="fa-solid fa-layer-group"></i><span data-i18n="map.baseMap.notLoaded">Base map not loaded · showing roads only</span></div>
+</div>
 
 <div id="toolbar" class="toolbar-compact mode-nav">
   <button class="tool-btn edit-only" id="tool-move" data-i18n-title="toolbar.move.title">
@@ -476,11 +536,11 @@ button.danger:active { background:#B3201A; }
     <i class="fa-solid fa-compress"></i>
     <span class="tool-label" data-i18n="toolbar.mergeNearby.label"></span>
   </button>
-  <button class="tool-btn" id="tool-navigation" title="以当前地图中心为目的地">
-    <i class="fa-solid fa-location-crosshairs"></i><span class="tool-label" data-i18n="nav.markCenter">目的地</span>
+  <button class="tool-btn" id="tool-navigation" data-i18n-title="toolbar.navigation.title">
+    <i class="fa-solid fa-location-crosshairs"></i><span class="tool-label" data-i18n="nav.markCenter"></span>
   </button>
-  <button class="tool-btn" id="tool-navigation-stop" title="取消导航">
-    <i class="fa-solid fa-xmark"></i><span class="tool-label">取消导航</span>
+  <button class="tool-btn" id="tool-navigation-stop" data-i18n-title="toolbar.navigationStop.title">
+    <i class="fa-solid fa-xmark"></i><span class="tool-label" data-i18n="toolbar.navigationStop.label"></span>
   </button>
   <div class="toolbar-divider"></div>
   <button class="tool-btn edit-only" id="tool-undo" data-i18n-title="toolbar.undo.title">
@@ -528,13 +588,13 @@ button.danger:active { background:#B3201A; }
     <div class="field"><span class="field-label" data-i18n="editor.segment.classification"></span>
       <select id="seg-classification">
         <option value="" data-i18n="editor.segment.classification.none">—</option>
-        <option value="G国道" data-i18n="editor.segment.classification.G国道">国道</option>
-        <option value="G高速" data-i18n="editor.segment.classification.G高速">高速</option>
-        <option value="S省道" data-i18n="editor.segment.classification.S省道">省道</option>
-        <option value="S高架" data-i18n="editor.segment.classification.S高架">高架</option>
-        <option value="X乡道" data-i18n="editor.segment.classification.X乡道">乡道</option>
-        <option value="Y县道" data-i18n="editor.segment.classification.Y县道">县道</option>
-        <option value="C村道" data-i18n="editor.segment.classification.C村道">村道</option>
+        <option value="G国道" data-i18n="editor.segment.classification.national">National Highway</option>
+        <option value="G高速" data-i18n="editor.segment.classification.highway">Expressway</option>
+        <option value="S省道" data-i18n="editor.segment.classification.provincial">Provincial Highway</option>
+        <option value="S高架" data-i18n="editor.segment.classification.elevated">Elevated Road</option>
+        <option value="X乡道" data-i18n="editor.segment.classification.township">Township Road</option>
+        <option value="Y县道" data-i18n="editor.segment.classification.county">County Road</option>
+        <option value="C村道" data-i18n="editor.segment.classification.village">Village Road</option>
       </select>
     </div>
     <div class="field"><span class="field-label" data-i18n="editor.segment.number"></span><input type="text" id="seg-number" data-i18n-placeholder="editor.segment.number.placeholder"></div>
@@ -594,7 +654,7 @@ button.danger:active { background:#B3201A; }
 <div id="route-summary">
   <div class="rs-head">
     <i class="fa-solid fa-route"></i>
-    <span class="rs-title" data-i18n="nav.routeTitle">路线预览</span>
+    <span class="rs-title" data-i18n="nav.routeTitle">Route preview</span>
   </div>
   <div class="rs-stats">
     <div class="rs-stat">
