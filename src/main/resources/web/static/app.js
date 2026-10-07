@@ -123,7 +123,7 @@ function pushUndo() {
 }
 
 async function undo() {
-  if (undoStack.length === 0) return;
+  if (undoStack.length === 0) { showToast(I18N.t('toast.nothingToUndo'), 'info'); return; }
   redoStack.push(snapshotStore());
   editingEntityId = '__undo__';
   try {
@@ -137,12 +137,7 @@ async function undo() {
       showToast(I18N.t('toast.undoFailed'), 'error');
       return;
     }
-    const result = await res.json();
-    if (result.warning) {
-      showToast(result.warning, 'warn');
-    } else {
-      showToast(I18N.t('toast.undoSuccess'), 'info');
-    }
+    showRestoreResult(await res.json(), 'undo');
     lastSyncServerTime = 0;
     clearSelection();
     mergeFirstNodeId = null;
@@ -155,7 +150,7 @@ async function undo() {
 }
 
 async function redo() {
-  if (redoStack.length === 0) return;
+  if (redoStack.length === 0) { showToast(I18N.t('toast.nothingToRedo'), 'info'); return; }
   undoStack.push(snapshotStore());
   editingEntityId = '__redo__';
   try {
@@ -169,12 +164,7 @@ async function redo() {
       showToast(I18N.t('toast.redoFailed'), 'error');
       return;
     }
-    const result = await res.json();
-    if (result.warning) {
-      showToast(result.warning, 'warn');
-    } else {
-      showToast(I18N.t('toast.redoSuccess'), 'info');
-    }
+    showRestoreResult(await res.json(), 'redo');
     lastSyncServerTime = 0;
     clearSelection();
     mergeFirstNodeId = null;
@@ -191,6 +181,25 @@ function undoButtonStyle() {
   const rb = document.getElementById('tool-redo');
   if (ub) ub.style.opacity = undoStack.length === 0 ? '0.35' : '';
   if (rb) rb.style.opacity = redoStack.length === 0 ? '0.35' : '';
+}
+
+// Number of entities actually changed by a /api/roads/restore response:
+// reverted (state rolled back) + restored (re-created after being deleted)
+function restoreChangeCount(result) {
+  const reverted = (result.revertedNodes || 0) + (result.revertedSegments || 0) + (result.revertedRoads || 0);
+  const restored = (result.restoredNodes || 0) + (result.restoredSegments || 0) + (result.restoredRoads || 0);
+  return reverted + restored;
+}
+
+function showRestoreResult(result, kind) {
+  const changed = restoreChangeCount(result);
+  if (result.warning) {
+    showToast(result.warning + (changed > 0 ? ' (' + changed + ')' : ''), 'warn');
+  } else if (changed === 0) {
+    showToast(I18N.t(kind === 'undo' ? 'toast.nothingToUndo' : 'toast.nothingToRedo'), 'info');
+  } else {
+    showToast(I18N.t(kind === 'undo' ? 'toast.undoSuccess' : 'toast.redoSuccess') + ' (' + changed + ')', 'info');
+  }
 }
 
 // ——— Toast ———
@@ -1316,6 +1325,7 @@ async function saveRoad() {
 
   // Save segment direction
   if (seg.direction !== direction) {
+    pushUndo();
     editingEntityId = sid;
     try {
       const res = await fetch('/api/segments/' + sid + '/direction', {

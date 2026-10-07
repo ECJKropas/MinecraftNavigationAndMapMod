@@ -1296,19 +1296,28 @@ public class RoadNetworkDatabase {
     }
 
     /**
-     * Restores entities from a JSON snapshot, but only reverts entities that were modified exactly once since the
-     * snapshot was taken (version == snapshotVersion + 1). Entities modified multiple times (concurrent in-game edits)
-     * are preserved. Entities not in the snapshot are kept (they were created after the snapshot).
+     * Restores entities from a JSON snapshot. An explicit undo/redo triggered by the user is authoritative, so this
+     * method always brings the network back to the snapshot state: entities that still exist are reverted, entities
+     * that were deleted after the snapshot was taken are re-created, and entities that were not touched since the
+     * snapshot are left as-is. Entities created after the snapshot (not present in the snapshot) are kept.
      *
-     * @return a JsonObject with "ok", "revertedNodes/Segments/Roads" counts, and "skipped*" counts for conflicts
+     * @return a JsonObject with "ok", "revertedNodes/Segments/Roads" counts, "restoredNodes/Segments/Roads" counts for
+     *         entities re-created after being deleted, "unchanged*" counts, and an optional "warning" when some
+     *         entities had been modified more than once since the snapshot and were therefore overwritten
      */
     public synchronized JsonObject restoreFromJson(JsonObject root) {
-        java.util.List<String> revertedNodes = new ArrayList<>();
-        java.util.List<String> revertedSegments = new ArrayList<>();
-        java.util.List<String> revertedRoads = new ArrayList<>();
-        java.util.List<String> skippedNodes = new ArrayList<>();
-        java.util.List<String> skippedSegments = new ArrayList<>();
-        java.util.List<String> skippedRoads = new ArrayList<>();
+        List<String> revertedNodes = new ArrayList<>();
+        List<String> revertedSegments = new ArrayList<>();
+        List<String> revertedRoads = new ArrayList<>();
+        List<String> restoredNodes = new ArrayList<>();
+        List<String> restoredSegments = new ArrayList<>();
+        List<String> restoredRoads = new ArrayList<>();
+        List<String> unchangedNodes = new ArrayList<>();
+        List<String> unchangedSegments = new ArrayList<>();
+        List<String> unchangedRoads = new ArrayList<>();
+        List<String> conflictedNodes = new ArrayList<>();
+        List<String> conflictedSegments = new ArrayList<>();
+        List<String> conflictedRoads = new ArrayList<>();
 
         // Nodes
         if (root.has("nodes")) {
@@ -1318,18 +1327,26 @@ public class RoadNetworkDatabase {
                 for (Node snapNode : nodeList) {
                     Node serverNode = nodes.get(snapNode.getId());
                     if (serverNode == null) {
-                        skippedNodes.add(snapNode.getId().toString());
-                        continue;
-                    }
-                    if (serverNode.getVersion() == snapNode.getVersion() + 1) {
-                        // Modified exactly once since snapshot — safe to revert
+                        // Deleted after the snapshot was taken — re-create it, otherwise deletions could never be undone
                         snapNode.setVersion(snapNode.getVersion() + 1);
                         snapNode.setModifiedAt(System.currentTimeMillis());
                         nodes.put(snapNode.getId(), snapNode);
-                        revertedNodes.add(snapNode.getId().toString());
-                    } else {
-                        skippedNodes.add(snapNode.getId().toString());
+                        restoredNodes.add(snapNode.getId().toString());
+                        continue;
                     }
+                    if (serverNode.getVersion() == snapNode.getVersion()) {
+                        // Untouched since the snapshot — nothing to revert
+                        unchangedNodes.add(snapNode.getId().toString());
+                        continue;
+                    }
+                    if (serverNode.getVersion() > snapNode.getVersion() + 1) {
+                        // Modified more than once since the snapshot: report it, but still honour the explicit undo
+                        conflictedNodes.add(snapNode.getId().toString());
+                    }
+                    snapNode.setVersion(snapNode.getVersion() + 1);
+                    snapNode.setModifiedAt(System.currentTimeMillis());
+                    nodes.put(snapNode.getId(), snapNode);
+                    revertedNodes.add(snapNode.getId().toString());
                 }
             }
         }
@@ -1342,17 +1359,26 @@ public class RoadNetworkDatabase {
                 for (Segment snapSeg : segList) {
                     Segment serverSeg = segments.get(snapSeg.getId());
                     if (serverSeg == null) {
-                        skippedSegments.add(snapSeg.getId().toString());
-                        continue;
-                    }
-                    if (serverSeg.getVersion() == snapSeg.getVersion() + 1) {
+                        // Deleted after the snapshot was taken — re-create it, otherwise deletions could never be undone
                         snapSeg.setVersion(snapSeg.getVersion() + 1);
                         snapSeg.setModifiedAt(System.currentTimeMillis());
                         segments.put(snapSeg.getId(), snapSeg);
-                        revertedSegments.add(snapSeg.getId().toString());
-                    } else {
-                        skippedSegments.add(snapSeg.getId().toString());
+                        restoredSegments.add(snapSeg.getId().toString());
+                        continue;
                     }
+                    if (serverSeg.getVersion() == snapSeg.getVersion()) {
+                        // Untouched since the snapshot — nothing to revert
+                        unchangedSegments.add(snapSeg.getId().toString());
+                        continue;
+                    }
+                    if (serverSeg.getVersion() > snapSeg.getVersion() + 1) {
+                        // Modified more than once since the snapshot: report it, but still honour the explicit undo
+                        conflictedSegments.add(snapSeg.getId().toString());
+                    }
+                    snapSeg.setVersion(snapSeg.getVersion() + 1);
+                    snapSeg.setModifiedAt(System.currentTimeMillis());
+                    segments.put(snapSeg.getId(), snapSeg);
+                    revertedSegments.add(snapSeg.getId().toString());
                 }
             }
         }
@@ -1365,17 +1391,26 @@ public class RoadNetworkDatabase {
                 for (Road snapRoad : roadList) {
                     Road serverRoad = roads.get(snapRoad.getId());
                     if (serverRoad == null) {
-                        skippedRoads.add(snapRoad.getId().toString());
-                        continue;
-                    }
-                    if (serverRoad.getVersion() == snapRoad.getVersion() + 1) {
+                        // Deleted after the snapshot was taken — re-create it, otherwise deletions could never be undone
                         snapRoad.setVersion(snapRoad.getVersion() + 1);
                         snapRoad.setModifiedAt(System.currentTimeMillis());
                         roads.put(snapRoad.getId(), snapRoad);
-                        revertedRoads.add(snapRoad.getId().toString());
-                    } else {
-                        skippedRoads.add(snapRoad.getId().toString());
+                        restoredRoads.add(snapRoad.getId().toString());
+                        continue;
                     }
+                    if (serverRoad.getVersion() == snapRoad.getVersion()) {
+                        // Untouched since the snapshot — nothing to revert
+                        unchangedRoads.add(snapRoad.getId().toString());
+                        continue;
+                    }
+                    if (serverRoad.getVersion() > snapRoad.getVersion() + 1) {
+                        // Modified more than once since the snapshot: report it, but still honour the explicit undo
+                        conflictedRoads.add(snapRoad.getId().toString());
+                    }
+                    snapRoad.setVersion(snapRoad.getVersion() + 1);
+                    snapRoad.setModifiedAt(System.currentTimeMillis());
+                    roads.put(snapRoad.getId(), snapRoad);
+                    revertedRoads.add(snapRoad.getId().toString());
                 }
             }
         }
@@ -1383,18 +1418,25 @@ public class RoadNetworkDatabase {
         markDirty();
         saveToDisk();
 
+        int totalReverted = revertedNodes.size() + revertedSegments.size() + revertedRoads.size();
+        int totalRestored = restoredNodes.size() + restoredSegments.size() + restoredRoads.size();
+        int totalConflicted = conflictedNodes.size() + conflictedSegments.size() + conflictedRoads.size();
+
         JsonObject result = new JsonObject();
         result.addProperty("ok", true);
         result.addProperty("revertedNodes", revertedNodes.size());
-        result.addProperty("skippedNodes", skippedNodes.size());
+        result.addProperty("restoredNodes", restoredNodes.size());
+        result.addProperty("unchangedNodes", unchangedNodes.size());
         result.addProperty("revertedSegments", revertedSegments.size());
-        result.addProperty("skippedSegments", skippedSegments.size());
+        result.addProperty("restoredSegments", restoredSegments.size());
+        result.addProperty("unchangedSegments", unchangedSegments.size());
         result.addProperty("revertedRoads", revertedRoads.size());
-        result.addProperty("skippedRoads", skippedRoads.size());
-        int totalSkipped = skippedNodes.size() + skippedSegments.size() + skippedRoads.size();
-        if (totalSkipped > 0) {
-            result.addProperty("warning",
-                totalSkipped + " entity(ies) were modified in-game and could not be reverted");
+        result.addProperty("restoredRoads", restoredRoads.size());
+        result.addProperty("unchangedRoads", unchangedRoads.size());
+        result.addProperty("changed", totalReverted + totalRestored);
+        if (totalConflicted > 0) {
+            result.addProperty("warning", totalConflicted
+                + " entity(ies) had been modified again after this snapshot and were overwritten by the undo");
         }
         return result;
     }

@@ -1067,8 +1067,9 @@ public class WayfarerHttpServer implements Runnable {
     }
 
     /**
-     * POST /api/roads/restore Merges the snapshot with the current state: only reverts entities that were modified
-     * exactly once since the snapshot. Concurrent in-game edits are preserved.
+     * POST /api/roads/restore Applies an undo/redo snapshot: existing entities are reverted to the snapshot state,
+     * entities deleted after the snapshot are re-created, unchanged entities are left untouched. Entities created after
+     * the snapshot (absent from the snapshot) are kept.
      */
     private void handleRestoreRoads(Request req) {
         try {
