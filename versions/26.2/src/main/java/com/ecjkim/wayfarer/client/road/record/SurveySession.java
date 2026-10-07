@@ -39,7 +39,7 @@ import it.unimi.dsi.fastutil.ints.IntSet;
 
 public class SurveySession {
     public enum State {
-        IDLE, RECORDING
+        IDLE, RECORDING, PAUSED
     }
 
     private static final double NODE_HIT_RADIUS = 2.0;
@@ -90,17 +90,32 @@ public class SurveySession {
             return;
 
         boolean hasTool = ToolItemManager.hasToolItem(client.player);
+
+        // Mouse input drives the session: in IDLE the first click on the ground starts a recording,
+        // in RECORDING further clicks extend or finish it. IDLE must be handled here too, otherwise
+        // the session can never leave IDLE and Survey mode appears to do nothing at all.
+        if (hasTool && (state == State.IDLE || state == State.RECORDING)) {
+            processMouseClicks(client, window);
+        } else {
+            // Drop stale button state so the next real click is not swallowed as a repeat.
+            mouseButtonDownLastTick.clear();
+        }
+
         if (state == State.IDLE)
             return;
 
         if (state == State.RECORDING) {
             if (!hasTool) {
-                state = State.IDLE;
-                client.player.sendSystemMessage(Component.literal("工具已离手，Survey 录制暂停。"));
+                // Keep the recorded nodes, so picking the tool back up resumes the same road.
+                state = State.PAUSED;
+                client.player.sendSystemMessage(Component.literal("工具已离手，Survey 录制已暂停（已记录的节点保留）。"));
                 return;
             }
-            processMouseClicks(client, window);
             spawnPathParticles(client);
+        } else if (state == State.PAUSED && hasTool) {
+            state = State.RECORDING;
+            particleTickCounter = 0;
+            client.player.sendSystemMessage(Component.literal("工具已切回，Survey 录制继续。"));
         }
     }
 
@@ -289,13 +304,14 @@ public class SurveySession {
     }
 
     public void onToolPickedUp(LocalPlayer player) {
+        particleTickCounter = 0;
         if (state == State.IDLE) {
-            player.sendSystemMessage(Component.literal("Survey 工具就绪，左键点击空地开始录制。"));
-        } else {
+            player
+                .sendSystemMessage(Component.literal("Survey 工具就绪：左键点击空地开始录制，右键放置路径点，左键点击节点结束录制。"));
+        } else if (state == State.PAUSED) {
             state = State.RECORDING;
             player.sendSystemMessage(Component.literal("工具已切回，Survey 录制继续。"));
         }
-        particleTickCounter = 0;
     }
 
     private void spawnPathParticles(Minecraft client) {
