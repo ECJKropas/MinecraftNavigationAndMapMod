@@ -93,6 +93,7 @@ public class WayfarerHttpServer implements Runnable {
         routes.add(new Route("PUT", Pattern.compile("/api/nodes/([0-9a-f-]+)"), this::handleUpdateNode));
         routes.add(new Route("DELETE", Pattern.compile("/api/nodes/([0-9a-f-]+)"), this::handleDeleteNode));
         routes.add(new Route("POST", "/api/nodes/merge", this::handleMergeNodes));
+        routes.add(new Route("POST", "/api/nodes/merge-nearby", this::handleMergeNearbyNodes));
         routes.add(new Route("POST", "/api/nodes/merge-clean", this::handleMergeCleanNodes));
         routes.add(new Route("POST", "/api/nodes/soft-delete", this::handleSoftDeleteNode));
         routes.add(new Route("POST", "/api/nodes/merge-segments", this::handleMergeSegmentsAtNode));
@@ -530,6 +531,34 @@ public class WayfarerHttpServer implements Runnable {
         } catch (Exception e) {
             sendJson(req.exchange, 400, errorJson("Invalid JSON: " + e.getMessage()));
         }
+    }
+
+    private void handleMergeNearbyNodes(Request req) {
+        double threshold = 1.0D;
+        if (req.body != null && !req.body.isEmpty()) {
+            try {
+                JsonObject body = JsonParser.parseString(req.body).getAsJsonObject();
+                if (body.has("threshold"))
+                    threshold = body.get("threshold").getAsDouble();
+            } catch (Exception ignored) {
+                // fall back to the default threshold
+            }
+        }
+        if (threshold <= 0)
+            threshold = 1.0D;
+
+        int merged = database.mergeNearbyNodes(threshold);
+        RoadNetworkDatabase.ConnectedComponentsStats stats = database.countConnectedComponents();
+        database.saveToDisk();
+
+        JsonObject result = new JsonObject();
+        result.addProperty("ok", true);
+        result.addProperty("threshold", threshold);
+        result.addProperty("mergedNodes", merged);
+        result.addProperty("nodeCount", stats.nodes);
+        result.addProperty("components", stats.components);
+        result.addProperty("isolatedNodes", stats.isolated);
+        sendJson(req.exchange, 200, result);
     }
 
     private void handleMergeCleanNodes(Request req) {

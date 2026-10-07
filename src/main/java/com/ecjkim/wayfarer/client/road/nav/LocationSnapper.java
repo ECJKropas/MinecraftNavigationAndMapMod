@@ -16,12 +16,15 @@
  */
 package com.ecjkim.wayfarer.client.road.nav;
 
+import java.util.ArrayList;
 import java.util.Collection;
+import java.util.Comparator;
 import java.util.List;
 import java.util.Optional;
 
 import com.ecjkim.wayfarer.client.road.data.RoadNetworkDatabase;
 import com.ecjkim.wayfarer.client.road.model.Node;
+import com.ecjkim.wayfarer.client.road.model.Segment;
 import com.ecjkim.wayfarer.client.road.spatial.NodeSpatialIndex;
 
 /**
@@ -59,7 +62,66 @@ public final class LocationSnapper {
      * </p>
      */
     public static List<Node> nearestNodes(RoadNetworkDatabase database, double x, double z, double radius, int limit) {
-        return List.copyOf(INDEX.nearest(sourceFor(database), x, z, radius, limit));
+        List<Node> nodeHits = List.copyOf(INDEX.nearest(sourceFor(database), x, z, radius, limit));
+        if (!nodeHits.isEmpty()) {
+            return nodeHits;
+        }
+        // No node within the snap radius. The click may still land on a visible road line whose nodes are spaced far
+        // apart, so project onto the nearest segment and snap to its endpoints instead of failing outright. This keeps
+        // "tap anywhere on the road" working even for sparse networks.
+        SegmentEndpoints endpoints = nearestSegmentEndpoints(database, x, z, radius);
+        if (endpoints != null) {
+            List<Node> fallback = new ArrayList<>(2);
+            if (endpoints.a() != null) fallback.add(endpoints.a());
+            if (endpoints.b() != null) fallback.add(endpoints.b());
+            fallback.sort(Comparator.comparing(n -> n.getId() == null ? "" : n.getId().toString()));
+            return fallback;
+        }
+        return List.of();
+    }
+
+    /**
+     * Finds the road segment whose line passes closest to {@code (x, z)}, provided that distance is at most
+     * {@code radius} blocks. Returns its two endpoint nodes, or {@code null} when nothing is that close.
+     */
+    private static SegmentEndpoints nearestSegmentEndpoints(RoadNetworkDatabase database, double x, double z,
+        double radius) {
+        double bestDistance = radius;
+        SegmentEndpoints best = null;
+        for (Segment segment : database.getAllSegments()) {
+            List<Node> nodes = database.getNodesForSegment(segment.getId());
+            if (nodes.size() < 2) {
+                continue;
+            }
+            Node prev = nodes.get(0);
+            for (int i = 1; i < nodes.size(); i++) {
+                Node curr = nodes.get(i);
+                double d = distanceToSegment(x, z, prev, curr);
+                if (d <= bestDistance) {
+                    bestDistance = d;
+                    best = new SegmentEndpoints(prev, curr);
+                }
+                prev = curr;
+            }
+        }
+        return best;
+    }
+
+    private static double distanceToSegment(double px, double pz, Node a, Node b) {
+        double dx = b.getX() - a.getX();
+        double dz = b.getZ() - a.getZ();
+        double len2 = dx * dx + dz * dz;
+        if (len2 < 1e-9) {
+            return Math.hypot(px - a.getX(), pz - a.getZ());
+        }
+        double t = ((px - a.getX()) * dx + (pz - a.getZ()) * dz) / len2;
+        t = Math.max(0.0, Math.min(1.0, t));
+        double cx = a.getX() + t * dx;
+        double cz = a.getZ() + t * dz;
+        return Math.hypot(px - cx, pz - cz);
+    }
+
+    private record SegmentEndpoints(Node a, Node b) {
     }
 
     private static synchronized NodeSpatialIndex.NodeSource sourceFor(RoadNetworkDatabase database) {

@@ -23,6 +23,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
@@ -945,6 +946,146 @@ public class RoadNetworkDatabase {
     }
 
     // ---------- Merge / Split ----------
+
+    /**
+     * Scans every pair of nodes and merges those whose horizontal (x,z) distance is strictly below
+     * {@code threshold} blocks. Nodes are grouped with a union-find so that any cluster of mutually close nodes
+     * collapses to a single representative (the one with the smallest id), keeping the operation deterministic and
+     * order-independent. Returns the number of nodes that were merged away.
+     *
+     * <p>
+     * Height (y) is intentionally ignored: this is used to weld junctions that were recorded as two coincident
+     * endpoints. Beware of stacked geometry (bridges / tunnels) whose horizontal projections coincide but which must
+     * stay disconnected — keep {@code threshold} small.
+     * </p>
+     */
+    public synchronized int mergeNearbyNodes(double threshold) {
+        List<Node> snapshot = new ArrayList<>(nodes.values());
+        int n = snapshot.size();
+        if (n < 2)
+            return 0;
+
+        int[] parent = new int[n];
+        for (int i = 0; i < n; i++)
+            parent[i] = i;
+
+        double t2 = threshold * threshold;
+        for (int i = 0; i < n; i++) {
+            Node a = snapshot.get(i);
+            for (int j = i + 1; j < n; j++) {
+                Node b = snapshot.get(j);
+                double dx = a.getX() - b.getX();
+                double dz = a.getZ() - b.getZ();
+                if (dx * dx + dz * dz < t2)
+                    union(parent, i, j);
+            }
+        }
+
+        Map<Integer, List<Node>> groups = new HashMap<>();
+        for (int i = 0; i < n; i++)
+            groups.computeIfAbsent(find(parent, i), k -> new ArrayList<>()).add(snapshot.get(i));
+
+        int merged = 0;
+        for (List<Node> group : groups.values()) {
+            if (group.size() < 2)
+                continue;
+            // Representative = smallest id, for deterministic results.
+            Node represent = group.get(0);
+            for (Node cand : group) {
+                if (cand.getId().toString().compareTo(represent.getId().toString()) < 0)
+                    represent = cand;
+            }
+            for (Node cand : group) {
+                if (!cand.getId().equals(represent.getId())) {
+                    mergeNodes(cand.getId(), represent.getId());
+                    merged++;
+                }
+            }
+        }
+        if (merged > 0)
+            markDirty();
+        return merged;
+    }
+
+    /**
+     * Counts the weakly-connected components of the road graph, where an edge exists between two nodes that are
+     * adjacent on the same segment. Also reports how many nodes are isolated (degree 0) and the total node count, so a
+     * caller can tell at a glance whether the network is one navigable whole or several disconnected islands.
+     */
+    public synchronized ConnectedComponentsStats countConnectedComponents() {
+        List<Node> nodeList = new ArrayList<>(nodes.values());
+        int n = nodeList.size();
+        if (n == 0)
+            return new ConnectedComponentsStats(0, 0, 0);
+
+        Map<UUID, Integer> index = new HashMap<>();
+        for (int i = 0; i < n; i++)
+            index.put(nodeList.get(i).getId(), i);
+
+        int[] parent = new int[n];
+        for (int i = 0; i < n; i++)
+            parent[i] = i;
+
+        Map<UUID, Integer> degree = new HashMap<>();
+        for (Segment seg : getAllSegments()) {
+            List<Node> segNodes = getNodesForSegment(seg.getId());
+            if (segNodes == null || segNodes.size() < 2)
+                continue;
+            for (int i = 0; i + 1 < segNodes.size(); i++) {
+                UUID u = segNodes.get(i).getId();
+                UUID v = segNodes.get(i + 1).getId();
+                Integer ui = index.get(u);
+                Integer vi = index.get(v);
+                if (ui != null && vi != null)
+                    union(parent, ui, vi);
+                degree.merge(u, 1, Integer::sum);
+                degree.merge(v, 1, Integer::sum);
+            }
+        }
+
+        Set<Integer> roots = new HashSet<>();
+        for (int i = 0; i < n; i++)
+            roots.add(find(parent, i));
+
+        int isolated = 0;
+        for (Node node : nodeList) {
+            if (degree.getOrDefault(node.getId(), 0) == 0)
+                isolated++;
+        }
+        return new ConnectedComponentsStats(roots.size(), isolated, n);
+    }
+
+    /** Result of {@link #countConnectedComponents()}: component count, isolated nodes, and total node count. */
+    public static final class ConnectedComponentsStats {
+        public final int components;
+        public final int isolated;
+        public final int nodes;
+
+        public ConnectedComponentsStats(int components, int isolated, int nodes) {
+            this.components = components;
+            this.isolated = isolated;
+            this.nodes = nodes;
+        }
+    }
+
+    private static void union(int[] parent, int a, int b) {
+        int ra = find(parent, a);
+        int rb = find(parent, b);
+        if (ra != rb)
+            parent[ra] = rb;
+    }
+
+    private static int find(int[] parent, int x) {
+        int root = x;
+        while (parent[root] != root)
+            root = parent[root];
+        while (parent[x] != root) {
+            int next = parent[x];
+            parent[x] = root;
+            x = next;
+        }
+        return root;
+    }
 
     /**
      * Merges multiple segments into one. The segments must be connected end-to-end; duplicate endpoints are
