@@ -137,7 +137,8 @@ public class RoadListScreen extends Screen {
         marqueePhases.clear();
         marqueePhaseCounter = 0;
 
-        searchBox = new EditBox(this.font, colLeftX + 2, 10, colLeftW - 4, SEARCH_H, Component.literal("Search"));
+        searchBox = new EditBox(this.font, colLeftX + 2, 10, colLeftW - 4, SEARCH_H,
+            Component.literal(I18n.get("wayfarer.road.gui.search_placeholder")));
         searchBox.setMaxLength(64);
         searchBox.setResponder(t -> {
             searchFilter = t.toLowerCase().trim();

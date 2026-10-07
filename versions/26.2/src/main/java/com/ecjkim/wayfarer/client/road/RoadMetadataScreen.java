@@ -40,6 +40,23 @@ public class RoadMetadataScreen extends Screen {
     private static final int PANEL_WIDTH = 300;
     private static final int PANEL_HEIGHT = 280;
 
+    /** The list above holds persisted storage codes; only their display goes through i18n. */
+    private static String classificationDisplay(String code) {
+        if (code == null || code.isEmpty()) {
+            return I18n.get("classification.none");
+        }
+        return switch (code) {
+            case "G国道" -> I18n.get("classification.national");
+            case "G高速" -> I18n.get("classification.highway");
+            case "S省道" -> I18n.get("classification.provincial");
+            case "S高架" -> I18n.get("classification.elevated");
+            case "X乡道" -> I18n.get("classification.township");
+            case "Y县道" -> I18n.get("classification.county");
+            case "C村道" -> I18n.get("classification.village");
+            default -> code;
+        };
+    }
+
     private final Segment segment;
     private final Consumer<Road> onSave;
     private final Runnable onCancel;
@@ -51,7 +68,7 @@ public class RoadMetadataScreen extends Screen {
     private Button cycleButton;
 
     public RoadMetadataScreen(Segment segment, Consumer<Road> onSave, Runnable onCancel) {
-        super(Component.literal("保存录制的道路"));
+        super(Component.literal(I18n.get("wayfarer.road.gui.metadata.title_create")));
         this.segment = segment;
         this.onSave = onSave;
         this.onCancel = onCancel;
@@ -82,7 +99,7 @@ public class RoadMetadataScreen extends Screen {
         String selectLabel = selectedRoad != null
             ? (selectedRoad.getName()
                 + (selectedRoad.getClassification() != null && !selectedRoad.getClassification().isEmpty()
-                    ? " (" + selectedRoad.getClassification() + ")" : ""))
+                    ? " (" + classificationDisplay(selectedRoad.getClassification()) + ")" : ""))
             : I18n.get("wayfarer.road.gui.metadata.select_road");
         this.addRenderableWidget(Button.builder(Component.literal(selectLabel), btn -> {
             this.minecraft.setScreenAndShow(new RoadListScreen(road -> {
@@ -96,7 +113,8 @@ public class RoadMetadataScreen extends Screen {
         int separatorY = selectButtonY + 30;
         int nameBoxY = separatorY + 52;
 
-        this.nameBox = new EditBox(this.font, fieldLeft, nameBoxY, fieldWidth, 20, Component.literal("道路名"));
+        this.nameBox = new EditBox(this.font, fieldLeft, nameBoxY, fieldWidth, 20,
+            Component.literal(I18n.get("wayfarer.road.gui.metadata.field_name")));
         this.nameBox.setMaxLength(64);
         this.nameBox.setValue("");
         this.addRenderableWidget(this.nameBox);
@@ -113,7 +131,8 @@ public class RoadMetadataScreen extends Screen {
 
         int numberLeft = fieldLeft + cycleButtonWidth + halfGap;
         int numberWidth = fieldWidth - cycleButtonWidth - halfGap;
-        this.numberBox = new EditBox(this.font, numberLeft, classifRowY, numberWidth, 20, Component.literal("编号"));
+        this.numberBox = new EditBox(this.font, numberLeft, classifRowY, numberWidth, 20,
+            Component.literal(I18n.get("wayfarer.road.gui.metadata.field_number")));
         this.numberBox.setMaxLength(16);
         this.numberBox.setValue("");
         this.addRenderableWidget(this.numberBox);
@@ -151,7 +170,7 @@ public class RoadMetadataScreen extends Screen {
                 roadName = classification.substring(0, 1) + number;
             }
             if (roadName.isEmpty()) {
-                roadName = "未命名道路";
+                roadName = I18n.get("wayfarer.road.gui.unnamed_road");
             }
 
             Road road = new Road(UUID.randomUUID(), roadName, "#FFFFFF", classification, number,
@@ -204,12 +223,14 @@ public class RoadMetadataScreen extends Screen {
         // Segment info
         int bottomInfoY = top + PANEL_HEIGHT - 44;
         graphics.text(this.font,
-            Component.literal("线段节点数: " + (segment.getNodeIds() != null ? segment.getNodeIds().size() : 0)), fieldLeft,
-            bottomInfoY, 0xFFCCCCCC, true);
+            Component.literal(I18n.get("wayfarer.road.gui.metadata.segment_node_count",
+                segment.getNodeIds() != null ? segment.getNodeIds().size() : 0)),
+            fieldLeft, bottomInfoY, 0xFFCCCCCC, true);
 
         if (selectedRoad != null) {
-            graphics.text(this.font, Component.literal("已关联道路: " + selectedRoad.getName()), fieldLeft, top + 38 + 8,
-                0xFF66AAFF, true);
+            graphics.text(this.font,
+                Component.literal(I18n.get("wayfarer.road.gui.metadata.assigned_road", selectedRoad.getName())),
+                fieldLeft, top + 38 + 8, 0xFF66AAFF, true);
         }
 
         super.extractRenderState(graphics, mouseX, mouseY, partialTick);
@@ -227,8 +248,7 @@ public class RoadMetadataScreen extends Screen {
     }
 
     private String classificationLabel() {
-        String val = CLASSIFICATIONS.get(classificationIndex);
-        return val.isEmpty() ? "道路分级" : val;
+        return classificationDisplay(CLASSIFICATIONS.get(classificationIndex));
     }
 
     private void cleanupOrphanData() {

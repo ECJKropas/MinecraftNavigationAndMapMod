@@ -18,6 +18,7 @@ package com.ecjkim.wayfarer.client;
 
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.player.LocalPlayer;
+import net.minecraft.client.resources.language.I18n;
 import net.minecraft.network.chat.Component;
 
 import net.fabricmc.api.ClientModInitializer;
@@ -78,8 +79,7 @@ public class WayfarerClient implements ClientModInitializer {
 
         // The window does not exist during onInitializeClient (Minecraft.getWindow() is null there), so the
         // Ctrl-scroll corner type switching callback must be installed once the client has started.
-        var started =
-            net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientLifecycleEvents.CLIENT_STARTED;
+        var started = net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientLifecycleEvents.CLIENT_STARTED;
         started.register(client -> {
             GLFW.glfwSetScrollCallback(client.getWindow().handle(), (win, dx, dy) -> pendingScrollDelta = dy);
         });
@@ -122,7 +122,7 @@ public class WayfarerClient implements ClientModInitializer {
 
     private void handleClientTick(Minecraft client) {
         if (client.player != null)
-            NAVIGATION_SESSION.updatePlayer(client.player.getX(), client.player.getZ());
+            NAVIGATION_SESSION.updatePlayer(client.player.getX(), client.player.getZ(), client.player.getYRot());
         // Detect world join to switch storage to the per-world file
         if (client.level != null && !worldInitialized) {
             initForWorld(client);
@@ -197,7 +197,8 @@ public class WayfarerClient implements ClientModInitializer {
                 } else {
                     SURVEY_SESSION.cycleDirectionPrev();
                 }
-                player.sendSystemMessage(Component.literal("方向类型: " + SURVEY_SESSION.getCurrentDirection().name()));
+                player.sendSystemMessage(Component
+                    .literal(I18n.get("wayfarer.road.survey.direction", SURVEY_SESSION.getCurrentDirection().name())));
             }
         }
 
@@ -210,10 +211,10 @@ public class WayfarerClient implements ClientModInitializer {
             return;
         ToolItemManager.setHeldItemAsTool(player);
         if (ToolItemManager.getToolItem().isEmpty()) {
-            player.sendSystemMessage(Component.literal("手持物品为空，已清除 Survey 工具设置。"));
+            player.sendSystemMessage(Component.literal(I18n.get("wayfarer.road.survey.tool_cleared_empty")));
         } else {
-            player.sendSystemMessage(
-                Component.literal("已将手持物品设为 Survey 工具: " + ToolItemManager.getToolItem().getHoverName().getString()));
+            player.sendSystemMessage(Component.literal(
+                I18n.get("wayfarer.road.survey.tool_set", ToolItemManager.getToolItem().getHoverName().getString())));
         }
     }
 
@@ -245,7 +246,7 @@ public class WayfarerClient implements ClientModInitializer {
         // Auto / Survey mutual exclusion
         if (ToolItemManager.hasToolItem(player) && WayfarerConfig.getInstance().toolItemEnabled) {
             if (!ROAD_MANAGER.isRecording()) {
-                player.sendSystemMessage(Component.literal("正在 Survey 模式，请切换手中物品后重试"));
+                player.sendSystemMessage(Component.literal(I18n.get("wayfarer.road.survey.in_survey_mode")));
             }
             return;
         }
@@ -254,19 +255,20 @@ public class WayfarerClient implements ClientModInitializer {
             ROAD_MANAGER.stopRecording();
             if (ROAD_MANAGER.getRecordedPointCount() < 2) {
                 ROAD_MANAGER.discardRecording();
-                player.sendSystemMessage(Component.literal("记录点太少，已取消这次道路记录。"));
+                player.sendSystemMessage(Component.literal(I18n.get("wayfarer.road.survey.too_few_points_cancel")));
             } else {
                 Segment segment = ROAD_MANAGER.saveRecording();
                 if (segment != null) {
                     client.setScreen(new RoadMetadataScreen(segment, savedRoad -> {
-                        player.sendSystemMessage(Component.literal("道路已保存: " + savedRoad.getName()));
+                        player.sendSystemMessage(
+                            Component.literal(I18n.get("wayfarer.road.survey.road_saved", savedRoad.getName())));
                     }, ROAD_MANAGER::discardRecording));
-                    player.sendSystemMessage(Component.literal("道路记录已停止，选择或创建道路后保存。"));
+                    player.sendSystemMessage(Component.literal(I18n.get("wayfarer.road.survey.recording_ended")));
                 }
             }
         } else {
             ROAD_MANAGER.startRecording();
-            player.sendSystemMessage(Component.literal("道路记录已开始。"));
+            player.sendSystemMessage(Component.literal(I18n.get("wayfarer.road.survey.recording_started")));
         }
     }
 }

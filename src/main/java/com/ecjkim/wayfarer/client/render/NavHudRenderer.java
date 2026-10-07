@@ -18,10 +18,12 @@ package com.ecjkim.wayfarer.client.render;
 
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphics;
+import net.minecraft.client.resources.language.I18n;
 
 import net.fabricmc.fabric.api.client.rendering.v1.HudRenderCallback;
 
 import com.ecjkim.wayfarer.client.WayfarerClient;
+import com.ecjkim.wayfarer.client.road.nav.Guidance;
 import com.ecjkim.wayfarer.client.road.nav.NavigationSession;
 
 public final class NavHudRenderer {
@@ -41,10 +43,17 @@ public final class NavHudRenderer {
         String text;
         int color;
         if (snapshot.state() == NavigationSession.State.ARRIVED) {
-            text = "已到达目的地";
+            text = I18n.get("wayfarer.nav.arrived");
             color = 0xFF55FF55;
         } else {
-            text = String.format("导航  剩余 %.1f 格  ETA %.0f 秒", snapshot.remainingDistance(),
+            String turn = turnText(snapshot.headingTurn());
+            if (snapshot.nextTurn() != null && snapshot.nextTurn().distance() <= 12D) {
+                turn = turnText(snapshot.nextTurn().type())
+                    + I18n.get("wayfarer.nav.turn_in", snapshot.nextTurn().distance());
+            } else if (snapshot.headingTurn() == Guidance.Turn.STRAIGHT) {
+                turn = I18n.get("wayfarer.nav.continue_road", snapshot.currentRoadDistance());
+            }
+            text = I18n.get("wayfarer.nav.hud", turn, snapshot.remainingDistance(),
                 snapshot.route() == null ? 0 : snapshot.route().getEtaSeconds());
             color = 0xFFFFFFFF;
         }
@@ -53,5 +62,14 @@ public final class NavHudRenderer {
         int y = client.getWindow().getGuiScaledHeight() - 62;
         graphics.fill(x, y, x + width, y + 16, 0x90000000);
         graphics.drawString(client.font, text, x + 6, y + 4, color);
+    }
+
+    private static String turnText(Guidance.Turn turn) {
+        return switch (turn) {
+            case LEFT -> I18n.get("wayfarer.nav.turn.left");
+            case RIGHT -> I18n.get("wayfarer.nav.turn.right");
+            case UTURN -> I18n.get("wayfarer.nav.turn.uturn");
+            case STRAIGHT -> I18n.get("wayfarer.nav.turn.straight");
+        };
     }
 }

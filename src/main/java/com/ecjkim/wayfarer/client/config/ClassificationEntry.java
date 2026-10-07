@@ -16,24 +16,24 @@
  */
 package com.ecjkim.wayfarer.client.config;
 
+import net.minecraft.client.resources.language.I18n;
+
 import fi.dy.masa.malilib.config.IConfigOptionListEntry;
 
 public enum ClassificationEntry implements IConfigOptionListEntry {
-    NONE("", "\u9053\u8def\u5206\u7ea7"), G_GUODAO("G\u56fd\u9053"), G_GAOSU("G\u9ad8\u901f"),
-    S_SHENGDAO("S\u7701\u9053"), S_GAOJIA("S\u9ad8\u67b6"), X_XIANGDAO("X\u4e61\u9053"), Y_XIANDAO("Y\u53bf\u9053"),
-    C_CUNDAO("C\u6751\u9053");
+    // The config values are the strings persisted in saved road data and in the malilib config file,
+    // so they must stay byte-for-byte identical; only the display name goes through i18n.
+    NONE("", "classification.default"), G_GUODAO("G\u56fd\u9053", "classification.national"),
+    G_GAOSU("G\u9ad8\u901f", "classification.highway"), S_SHENGDAO("S\u7701\u9053", "classification.provincial"),
+    S_GAOJIA("S\u9ad8\u67b6", "classification.elevated"), X_XIANGDAO("X\u4e61\u9053", "classification.township"),
+    Y_XIANDAO("Y\u53bf\u9053", "classification.county"), C_CUNDAO("C\u6751\u9053", "classification.village");
 
     private final String configValue;
-    private final String displayName;
+    private final String displayNameKey;
 
-    ClassificationEntry(String configValue) {
+    ClassificationEntry(String configValue, String displayNameKey) {
         this.configValue = configValue;
-        this.displayName = configValue;
-    }
-
-    ClassificationEntry(String configValue, String displayName) {
-        this.configValue = configValue;
-        this.displayName = displayName;
+        this.displayNameKey = displayNameKey;
     }
 
     @Override
@@ -43,7 +43,7 @@ public enum ClassificationEntry implements IConfigOptionListEntry {
 
     @Override
     public String getDisplayName() {
-        return displayName;
+        return I18n.get(displayNameKey);
     }
 
     @Override

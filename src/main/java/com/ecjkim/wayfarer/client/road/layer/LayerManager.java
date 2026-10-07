@@ -23,6 +23,8 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
+import net.minecraft.client.resources.language.I18n;
+
 /**
  * Central registry for all map layers.
  *
@@ -35,10 +37,10 @@ public class LayerManager {
     private final Map<String, MapLayer> layers = new LinkedHashMap<>();
 
     public LayerManager() {
-        registerBuiltin(new BuiltinLayer("xaero_base", "Xaero 世界地图", 0, true));
-        registerBuiltin(new BuiltinLayer("road_network", "道路路网", 100, true));
-        registerBuiltin(new BuiltinLayer("administrative", "行政区域", 200, true));
-        registerBuiltin(new BuiltinLayer("poi", "兴趣点", 300, true));
+        registerBuiltin(new BuiltinLayer("xaero_base", "wayfarer.layer.xaero_base", 0, true));
+        registerBuiltin(new BuiltinLayer("road_network", "wayfarer.layer.road_network", 100, true));
+        registerBuiltin(new BuiltinLayer("administrative", "wayfarer.layer.administrative", 200, true));
+        registerBuiltin(new BuiltinLayer("poi", "wayfarer.layer.poi", 300, true));
     }
 
     /**
@@ -101,13 +103,13 @@ public class LayerManager {
 
     private static final class BuiltinLayer implements MapLayer {
         private final String id;
-        private final String displayName;
+        private final String displayNameKey;
         private final int zIndex;
         private boolean visible;
 
-        BuiltinLayer(String id, String displayName, int zIndex, boolean visible) {
+        BuiltinLayer(String id, String displayNameKey, int zIndex, boolean visible) {
             this.id = id;
-            this.displayName = displayName;
+            this.displayNameKey = displayNameKey;
             this.zIndex = zIndex;
             this.visible = visible;
         }
@@ -119,7 +121,7 @@ public class LayerManager {
 
         @Override
         public String getDisplayName() {
-            return displayName;
+            return I18n.get(displayNameKey);
         }
 
         @Override

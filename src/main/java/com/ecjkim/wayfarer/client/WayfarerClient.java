@@ -136,7 +136,7 @@ public class WayfarerClient implements ClientModInitializer {
 
     private void handleClientTick(Minecraft client) {
         if (client.player != null) {
-            NAVIGATION_SESSION.updatePlayer(client.player.getX(), client.player.getZ());
+            NAVIGATION_SESSION.updatePlayer(client.player.getX(), client.player.getZ(), client.player.getYRot());
         }
         // Detect world join to switch storage to the per-world file
         if (client.level != null && !worldInitialized) {
@@ -195,7 +195,7 @@ public class WayfarerClient implements ClientModInitializer {
             if (consumeHotkey(window, bind)) {
                 NAVIGATION_SESSION.stop();
                 if (client.player != null)
-                    client.player.displayClientMessage(Component.literal("导航已取消"), false);
+                    client.player.displayClientMessage(Component.translatable("wayfarer.nav.cancelled"), false);
                 break;
             }
         }

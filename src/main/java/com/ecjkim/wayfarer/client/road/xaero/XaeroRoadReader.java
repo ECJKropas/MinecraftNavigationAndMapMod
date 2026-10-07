@@ -16,19 +16,20 @@
  */
 package com.ecjkim.wayfarer.client.road.xaero;
 
-import net.minecraft.client.Minecraft;
-import net.minecraft.client.gui.screens.Screen;
 import java.awt.Desktop;
 import java.net.URI;
+import java.util.ArrayList;
+
+import net.minecraft.client.Minecraft;
+import net.minecraft.client.gui.screens.Screen;
+import net.minecraft.client.resources.language.I18n;
+
+import com.ecjkim.wayfarer.client.road.data.RoadNetworkDatabase;
 
 import xaero.map.element.render.ElementReader;
 import xaero.map.element.render.ElementRenderLocation;
 import xaero.map.gui.IRightClickableElement;
 import xaero.map.gui.dropdown.rightclick.RightClickOption;
-
-import java.util.ArrayList;
-
-import com.ecjkim.wayfarer.client.road.data.RoadNetworkDatabase;
 
 /**
  * Describes road elements to Xaero's element pipeline.
@@ -154,7 +155,7 @@ public final class XaeroRoadReader extends ElementReader<XaeroRoadElement, Xaero
     @Override
     public ArrayList<RightClickOption> getRightClickOptions(XaeroRoadElement element, IRightClickableElement target) {
         ArrayList<RightClickOption> options = new ArrayList<>();
-        options.add(new RightClickOption("定位到网页编辑器", 0, target) {
+        options.add(new RightClickOption(I18n.get("wayfarer.xaero.open_web_editor"), 0, target) {
             @Override
             public void onAction(Screen screen) {
                 String url = "http://localhost:7891/?x=" + element.anchorX() + "&z=" + element.anchorZ();
@@ -169,14 +170,14 @@ public final class XaeroRoadReader extends ElementReader<XaeroRoadElement, Xaero
                 }
             }
         });
-        options.add(new RightClickOption("复制坐标", 1, target) {
+        options.add(new RightClickOption(I18n.get("wayfarer.xaero.copy_coordinates"), 1, target) {
             @Override
             public void onAction(Screen screen) {
-                Minecraft.getInstance().keyboardHandler.setClipboard(
-                    String.format("%.2f, %.2f", element.anchorX(), element.anchorZ()));
+                Minecraft.getInstance().keyboardHandler
+                    .setClipboard(String.format("%.2f, %.2f", element.anchorX(), element.anchorZ()));
             }
         });
-        options.add(new RightClickOption("删除该路段", 2, target) {
+        options.add(new RightClickOption(I18n.get("wayfarer.xaero.delete_segment"), 2, target) {
             @Override
             public void onAction(Screen screen) {
                 RoadNetworkDatabase database = RoadNetworkDatabase.getInstance();

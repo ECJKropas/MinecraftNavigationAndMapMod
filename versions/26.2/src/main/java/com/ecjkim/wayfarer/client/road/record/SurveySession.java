@@ -22,6 +22,7 @@ import java.util.UUID;
 
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.player.LocalPlayer;
+import net.minecraft.client.resources.language.I18n;
 import net.minecraft.network.chat.Component;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.phys.Vec3;
@@ -108,14 +109,15 @@ public class SurveySession {
             if (!hasTool) {
                 // Keep the recorded nodes, so picking the tool back up resumes the same road.
                 state = State.PAUSED;
-                client.player.sendSystemMessage(Component.literal("工具已离手，Survey 录制已暂停（已记录的节点保留）。"));
+                client.player
+                    .sendSystemMessage(Component.literal(I18n.get("wayfarer.road.survey.tool_removed_paused")));
                 return;
             }
             spawnPathParticles(client);
         } else if (state == State.PAUSED && hasTool) {
             state = State.RECORDING;
             particleTickCounter = 0;
-            client.player.sendSystemMessage(Component.literal("工具已切回，Survey 录制继续。"));
+            client.player.sendSystemMessage(Component.literal(I18n.get("wayfarer.road.survey.tool_resumed_plain")));
         }
     }
 
@@ -177,7 +179,7 @@ public class SurveySession {
             nodeIds.add(startNode.getId());
             lastNodePos = new Vec3(pos.x, pos.y, pos.z);
             state = State.RECORDING;
-            player.sendSystemMessage(Component.literal("Survey 录制已开始，右键放置路径点，左键结束录制。"));
+            player.sendSystemMessage(Component.literal(I18n.get("wayfarer.road.survey.recording_started_hint")));
         } else if (state == State.RECORDING) {
             Vec3 pos = player.position();
             Node endNode = createNode(pos.x, pos.y, pos.z);
@@ -189,7 +191,7 @@ public class SurveySession {
 
     private void handleLeftClickOnNode(LocalPlayer player, UUID hitNodeId) {
         if (state == State.IDLE) {
-            player.sendSystemMessage(Component.literal("点击空地开始录制"));
+            player.sendSystemMessage(Component.literal(I18n.get("wayfarer.road.survey.click_air_to_start")));
         } else if (state == State.RECORDING) {
             if (!nodeIds.contains(hitNodeId)) {
                 nodeIds.add(hitNodeId);
@@ -211,7 +213,8 @@ public class SurveySession {
         RoadNetworkDatabase.getInstance().addNode(waypoint);
         nodeIds.add(waypoint.getId());
         lastNodePos = new Vec3(pos.x, pos.y, pos.z);
-        player.sendSystemMessage(Component.literal("已放置路径点 (" + nodeIds.size() + ")"));
+        player.sendSystemMessage(
+            Component.literal(I18n.get("wayfarer.road.survey.waypoint_placed_simple", nodeIds.size())));
     }
 
     private void handleRightClickOnNode(LocalPlayer player, UUID hitNodeId) {
@@ -225,13 +228,14 @@ public class SurveySession {
         if (hitNode != null) {
             lastNodePos = new Vec3(hitNode.getX(), hitNode.getY(), hitNode.getZ());
         }
-        player.sendSystemMessage(Component.literal("已吸附到现有节点 (" + nodeIds.size() + ")"));
+        player.sendSystemMessage(
+            Component.literal(I18n.get("wayfarer.road.survey.waypoint_snapped_simple", nodeIds.size())));
     }
 
     private void finishRecording(LocalPlayer player) {
         if (nodeIds.size() < 2) {
             cleanupOrphanData();
-            player.sendSystemMessage(Component.literal("节点太少，已取消录制。"));
+            player.sendSystemMessage(Component.literal(I18n.get("wayfarer.road.survey.too_few_nodes")));
             state = State.IDLE;
             return;
         }
@@ -249,13 +253,14 @@ public class SurveySession {
 
         Minecraft client = Minecraft.getInstance();
         client.setScreenAndShow(new RoadMetadataScreen(segment, savedRoad -> {
-            player.sendSystemMessage(Component.literal("道路已保存: " + savedRoad.getName()));
+            player
+                .sendSystemMessage(Component.literal(I18n.get("wayfarer.road.survey.road_saved", savedRoad.getName())));
             pendingSegment = null;
         }, () -> {
             cleanupOrphanData();
             pendingSegment = null;
         }));
-        player.sendSystemMessage(Component.literal("道路记录已停止，选择或创建道路后保存。"));
+        player.sendSystemMessage(Component.literal(I18n.get("wayfarer.road.survey.recording_ended")));
     }
 
     private Node createNode(double x, double y, double z) {
@@ -306,11 +311,10 @@ public class SurveySession {
     public void onToolPickedUp(LocalPlayer player) {
         particleTickCounter = 0;
         if (state == State.IDLE) {
-            player
-                .sendSystemMessage(Component.literal("Survey 工具就绪：左键点击空地开始录制，右键放置路径点，左键点击节点结束录制。"));
+            player.sendSystemMessage(Component.literal(I18n.get("wayfarer.road.survey.tool_ready_hint")));
         } else if (state == State.PAUSED) {
             state = State.RECORDING;
-            player.sendSystemMessage(Component.literal("工具已切回，Survey 录制继续。"));
+            player.sendSystemMessage(Component.literal(I18n.get("wayfarer.road.survey.tool_resumed_plain")));
         }
     }
 

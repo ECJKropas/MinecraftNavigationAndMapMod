@@ -23,11 +23,15 @@ import com.google.common.collect.ImmutableList;
 import fi.dy.masa.malilib.config.options.ConfigHotkey;
 
 public class WayfarerHotkeys {
-    public static final ConfigHotkey TOGGLE_RECORDING = new ConfigHotkey("toggleRecording", "R", "切换道路录制开关");
-    public static final ConfigHotkey OPEN_MENU = new ConfigHotkey("openMenu", "N", "打开导航菜单");
-    public static final ConfigHotkey SET_HELD_ITEM_AS_TOOL =
-        new ConfigHotkey("setHeldItemAsTool", "LEFT_CONTROL,LEFT_ALT,T", "将当前手持物品设为 Survey 工具");
-    public static final ConfigHotkey NAVIGATION = new ConfigHotkey("navigation", "G", "停止当前导航");
+    // The comment passed to malilib is only the fallback: malilib looks the tooltip up under
+    // "config.comment.<lowercased name>", which is where the zh_cn / en_us translations live.
+    public static final ConfigHotkey TOGGLE_RECORDING =
+        new ConfigHotkey("toggleRecording", "R", "Start or stop automatic road recording");
+    public static final ConfigHotkey OPEN_MENU = new ConfigHotkey("openMenu", "N", "Open the Wayfarer navigation menu");
+    public static final ConfigHotkey SET_HELD_ITEM_AS_TOOL = new ConfigHotkey("setHeldItemAsTool",
+        "LEFT_CONTROL,LEFT_ALT,T", "Set the currently held item as the Survey tool");
+    public static final ConfigHotkey NAVIGATION =
+        new ConfigHotkey("navigation", "G", "Stop the navigation that is currently running");
 
     public static final List<ConfigHotkey> HOTKEY_LIST =
         ImmutableList.of(TOGGLE_RECORDING, OPEN_MENU, SET_HELD_ITEM_AS_TOOL, NAVIGATION);

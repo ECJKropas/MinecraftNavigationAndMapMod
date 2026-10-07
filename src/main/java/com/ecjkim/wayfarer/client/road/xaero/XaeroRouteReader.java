@@ -3,7 +3,7 @@
  * https://github.com/ECJKropas/MinecraftNavigationAndMapMod
 
  * MinecraftNavigationAndMapMod is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by the
+ * it under the terms of the GNU General Public License as published by
  * the Free Software Foundation, version 3 of the License.
 
  * MinecraftNavigationAndMapMod is distributed in the hope that it will be useful,
@@ -17,6 +17,7 @@
 package com.ecjkim.wayfarer.client.road.xaero;
 
 import net.minecraft.client.Minecraft;
+import net.minecraft.client.resources.language.I18n;
 
 import xaero.map.element.render.ElementReader;
 import xaero.map.element.render.ElementRenderLocation;
@@ -102,7 +103,7 @@ public final class XaeroRouteReader extends ElementReader<XaeroRouteElement, Xae
 
     @Override
     public String getMenuName(XaeroRouteElement element) {
-        return "Wayfarer 路线";
+        return I18n.get("wayfarer.xaero.route_name");
     }
 
     @Override

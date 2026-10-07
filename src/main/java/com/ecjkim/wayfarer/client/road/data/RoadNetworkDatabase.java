@@ -317,7 +317,7 @@ public class RoadNetworkDatabase {
         if (degree == 1) {
             Segment seg = connectedSegments.get(0);
             if (seg.getNodeIds().size() <= 2) {
-                return errorResult("unsupported", "该节点不支持软删除");
+                return errorResult("unsupported");
             }
             // Shorten: remove endpoint from segment
             List<UUID> newIds = new ArrayList<>(seg.getNodeIds());
@@ -335,7 +335,7 @@ public class RoadNetworkDatabase {
 
         // --- Non-even degree > 1: unsupported ---
         if (degree % 2 != 0) {
-            return errorResult("unsupported", "该节点不支持软删除");
+            return errorResult("unsupported");
         }
 
         // --- Even degree: center node ---
@@ -393,7 +393,7 @@ public class RoadNetworkDatabase {
             double dz = rightZ - leftZ;
             double len = Math.sqrt(dx * dx + dz * dz);
             if (len < 1e-6) {
-                return errorResult("unsupported", "该节点不支持软删除");
+                return errorResult("unsupported");
             }
             dirs[i][0] = dx / len;
             dirs[i][1] = dz / len;
@@ -438,7 +438,7 @@ public class RoadNetworkDatabase {
             }
 
             if (!found) {
-                return errorResult("road_mismatch", "软删除失败，有不同名路段");
+                return errorResult("road_mismatch");
             }
         }
 
@@ -534,12 +534,6 @@ public class RoadNetworkDatabase {
         JsonObject obj = new JsonObject();
         obj.addProperty("ok", false);
         obj.addProperty("error", error);
-        return obj;
-    }
-
-    private static JsonObject errorResult(String error, String message) {
-        JsonObject obj = errorResult(error);
-        obj.addProperty("message", message);
         return obj;
     }
 
@@ -948,10 +942,10 @@ public class RoadNetworkDatabase {
     // ---------- Merge / Split ----------
 
     /**
-     * Scans every pair of nodes and merges those whose horizontal (x,z) distance is strictly below
-     * {@code threshold} blocks. Nodes are grouped with a union-find so that any cluster of mutually close nodes
-     * collapses to a single representative (the one with the smallest id), keeping the operation deterministic and
-     * order-independent. Returns the number of nodes that were merged away.
+     * Scans every pair of nodes and merges those whose horizontal (x,z) distance is strictly below {@code threshold}
+     * blocks. Nodes are grouped with a union-find so that any cluster of mutually close nodes collapses to a single
+     * representative (the one with the smallest id), keeping the operation deterministic and order-independent. Returns
+     * the number of nodes that were merged away.
      *
      * <p>
      * Height (y) is intentionally ignored: this is used to weld junctions that were recorded as two coincident
