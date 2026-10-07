@@ -7,6 +7,13 @@ let roadStore = { nodes:{}, segments:{}, roads:{} };
 let activeTool = null;          // 'move' | 'point' | 'merge' | 'fenhe' | 'softdelete' | null
 let navigationPickMode = false;
 let navigationLayer = null;
+let navMode = 'WALK';                 // 'WALK' | 'DRIVE' — sent to server (C1)
+let navMarkers = { start: null, end: null, player: null };
+let navActive = false;
+let viewportDirty = true;            // C2: re-cull only when needed
+let snapToGrid = false;             // C3: snap node edits to integer grid
+let renderedSegmentCount = 0;       // C2: perf indicator
+let totalSegmentCount = 0;
 let toolbarMode = 'compact';   // 'compact' | 'detailed'
 let mergeFirstNodeId = null;   // first node selected in merge tool
 const TOOL_TOLERANCE_PX = 12;  // pixel tolerance for point tool segment detection
@@ -338,6 +345,10 @@ async function initMap() {
   // Global drag handlers (document-level to catch mouse outside map)
   document.addEventListener('mousemove', onGlobalMouseMove);
   document.addEventListener('mouseup', onGlobalMouseUp);
+
+  // C2: re-cull only after the viewport actually changed
+  map.on('moveend', () => { viewportDirty = true; maybeRender(); });
+  map.on('zoomend', () => { viewportDirty = true; maybeRender(); });
 }
 
 function onGlobalMouseMove(e) {
@@ -391,6 +402,83 @@ async function loadConfig() {
 }
 
 function mc2latlng(x, z) { return [z / SCALE, x / SCALE]; }
+
+// ——— Part C2: viewport culling + polyline simplification ———
+function pointInView(lat, lng) {
+  if (!map) return true;
+  const b = map.getBounds();
+  return lat >= b.getSouth() && lat <= b.getNorth() && lng >= b.getWest() && lng <= b.getEast();
+}
+
+function segmentInView(pts) {
+  if (!map || !pts.length) return true;
+  let minLat = Infinity, maxLat = -Infinity, minLng = Infinity, maxLng = -Infinity;
+  for (const p of pts) {
+    if (p.lat < minLat) minLat = p.lat;
+    if (p.lat > maxLat) maxLat = p.lat;
+    if (p.lng < minLng) minLng = p.lng;
+    if (p.lng > maxLng) maxLng = p.lng;
+  }
+  const b = map.getBounds();
+  return !(maxLat < b.getSouth() || minLat > b.getNorth() || maxLng < b.getWest() || minLng > b.getEast());
+}
+
+// Douglas–Peucker in screen space: keeps geometry visually identical at the current zoom while dropping
+// redundant vertices, so a long road with hundreds of points becomes a handful of segments on screen.
+function simplifyScreen(pts, epsPx) {
+  if (pts.length <= 2) return pts;
+  const sp = pts.map(p => map.latLngToContainerPoint(p));
+  const out = douglasPeucker(sp, epsPx);
+  return out.map(p => map.containerPointToLatLng(p));
+}
+
+function douglasPeucker(points, epsilon) {
+  if (points.length < 3) return points.slice();
+  let maxDist = 0, index = 0;
+  const end = points.length - 1;
+  for (let i = 1; i < end; i++) {
+    const d = perpendicularDistance(points[i], points[0], points[end]);
+    if (d > maxDist) { maxDist = d; index = i; }
+  }
+  if (maxDist > epsilon) {
+    const left = douglasPeucker(points.slice(0, index + 1), epsilon);
+    const right = douglasPeucker(points.slice(index), epsilon);
+    return left.slice(0, -1).concat(right);
+  }
+  return [points[0], points[end]];
+}
+
+function perpendicularDistance(p, a, b) {
+  const dx = b.x - a.x, dy = b.y - a.y;
+  const len = Math.hypot(dx, dy);
+  if (len === 0) return Math.hypot(p.x - a.x, p.y - a.y);
+  return Math.abs((p.x - a.x) * dy - (p.y - a.y) * dx) / len;
+}
+
+// True when any of the entities just synced from the server falls inside the current map view.
+function changedEntitiesInView(data) {
+  if (!map) return true;
+  if (data.nodes) for (const n of data.nodes) { if (pointInView(n.z / SCALE, n.x / SCALE)) return true; }
+  if (data.segments) for (const s of data.segments) {
+    if (!s.nodeIds) continue;
+    let minLat = Infinity, maxLat = -Infinity, minLng = Infinity, maxLng = -Infinity, ok = false;
+    for (const nid of s.nodeIds) {
+      const n = roadStore.nodes[nid];
+      if (!n) continue;
+      ok = true;
+      const lat = n.z / SCALE, lng = n.x / SCALE;
+      if (lat < minLat) minLat = lat; if (lat > maxLat) maxLat = lat;
+      if (lng < minLng) minLng = lng; if (lng > maxLng) maxLng = lng;
+    }
+    if (ok && segmentInView([{lat: minLat, lng: minLng}, {lat: maxLat, lng: maxLng}])) return true;
+  }
+  return false;
+}
+
+// Only re-cull/re-draw when the viewport moved or an edit touched a visible segment.
+function maybeRender() {
+  if (viewportDirty) { renderAll(); viewportDirty = false; }
+}
 
 // ——— Data ———
 async function loadData() {
@@ -465,7 +553,10 @@ async function loadDelta() {
       }
     }
 
-    if (changed) renderAll();
+    if (changed && (viewportDirty || changedEntitiesInView(data))) {
+      renderAll();
+      viewportDirty = false;
+    }
   } catch (e) { /* silent */ }
 }
 
@@ -693,6 +784,9 @@ function renderAll() {
   window._roadLabels.forEach(l => map.removeLayer(l));
   window._roadLabels.clear();
 
+  renderedSegmentCount = 0;
+  totalSegmentCount = Object.keys(roadStore.segments).length;
+
   // Build point arrays helper
   function buildPoints(seg) {
     const pts = [];
@@ -722,8 +816,11 @@ function renderAll() {
 
   // Render unassigned (gray edge + white fill)
   for (const { id: sid, seg } of unassigned) {
-    const pts = buildPoints(seg);
+    let pts = buildPoints(seg);
     if (pts.length < 2) continue;
+    if (!segmentInView(pts)) continue;
+    pts = simplifyScreen(pts, 1.2);
+    renderedSegmentCount++;
     const isSelected = selectedSegments.has(sid);
     const eo = { color: '#BBBBBB', weight: isSelected ? 5.5 : 4.5, opacity: isSelected ? 1 : 0.5, smoothFactor: 0.2 };
     const fo = { color: '#F8F8F8', weight: isSelected ? 3.5 : 3, opacity: isSelected ? 1 : 0.92, smoothFactor: 0.2 };
@@ -752,8 +849,11 @@ function renderAll() {
     const allPts = [];
 
     for (const { id: sid, seg } of group.items) {
-      const pts = buildPoints(seg);
+      let pts = buildPoints(seg);
       if (pts.length < 2) continue;
+      if (!segmentInView(pts)) continue;
+      pts = simplifyScreen(pts, 1.2);
+      renderedSegmentCount++;
       const mid = pts[Math.floor(pts.length / 2)];
       if (mid && isFinite(mid.lat) && isFinite(mid.lng)) {
         allPts.push(mid);
@@ -853,6 +953,7 @@ function renderAll() {
     const fill = node.source === 'AUTO' ? '#aeaeb2'
       : node.cornerType === 'SHARP' ? '#FF3B30' : '#007AFF';
     const isMergeTarget = activeTool === 'merge' && nid === mergeFirstNodeId;
+    if (!pointInView(node.z / SCALE, node.x / SCALE)) continue;
     const marker = L.circleMarker(mc2latlng(node.x, node.z), {
       radius: isMergeTarget ? 7 : 5,
       fillColor: isMergeTarget ? '#FFD60A' : fill,
@@ -902,6 +1003,9 @@ function renderAll() {
     });
     nodeMarkers.set(nid, marker);
   }
+
+  const perfText = document.getElementById('perf-text');
+  if (perfText) perfText.textContent = I18N.t('perf.rendered', { n: renderedSegmentCount, total: totalSegmentCount });
 }
 
 // ——— Interactions ———
@@ -918,28 +1022,159 @@ function onMapClick(e) {
   clearSelection();
 }
 
+// ——— Part C1: Navigation ———
+function openNavPicker() {
+  document.getElementById('nav-picker').classList.add('visible');
+}
+function closeNavPicker() {
+  document.getElementById('nav-picker').classList.remove('visible');
+}
+
 async function startNavigation(x, z) {
   try {
-    const res = await fetch('/api/nav/start', {method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({x, z})});
+    closeNavPicker();
+    const res = await fetch('/api/nav/start', {
+      method: 'POST', headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({ x, z, mode: navMode })
+    });
     const data = await res.json();
-    if (!res.ok || !data.ok) { showToast('导航失败: ' + (data.error || '无可达路线'), 'error'); return; }
+    if (!res.ok || !data.ok) {
+      showToast(I18N.t('nav.noRoute') + (data.error ? ': ' + data.error : ''), 'error');
+      return;
+    }
+    navActive = true;
+    showNavPanel();
     renderNavigation(data);
+    updateNavPanel(data);
   } catch (e) { showToast('导航请求失败: ' + e.message, 'error'); }
 }
 
-function renderNavigation(data) {
-  if (navigationLayer) map.removeLayer(navigationLayer);
-  if (data.coordinates && data.coordinates.length > 1) {
-    navigationLayer = L.polyline(data.coordinates.map(c => mc2latlng(c[0], c[1])), {color: '#007AFF', weight: 5, opacity: 0.85}).addTo(map);
+function clearNavLayers() {
+  if (navigationLayer) { map.removeLayer(navigationLayer); navigationLayer = null; }
+  for (const k of ['start', 'end', 'player']) {
+    if (navMarkers[k]) { map.removeLayer(navMarkers[k]); navMarkers[k] = null; }
   }
+}
+
+function renderNavigation(data) {
+  clearNavLayers();
+  const coords = (data.coordinates && data.coordinates.length > 1) ? data.coordinates : null;
+  if (coords) {
+    const pts = coords.map(c => mc2latlng(c[0], c[1]));
+    navigationLayer = L.polyline(pts, {
+      color: '#007AFF', weight: 5, opacity: 0.9, lineCap: 'round', lineJoin: 'round'
+    }).addTo(map);
+  }
+  const dest = data.destination;
+  if (dest) {
+    navMarkers.end = L.circleMarker(mc2latlng(dest.x, dest.z), {
+      radius: 7, color: '#fff', weight: 3, fillColor: '#FF3B30', fillOpacity: 1
+    }).addTo(map);
+  }
+  if (coords) {
+    navMarkers.start = L.circleMarker(mc2latlng(coords[0][0], coords[0][1]), {
+      radius: 6, color: '#fff', weight: 3, fillColor: '#34C759', fillOpacity: 1
+    }).addTo(map);
+  }
+  if (typeof data.playerX === 'number' && typeof data.playerZ === 'number') {
+    navMarkers.player = L.circleMarker(mc2latlng(data.playerX, data.playerZ), {
+      radius: 5, color: '#fff', weight: 2, fillColor: '#007AFF', fillOpacity: 0.95
+    }).addTo(map);
+  }
+}
+
+function updateNavPanel(data) {
+  const panel = document.getElementById('nav-panel');
+  if (!navActive) { panel.classList.remove('visible'); return; }
+  panel.classList.add('visible');
+
+  const statusEl = document.getElementById('nav-status');
+  if (data.state === 'ARRIVED') { statusEl.textContent = I18N.t('nav.arrived'); statusEl.style.color = '#34c759'; }
+  else if (data.offRoute) { statusEl.textContent = I18N.t('nav.offRoute'); statusEl.style.color = 'var(--red)'; }
+  else { statusEl.textContent = ''; statusEl.style.color = ''; }
+
+  const rem = data.remainingDistance || 0;
+  document.getElementById('nav-remaining').innerHTML =
+    formatDistance(rem) + ' <small>' + I18N.t('nav.meters') + '</small>';
+  document.getElementById('nav-eta').textContent = formatDuration(data.remainingTime || 0);
+
+  const turnIco = document.getElementById('nav-turn-ico');
+  const turnTxt = document.getElementById('nav-turn-txt');
+  const turnDist = document.getElementById('nav-turn-dist');
+  if (data.nextTurn) {
+    const m = {
+      LEFT: ['fa-arrow-left', 'nav.turnLeft'],
+      RIGHT: ['fa-arrow-right', 'nav.turnRight'],
+      UTURN: ['fa-arrow-rotate-left', 'nav.uturn'],
+      STRAIGHT: ['fa-arrow-up', 'nav.straight']
+    }[data.nextTurn.type] || ['fa-arrow-up', 'nav.straight'];
+    turnIco.innerHTML = '<i class="fa-solid ' + m[0] + '"></i>';
+    turnTxt.textContent = I18N.t(m[1]);
+    turnDist.textContent = formatDistance(data.nextTurn.distance) + ' ' + I18N.t('nav.meters');
+  } else {
+    turnIco.innerHTML = '<i class="fa-solid fa-arrow-up"></i>';
+    turnTxt.textContent = I18N.t('nav.straight');
+    turnDist.textContent = '';
+  }
+
+  if (data.destination) {
+    document.getElementById('nav-dest-coords').textContent =
+      Math.round(data.destination.x) + ', ' + Math.round(data.destination.z);
+  }
+
+  let pct = 0;
+  if (data.coordinates && data.coordinates.length > 1) {
+    let totalLen = 0;
+    for (let i = 1; i < data.coordinates.length; i++) {
+      const dx = data.coordinates[i][0] - data.coordinates[i - 1][0];
+      const dz = data.coordinates[i][1] - data.coordinates[i - 1][1];
+      totalLen += Math.hypot(dx, dz);
+    }
+    if (totalLen > 0) pct = Math.max(0, Math.min(1, 1 - rem / totalLen));
+  }
+  document.getElementById('nav-progress-bar').style.width = (pct * 100).toFixed(1) + '%';
+
+  document.querySelectorAll('#nav-mode button').forEach(b => {
+    b.classList.toggle('active', b.dataset.mode === navMode);
+  });
+}
+
+function showNavPanel() { document.getElementById('nav-panel').classList.add('visible'); }
+function hideNavPanel() { document.getElementById('nav-panel').classList.remove('visible'); }
+
+function formatDistance(m) {
+  m = Math.max(0, Math.round(m));
+  if (m >= 1000) return (m / 1000).toFixed(1) + 'k';
+  return String(m);
+}
+function formatDuration(sec) {
+  sec = Math.max(0, Math.round(sec));
+  if (sec < 60) return sec + 's';
+  const m = Math.floor(sec / 60);
+  const s = sec % 60;
+  if (m < 60) return s ? (m + 'm' + s + 's') : (m + 'm');
+  const h = Math.floor(m / 60);
+  return (h + 'h' + (m % 60) + 'm');
 }
 
 async function refreshNavigation() {
   try {
-    const data = await (await fetch('/api/nav/state')).json();
-    if (data.state === 'ACTIVE' && data.coordinates) renderNavigation(data);
-    if (data.state === 'IDLE' && navigationLayer) { map.removeLayer(navigationLayer); navigationLayer = null; }
+    const res = await fetch('/api/nav/state');
+    const data = await res.json();
+    if (data.state === 'IDLE') {
+      if (navActive) { navActive = false; clearNavLayers(); hideNavPanel(); }
+      return;
+    }
+    navActive = true;
+    renderNavigation(data);
+    updateNavPanel(data);
   } catch (e) { /* server may be restarting */ }
+}
+
+function cancelNavigation() {
+  fetch('/api/nav/stop', { method: 'POST' }).then(() => {
+    navActive = false; clearNavLayers(); hideNavPanel();
+  }).catch(() => {});
 }
 
 function onNodeClick(nid, event) {
@@ -966,8 +1201,9 @@ function onSegmentClick(sid, event) {
 
 function onNodeDragEnd(nid, marker) {
   const latlng = marker.getLatLng();
-  const x = latlng.lng * SCALE;
-  const z = latlng.lat * SCALE;
+  let x = latlng.lng * SCALE;
+  let z = latlng.lat * SCALE;
+  if (snapToGrid) { x = Math.round(x); z = Math.round(z); }
   const node = roadStore.nodes[nid];
   if (!node) return;
   pushUndo();
@@ -1024,6 +1260,14 @@ function clearSelection() {
 function updateMergeButton() {
   const btn = document.getElementById('merge-btn');
   btn.style.display = selectedSegments.size >= 2 ? '' : 'none';
+  const bar = document.getElementById('batch-bar');
+  const delLabel = document.getElementById('batch-del-label');
+  if (selectedSegments.size >= 1) {
+    delLabel.textContent = I18N.t('edit.deleteSelected', { n: selectedSegments.size });
+    bar.classList.add('visible');
+  } else {
+    bar.classList.remove('visible');
+  }
 }
 
 // ——— Actions ———
@@ -1131,6 +1375,31 @@ async function mergeSegments() {
   else showToast(I18N.t('toast.mergeFailed'), 'error');
 }
 
+// ——— Part C3: snap-to-grid + batch delete ———
+function toggleSnap() {
+  snapToGrid = !snapToGrid;
+  const el = document.getElementById('snap-toggle');
+  el.classList.toggle('active', snapToGrid);
+  el.title = snapToGrid ? I18N.t('edit.snap.on') : I18N.t('edit.snap.off');
+  showToast(snapToGrid ? I18N.t('edit.snap.on') : I18N.t('edit.snap.off'));
+}
+
+async function deleteSelectedSegments() {
+  if (selectedSegments.size === 0) return;
+  const ids = [...selectedSegments];
+  showSheet(I18N.t('sheet.deleteSegment.title'), I18N.t('sheet.deleteSegment.message'), [
+    { label: I18N.t('sheet.deleteNode.cancel'), role: 'cancel' },
+    { label: I18N.t('sheet.deleteNode.confirm'), role: 'destructive', action: async () => {
+        pushUndo();
+        for (const sid of ids) {
+          await fetch('/api/segments/' + sid, { method: 'DELETE' });
+        }
+        clearSelection(); loadData();
+        showToast(I18N.t('toast.segmentDeleted'));
+      } }
+  ]);
+}
+
 // ——— Toolbar ———
 function initToolbar() {
   document.getElementById('tool-move').addEventListener('click', () => toggleTool('move'));
@@ -1170,19 +1439,28 @@ function initToolbar() {
   document.getElementById('tool-merge').addEventListener('click', () => toggleTool('merge'));
   document.getElementById('tool-fenhe').addEventListener('click', () => toggleTool('fenhe'));
   document.getElementById('tool-softdelete').addEventListener('click', () => toggleTool('softdelete'));
-  document.getElementById('tool-navigation').addEventListener('click', () => {
-    const typed = prompt('输入目的地 X,Z，留空后在地图上点选：');
-    if (typed && typed.includes(',')) {
-      const parts = typed.split(',').map(Number);
-      if (parts.length === 2 && parts.every(Number.isFinite)) { startNavigation(parts[0], parts[1]); return; }
+  document.getElementById('tool-navigation').addEventListener('click', () => openNavPicker());
+  document.getElementById('pick-on-map').addEventListener('click', () => {
+    closeNavPicker(); navigationPickMode = true; showToast('请在地图上点击目的地');
+  });
+  document.getElementById('pick-coords-go').addEventListener('click', () => {
+    const v = document.getElementById('pick-coords-input').value;
+    if (v && v.includes(',')) {
+      const p = v.split(',').map(Number);
+      if (p.length === 2 && p.every(Number.isFinite)) { startNavigation(p[0], p[1]); return; }
     }
-    navigationPickMode = true;
-    showToast('请在地图上点击目的地');
+    showToast('坐标格式有误（应为 X,Y）', 'error');
   });
-  document.getElementById('tool-navigation-stop').addEventListener('click', async () => {
-    await fetch('/api/nav/stop', {method: 'POST'});
-    if (navigationLayer) { map.removeLayer(navigationLayer); navigationLayer = null; }
+  document.getElementById('pick-coords-input').addEventListener('keydown', e => {
+    if (e.key === 'Enter') document.getElementById('pick-coords-go').click();
   });
+  document.getElementById('nav-cancel').addEventListener('click', cancelNavigation);
+  document.querySelectorAll('#nav-mode button').forEach(b => {
+    b.addEventListener('click', () => { navMode = b.dataset.mode; if (navActive) updateNavPanel({}); });
+  });
+  document.getElementById('tool-navigation-stop').addEventListener('click', cancelNavigation);
+  document.getElementById('snap-toggle').addEventListener('click', toggleSnap);
+  document.getElementById('batch-delete').addEventListener('click', deleteSelectedSegments);
   document.getElementById('tool-undo').addEventListener('click', undo);
   document.getElementById('tool-redo').addEventListener('click', redo);
   document.getElementById('tool-mode-toggle').addEventListener('click', toggleToolbarMode);
@@ -1341,8 +1619,9 @@ function findNearestIntersection(latlng) {
 async function insertNodeOnSegment(segId, insertIndex, latlng) {
   const seg = roadStore.segments[segId];
   if (!seg) return;
-  const x = latlng.lng * SCALE;
-  const z = latlng.lat * SCALE;
+  let x = latlng.lng * SCALE;
+  let z = latlng.lat * SCALE;
+  if (snapToGrid) { x = Math.round(x); z = Math.round(z); }
   try {
     pushUndo();
     const res = await fetch('/api/segments/' + segId + '/insert', {

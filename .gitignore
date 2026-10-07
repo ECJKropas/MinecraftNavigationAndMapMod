@@ -49,3 +49,6 @@ __pycache__
 .gemini/
 
 docs/other_mods
+
+# locally supplied third-party jars (closed-source, not redistributable)
+ref/

@@ -33,17 +33,17 @@ import java.util.logging.Logger;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
-import com.ecjkim.wayfarer.client.WayfarerConfig;
 import com.ecjkim.wayfarer.client.WayfarerClient;
+import com.ecjkim.wayfarer.client.WayfarerConfig;
 import com.ecjkim.wayfarer.client.config.WayfarerConfigs;
 import com.ecjkim.wayfarer.client.road.data.RoadNetworkDatabase;
 import com.ecjkim.wayfarer.client.road.model.Direction;
 import com.ecjkim.wayfarer.client.road.model.Node;
 import com.ecjkim.wayfarer.client.road.model.Road;
 import com.ecjkim.wayfarer.client.road.model.Segment;
+import com.ecjkim.wayfarer.client.road.model.Source;
 import com.ecjkim.wayfarer.client.road.nav.NavigationSession;
 import com.ecjkim.wayfarer.client.road.nav.Route;
-import com.ecjkim.wayfarer.client.road.model.Source;
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
 import com.google.gson.JsonArray;
@@ -260,7 +260,9 @@ public class WayfarerHttpServer implements Runnable {
 
     // -------- API handlers --------
 
-    private NavigationSession navigation() { return WayfarerClient.getNavigationSession(); }
+    private NavigationSession navigation() {
+        return WayfarerClient.getNavigationSession();
+    }
 
     private void handleStartNavigation(Request req) {
         if (req.body == null) {
@@ -269,8 +271,10 @@ public class WayfarerHttpServer implements Runnable {
         }
         try {
             JsonObject body = JsonParser.parseString(req.body).getAsJsonObject();
-            if (!body.has("x") || !body.has("z")) throw new IllegalArgumentException("Missing x or z");
-            NavigationSession.Result result = navigation().start(body.get("x").getAsDouble(), body.get("z").getAsDouble());
+            if (!body.has("x") || !body.has("z"))
+                throw new IllegalArgumentException("Missing x or z");
+            NavigationSession.Result result =
+                navigation().start(body.get("x").getAsDouble(), body.get("z").getAsDouble());
             sendJson(req.exchange, result.success() ? 200 : 422, navigationJson(result.snapshot(), result.error()));
         } catch (RuntimeException e) {
             sendJson(req.exchange, 400, errorJson("Invalid navigation request: " + e.getMessage()));
@@ -293,7 +297,24 @@ public class WayfarerHttpServer implements Runnable {
         result.addProperty("playerX", snapshot.playerX());
         result.addProperty("playerZ", snapshot.playerZ());
         result.addProperty("remainingDistance", snapshot.remainingDistance());
-        if (error != null) result.addProperty("error", error);
+        // Guidance fields, purely additive: every pre-existing field keeps its name and meaning.
+        result.addProperty("remainingTime", snapshot.remainingTime());
+        result.addProperty("offRoute", snapshot.offRoute());
+        if (snapshot.nextTurn() != null) {
+            JsonObject nextTurn = new JsonObject();
+            nextTurn.addProperty("type", snapshot.nextTurn().type().name());
+            nextTurn.addProperty("distance", snapshot.nextTurn().distance());
+            Node nextTurnNode = snapshot.nextTurn().node();
+            if (nextTurnNode != null) {
+                JsonObject node = new JsonObject();
+                node.addProperty("x", nextTurnNode.getX());
+                node.addProperty("z", nextTurnNode.getZ());
+                nextTurn.add("node", node);
+            }
+            result.add("nextTurn", nextTurn);
+        }
+        if (error != null)
+            result.addProperty("error", error);
         if (snapshot.destination() != null) {
             JsonObject destination = new JsonObject();
             destination.addProperty("x", snapshot.destination().getX());
@@ -436,20 +457,11 @@ public class WayfarerHttpServer implements Runnable {
                     return;
                 }
 
-                boolean positionChanged = false;
+                // Position edits go through the database: updateNodePosition() performs exactly what this handler
+                // used to do inline (x/z, modifiedAt, version + 1) and additionally raises the mutation stamp that
+                // spatial caches (LocationSnapper's index) use to notice changes.
                 if (hasX) {
-                    existing.setX(body.get("x").getAsDouble());
-                    positionChanged = true;
-                }
-                if (hasZ) {
-                    existing.setZ(body.get("z").getAsDouble());
-                    positionChanged = true;
-                }
-
-                if (positionChanged) {
-                    existing.setModifiedAt(System.currentTimeMillis());
-                    int nextVer = existing.getVersion() + 1;
-                    existing.setVersion(nextVer);
+                    database.updateNodePosition(id, body.get("x").getAsDouble(), body.get("z").getAsDouble());
                 }
 
                 database.saveToDisk();

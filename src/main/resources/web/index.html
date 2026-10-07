@@ -262,6 +262,141 @@ button.danger:active { background:#B3201A; }
   }
   body::before { display:none; }
 }
+
+/* ============ Part C — Navigation panel (C1) ============ */
+#nav-panel {
+  position:fixed; left:60px; bottom:20px; z-index:40;
+  width:328px; max-width:calc(100vw - 80px);
+  background:rgba(255,255,255,0.46);
+  backdrop-filter:var(--glass-blur); -webkit-backdrop-filter:var(--glass-blur);
+  border-radius:var(--radius-lg);
+  border:1px solid var(--glass-border);
+  box-shadow:var(--glass-shadow), var(--glass-inset);
+  padding:14px 16px 16px;
+  opacity:0; transform:translateY(12px) scale(0.98);
+  transition:opacity 240ms ease, transform 320ms cubic-bezier(0.22,1,0.36,1);
+  pointer-events:none;
+}
+#nav-panel.visible { opacity:1; transform:translateY(0) scale(1); pointer-events:auto; }
+
+.nav-head { display:flex; align-items:center; gap:8px; margin-bottom:12px; }
+.nav-head .nav-route-ico {
+  width:26px; height:26px; border-radius:8px; flex-shrink:0;
+  display:flex; align-items:center; justify-content:center;
+  background:var(--blue); color:#fff; font-size:13px;
+}
+.nav-head .nav-title { font-size:14px; font-weight:590; color:var(--text-primary); letter-spacing:-0.01em; }
+.nav-head .nav-status { margin-left:auto; font-size:11px; font-weight:500; color:var(--text-tertiary); }
+
+.nav-progress { height:4px; border-radius:2px; background:rgba(0,0,0,0.08); overflow:hidden; margin-bottom:14px; }
+.nav-progress > i { display:block; height:100%; width:0%; border-radius:2px; background:var(--blue); transition:width 400ms cubic-bezier(0.22,1,0.36,1); }
+
+.nav-stats { display:flex; gap:10px; margin-bottom:12px; }
+.nav-stat {
+  flex:1; background:rgba(255,255,255,0.5); border:1px solid rgba(255,255,255,0.5);
+  border-radius:12px; padding:9px 11px;
+}
+.nav-stat .k { font-size:10px; font-weight:600; letter-spacing:0.04em; text-transform:uppercase; color:var(--text-tertiary); }
+.nav-stat .v { font-size:19px; font-weight:600; color:var(--text-primary); letter-spacing:-0.02em; line-height:1.2; margin-top:2px; }
+.nav-stat .v small { font-size:11px; font-weight:500; color:var(--text-secondary); margin-left:2px; }
+
+.nav-next {
+  display:flex; align-items:center; gap:10px;
+  background:rgba(0,122,255,0.10); border:1px solid rgba(0,122,255,0.16);
+  border-radius:12px; padding:9px 11px; margin-bottom:12px;
+}
+.nav-next .turn-ico {
+  width:30px; height:30px; border-radius:9px; flex-shrink:0;
+  display:flex; align-items:center; justify-content:center;
+  background:var(--blue); color:#fff; font-size:14px;
+}
+.nav-next .turn-txt { font-size:13px; font-weight:590; color:var(--text-primary); letter-spacing:-0.01em; }
+.nav-next .turn-dist { margin-left:auto; font-size:12px; font-weight:500; color:var(--text-secondary); }
+
+.nav-foot { display:flex; align-items:center; gap:8px; }
+.nav-seg {
+  display:inline-flex; background:rgba(0,0,0,0.05); border-radius:9px; padding:2px; gap:2px; flex:1;
+}
+.nav-seg button {
+  flex:1; border:none; background:none; padding:5px 0; font-size:12px; font-weight:550;
+  color:var(--text-secondary); border-radius:7px; cursor:pointer; transition:all 140ms ease;
+}
+.nav-seg button.active { background:#fff; color:var(--blue); box-shadow:var(--shadow-sm); }
+.nav-cancel {
+  flex-shrink:0; background:rgba(255,59,48,0.10); color:var(--red);
+  border:none; border-radius:9px; padding:6px 12px; font-size:12px; font-weight:590; cursor:pointer;
+  transition:background 120ms ease;
+}
+.nav-cancel:hover { background:rgba(255,59,48,0.18); }
+.nav-cancel:active { transform:scale(0.97); }
+.nav-dest { font-size:11px; color:var(--text-tertiary); margin-bottom:12px; word-break:break-all; }
+.nav-dest b { color:var(--text-secondary); font-weight:600; }
+
+/* Nav destination picker */
+#nav-picker {
+  position:fixed; left:50%; top:50%; transform:translate(-50%,-46%) scale(0.97);
+  z-index:60; width:300px;
+  background:rgba(255,255,255,0.92); backdrop-filter:blur(32px) saturate(180%); -webkit-backdrop-filter:blur(32px) saturate(180%);
+  border-radius:var(--radius-lg); border:1px solid var(--glass-border);
+  box-shadow:var(--glass-shadow), var(--glass-inset); padding:18px 18px 16px;
+  opacity:0; pointer-events:none; transition:opacity 200ms ease, transform 280ms cubic-bezier(0.22,1,0.36,1);
+}
+#nav-picker.visible { opacity:1; transform:translate(-50%,-50%) scale(1); pointer-events:auto; }
+#nav-picker h3 { font-size:15px; font-weight:590; margin-bottom:14px; letter-spacing:-0.01em; }
+#nav-picker .pick-row { display:flex; gap:8px; margin-bottom:10px; }
+#nav-picker .pick-row button {
+  flex:1; display:flex; flex-direction:column; align-items:center; gap:5px; padding:12px 6px;
+  background:rgba(0,0,0,0.04); border:none; border-radius:12px; cursor:pointer; color:var(--text-primary);
+  font-size:12px; font-weight:550; transition:background 120ms ease, transform 80ms ease;
+}
+#nav-picker .pick-row button:hover { background:rgba(0,0,0,0.07); }
+#nav-picker .pick-row button:active { transform:scale(0.97); }
+#nav-picker .pick-row button i { font-size:18px; color:var(--blue); }
+#nav-picker .pick-coords { display:flex; gap:7px; }
+#nav-picker .pick-coords input { flex:1; width:auto; }
+#nav-picker .pick-coords button { background:var(--blue); color:#fff; }
+
+/* ============ Part C — Performance indicator (C2) ============ */
+#perf-chip {
+  position:fixed; left:60px; top:16px; z-index:30;
+  display:flex; align-items:center; gap:7px;
+  background:var(--glass-bg); backdrop-filter:var(--glass-blur); -webkit-backdrop-filter:var(--glass-blur);
+  border:1px solid var(--glass-border); border-radius:20px; padding:5px 12px;
+  font-size:11px; font-weight:500; color:var(--text-secondary);
+  box-shadow:var(--glass-shadow);
+}
+#perf-chip i { font-size:11px; color:var(--blue); }
+
+/* ============ Part C — Batch bar & snap toggle (C3) ============ */
+#batch-bar {
+  position:fixed; left:50%; bottom:20px; transform:translateX(-50%) translateY(14px); z-index:45;
+  display:flex; align-items:center; gap:8px;
+  background:rgba(28,28,30,0.72); backdrop-filter:blur(24px) saturate(180%); -webkit-backdrop-filter:blur(24px) saturate(180%);
+  border-radius:16px; padding:8px 12px; box-shadow:0 12px 40px rgba(0,0,0,0.22);
+  opacity:0; pointer-events:none; transition:opacity 220ms ease, transform 280ms cubic-bezier(0.22,1,0.36,1);
+}
+#batch-bar.visible { opacity:1; transform:translateX(-50%) translateY(0); pointer-events:auto; }
+#batch-bar .batch-title { color:rgba(255,255,255,0.6); font-size:11px; font-weight:600; padding:0 4px; }
+#batch-bar button {
+  background:rgba(255,255,255,0.12); color:#fff; border:none; border-radius:10px; padding:7px 13px;
+  font-size:12px; font-weight:550; cursor:pointer; transition:background 120ms ease, transform 80ms ease;
+}
+#batch-bar button:hover { background:rgba(255,255,255,0.2); }
+#batch-bar button:active { transform:scale(0.97); }
+#batch-bar button.danger { background:rgba(255,59,48,0.85); }
+#batch-bar button.danger:hover { background:var(--red); }
+
+#snap-toggle {
+  position:fixed; right:56px; bottom:120px; z-index:30;
+  display:flex; align-items:center; gap:6px;
+  background:var(--glass-bg); backdrop-filter:var(--glass-blur); -webkit-backdrop-filter:var(--glass-blur);
+  border:1px solid var(--glass-border); border-radius:20px; padding:5px 12px;
+  font-size:11px; font-weight:550; color:var(--text-secondary); cursor:pointer;
+  box-shadow:var(--glass-shadow); transition:color 120ms ease, background 120ms ease;
+  -webkit-user-select:none; user-select:none;
+}
+#snap-toggle.active { color:var(--blue); background:rgba(0,122,255,0.12); }
+#snap-toggle i { font-size:12px; }
 </style>
 </head>
 <body>
@@ -373,6 +508,63 @@ button.danger:active { background:#B3201A; }
     </div>
   </div>
 </div>
+
+<!-- Part C1 — Navigation panel -->
+<div id="nav-panel">
+  <div class="nav-head">
+    <div class="nav-route-ico"><i class="fa-solid fa-route"></i></div>
+    <span class="nav-title" data-i18n="nav.title"></span>
+    <span class="nav-status" id="nav-status"></span>
+  </div>
+  <div class="nav-progress"><i id="nav-progress-bar"></i></div>
+  <div class="nav-stats">
+    <div class="nav-stat">
+      <div class="k" data-i18n="nav.remaining"></div>
+      <div class="v" id="nav-remaining">—</div>
+    </div>
+    <div class="nav-stat">
+      <div class="k" data-i18n="nav.eta"></div>
+      <div class="v" id="nav-eta">—</div>
+    </div>
+  </div>
+  <div class="nav-next">
+    <div class="turn-ico" id="nav-turn-ico"><i class="fa-solid fa-arrow-up"></i></div>
+    <div class="turn-txt" id="nav-turn-txt">—</div>
+    <div class="turn-dist" id="nav-turn-dist"></div>
+  </div>
+  <div class="nav-dest"><b data-i18n="nav.destination"></b> <span id="nav-dest-coords">—</span></div>
+  <div class="nav-foot">
+    <div class="nav-seg" id="nav-mode">
+      <button data-mode="WALK" data-i18n="nav.walk"></button>
+      <button data-mode="DRIVE" data-i18n="nav.drive"></button>
+    </div>
+    <button class="nav-cancel" id="nav-cancel" data-i18n="nav.cancel"></button>
+  </div>
+</div>
+
+<!-- Part C1 — Destination picker -->
+<div id="nav-picker">
+  <h3 data-i18n="nav.pickTitle"></h3>
+  <div class="pick-row">
+    <button id="pick-on-map"><i class="fa-solid fa-location-crosshairs"></i><span data-i18n="nav.pickOnMap"></span></button>
+  </div>
+  <div class="pick-coords">
+    <input type="text" id="pick-coords-input" data-i18n-placeholder="nav.coordsPlaceholder">
+    <button id="pick-coords-go"><i class="fa-solid fa-arrow-right"></i></button>
+  </div>
+</div>
+
+<!-- Part C2 — Performance indicator -->
+<div id="perf-chip"><i class="fa-solid fa-layer-group"></i><span id="perf-text"></span></div>
+
+<!-- Part C3 — Batch action bar -->
+<div id="batch-bar">
+  <span class="batch-title" data-i18n="edit.batchTitle"></span>
+  <button id="batch-delete" class="danger"><i class="fa-solid fa-trash"></i> <span id="batch-del-label"></span></button>
+</div>
+
+<!-- Part C3 — Snap-to-grid toggle -->
+<div id="snap-toggle" title=""><i class="fa-solid fa-grid"></i><span data-i18n="edit.snap.title"></span></div>
 
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script src="/static/i18n.js"></script>

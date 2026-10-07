@@ -4,13 +4,21 @@
 
  * MinecraftNavigationAndMapMod is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
+ * the Free Software Foundation, version 3 of the License.
+
+ * MinecraftNavigationAndMapMod is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+
+ * You should have received a copy of the GNU General Public License
+ * along with MinecraftNavigationAndMapMod.  If not, see <https://www.gnu.org/licenses/>.
  */
 package com.ecjkim.wayfarer.client.render;
 
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphics;
+
 import net.fabricmc.fabric.api.client.rendering.v1.HudRenderCallback;
 
 import com.ecjkim.wayfarer.client.WayfarerClient;
@@ -19,13 +27,17 @@ import com.ecjkim.wayfarer.client.road.nav.NavigationSession;
 public final class NavHudRenderer {
     private NavHudRenderer() {}
 
-    public static void register() { HudRenderCallback.EVENT.register(NavHudRenderer::render); }
+    public static void register() {
+        HudRenderCallback.EVENT.register(NavHudRenderer::render);
+    }
 
     private static void render(GuiGraphics graphics, float tickDelta) {
         Minecraft client = Minecraft.getInstance();
-        if (client.player == null || client.options.hideGui) return;
+        if (client.player == null || client.options.hideGui)
+            return;
         NavigationSession.Snapshot snapshot = WayfarerClient.getNavigationSession().snapshot();
-        if (snapshot.state() == NavigationSession.State.IDLE) return;
+        if (snapshot.state() == NavigationSession.State.IDLE)
+            return;
         String text;
         int color;
         if (snapshot.state() == NavigationSession.State.ARRIVED) {

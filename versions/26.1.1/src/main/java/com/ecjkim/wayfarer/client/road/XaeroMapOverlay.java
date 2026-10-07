@@ -33,6 +33,7 @@ import com.ecjkim.wayfarer.client.road.data.RoadNetworkDatabase;
 import com.ecjkim.wayfarer.client.road.model.Node;
 import com.ecjkim.wayfarer.client.road.model.Road;
 import com.ecjkim.wayfarer.client.road.model.Segment;
+import com.ecjkim.wayfarer.client.road.xaero.XaeroLayer;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -57,10 +58,16 @@ public final class XaeroMapOverlay {
             }
         });
         LOGGER.info("XaeroMapOverlay registered (26.x)");
+        // The new layer is wired up from here so that the two paths that talk to Xaero sit in one place.
+        XaeroLayer.install();
     }
 
     private static void onAfterScreenRender(Screen screen, GuiGraphicsExtractor graphics, int mouseX, int mouseY,
         float tickDelta) {
+        if (XaeroLayer.isActive()) {
+            // Xaero's own pipeline has the network; drawing it here as well would double every stroke.
+            return;
+        }
         RoadNetworkDatabase db = RoadNetworkDatabase.getInstance();
         Collection<Road> roads = db.getRoads();
         if (roads.isEmpty())

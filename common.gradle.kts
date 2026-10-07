@@ -45,8 +45,11 @@ repositories {
         url = uri("https://maven.fallenbreath.me/releases")
         content { includeGroup("me.fallenbreath") }
     }
+    // Locally supplied third-party jars (malilib, Xaero's World Map, ...).
+    // These are closed-source and must not be redistributed, so the directory is
+    // untracked: drop the jars in `ref/` and the build picks them up by name.
     flatDir {
-        dirs(rootProject.file("docs/other_mods"))
+        dirs(rootProject.file("ref"))
     }
 }
 
@@ -112,8 +115,47 @@ dependencies {
         autoImplementation(fabricApiDependency("fabric-rendering-v1"))
     }
 
-    // malilib (local jar from docs/other_mods)
+    // malilib (local jar from ref/)
     autoImplementation(":${gradleProperty("malilibDep")}")
+
+    // Xaero's World Map — closed-source, not published to any Maven, so it is supplied
+    // locally via `ref/` and only participates at compile time. Nothing from the jar is
+    // bundled into the mod; at runtime the overlay talks to Xaero through its public
+    // `WorldMap.mapElementRenderHandler` extension point and is simply absent when the
+    // player does not have Xaero installed.
+    val xaeroJarRelative = project.findProperty("xaeroWorldMapJar")?.toString().orEmpty()
+    if (xaeroJarRelative.isEmpty()) {
+        error(
+            "Missing 'xaeroWorldMapJar' in ${project.path}/gradle.properties. " +
+                "Add the Xaero's World Map jar name, e.g. " +
+                "xaeroWorldMapJar=ref/xaeroworldmap-fabric-26.2-1.44.2.jar",
+        )
+    }
+    val xaeroJar = rootProject.file(xaeroJarRelative)
+    if (!xaeroJar.isFile) {
+        error(
+            "Xaero's World Map jar not found at ${xaeroJar.absolutePath}. " +
+                "The jar is closed-source and cannot be committed; download it and place it there.",
+        )
+    }
+    autoCompileOnly(files(xaeroJar))
+
+    // XaeroLib ships as a jar nested inside the world map jar (META-INF/jars/). It is only needed where Xaero's
+    // element API exposes xaero.lib types in the signatures we override — on MC 26.2 the buffer parameter is
+    // XaeroBufferProvider rather than vanilla's BufferSource. Versions whose Xaero still takes a vanilla buffer
+    // source leave `xaeroLibJar` unset and do not need it at all.
+    val xaeroLibRelative = project.findProperty("xaeroLibJar")?.toString().orEmpty()
+    if (xaeroLibRelative.isNotEmpty()) {
+        val xaeroLibJar = rootProject.file(xaeroLibRelative)
+        if (!xaeroLibJar.isFile) {
+            error(
+                "XaeroLib jar not found at ${xaeroLibJar.absolutePath}. Extract it from " +
+                    "META-INF/jars/ inside the Xaero's World Map jar with " +
+                    "`unzip -p <worldmap>.jar META-INF/jars/xaerolib-*.jar > $xaeroLibRelative`.",
+            )
+        }
+        autoCompileOnly(files(xaeroLibJar))
+    }
 }
 
 val langDir = "assets/wayfarer/lang"

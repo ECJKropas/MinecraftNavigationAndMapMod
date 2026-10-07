@@ -7,7 +7,7 @@ const I18N = {
     'zh-CN': {
       // Page
       'page.title': 'Wayfarer — 道路编辑器',
-      
+
       // Toolbar
       'toolbar.move.title': '移动节点',
       'toolbar.move.label': '移动',
@@ -30,10 +30,10 @@ const I18N = {
       'toolbar.contract.label': '收起',
       'toolbar.language.title': '切换语言',
       'toolbar.language.label': 'EN',
-      
+
       // Editor - No selection
       'editor.noSelection': '点击节点或路段查看属性',
-      
+
       // Editor - Node
       'editor.node.sectionLabel': '节点属性',
       'editor.node.id': 'ID',
@@ -43,7 +43,7 @@ const I18N = {
       'editor.node.save': '保存',
       'editor.node.cancel': '取消',
       'editor.node.delete': '删除节点',
-      
+
       // Editor - Segment
       'editor.segment.sectionLabel': '路段属性',
       'editor.segment.id': 'ID',
@@ -70,7 +70,7 @@ const I18N = {
       'editor.segment.cancel': '取消',
       'editor.segment.mergeSelected': '合并选中',
       'editor.segment.delete': '删除路段',
-      
+
       // Toasts - General
       'toast.undoFailed': '撤销失败',
       'toast.undoSuccess': '已撤销',
@@ -81,7 +81,7 @@ const I18N = {
       'toast.saveFailed': '保存失败',
       'toast.deleteFailed': '删除失败',
       'toast.unknownError': '未知错误',
-      
+
       // Toasts - Node
       'toast.nodeSaved': '节点已保存',
       'toast.nodeDeleted': '节点已删除',
@@ -90,13 +90,13 @@ const I18N = {
       'toast.nodeMerged': '节点已合并',
       'toast.nodeSoftDeleted': '节点已软删除',
       'toast.endpointSoftDeleted': '端点已软删除',
-      
+
       // Toasts - Segment/Road
       'toast.segmentDeleted': '路段已删除',
       'toast.segmentMerged': '路段已合并',
       'toast.segmentNotLinked': '该路段未关联道路',
       'toast.roadSaved': '道路已保存',
-      
+
       // Toasts - Conflict
       'toast.versionConflict': '版本冲突',
       'toast.gameModified': '游戏内已修改',
@@ -104,7 +104,7 @@ const I18N = {
       'toast.syncedFromGame': '已从游戏同步最新数据',
       'toast.acceptedGameVersion': '已接受游戏版本',
       'toast.retrying': '重试中...',
-      
+
       // Toasts - Tools
       'toast.noSegmentNearby': '附近没有路段，无法插入孤立节点',
       'toast.selectedNode': '已选中节点 {id}，再点击目标节点完成合并',
@@ -118,38 +118,78 @@ const I18N = {
       'toast.mergeFailed': '合并失败',
       'toast.insertFailed': '插入失败',
       'toast.intersectionInsertFailed': '交点插入失败',
-      
+
       // Sheets - Node delete
       'sheet.deleteNode.title': '删除节点',
       'sheet.deleteNode.message': '此操作将级联删除关联路段，确定要删除吗？',
       'sheet.deleteNode.cancel': '取消',
       'sheet.deleteNode.confirm': '删除',
-      
+
       // Sheets - Segment delete
       'sheet.deleteSegment.title': '删除路段',
       'sheet.deleteSegment.message': '确定要删除此路段吗？',
-      
+
       // Sheets - Merge
       'sheet.mergeNode.title': '合并节点',
       'sheet.mergeNode.message': '合并该节点会删除中间所有节点，是否继续？',
       'sheet.mergeNode.cancel': '取消',
       'sheet.mergeNode.confirm': '合并',
-      
+
       // Sheets - Conflict
       'sheet.conflict.message': '此{entityType}在游戏中已被修改 (版本 {serverVersion})。\n你的编辑版本为 {clientVersion}。\n\n选择如何处理：',
       'sheet.conflict.optionA': '输入 [A] 接受游戏版本 (按 A)',
       'sheet.conflict.optionR': '输入 [R] 重试你的编辑 (按 R)',
-      
+
       // Entity types
       'entity.node': '节点',
       'entity.segment': '路段',
-      'entity.road': '道路'
+      'entity.road': '道路',
+
+      // Navigation panel (C1)
+      'nav.title': '导航中',
+      'nav.empty': '点击「导航」选择终点开始',
+      'nav.destination': '终点',
+      'nav.eta': '预计到达',
+      'nav.remaining': '剩余路程',
+      'nav.next': '下一步',
+      'nav.turnLeft': '左转',
+      'nav.turnRight': '右转',
+      'nav.straight': '直行',
+      'nav.uturn': '掉头',
+      'nav.cancel': '取消导航',
+      'nav.mode': '出行方式',
+      'nav.walk': '步行',
+      'nav.drive': '驾车',
+      'nav.pickTitle': '选择导航终点',
+      'nav.pickOnMap': '在地图上点选',
+      'nav.enterCoords': '输入坐标',
+      'nav.usePlayer': '以当前位置为起点',
+      'nav.start': '开始导航',
+      'nav.arrived': '已到达目的地',
+      'nav.offRoute': '已偏离路线，正在重新规划…',
+      'nav.noRoute': '未找到可达路线',
+      'nav.coordsPlaceholder': '终点 X,Z（留空点选）',
+      'nav.progress': '进度',
+      'nav.meters': '米',
+      'nav.startPoint': '起点',
+
+      // Performance indicator (C2)
+      'perf.rendered': '已渲染 {n} / {total} 段',
+      'perf.culled': '视口裁剪',
+      'perf.simplified': '折线抽稀',
+
+      // Editing — snap & batch (C3)
+      'edit.snap.title': '吸附网格',
+      'edit.snap.on': '已开启吸附',
+      'edit.snap.off': '已关闭吸附',
+      'edit.deleteSelected': '删除选中 {n}',
+      'edit.batchTitle': '批量操作'
     },
-    
+
     'en': {
       // Page
       'page.title': 'Wayfarer — Road Editor',
-      
+
       // Toolbar
       'toolbar.move.title': 'Move Node',
       'toolbar.move.label': 'Move',
@@ -172,10 +212,10 @@ const I18N = {
       'toolbar.contract.label': 'Collapse',
       'toolbar.language.title': 'Change Language',
       'toolbar.language.label': '中',
-      
+
       // Editor - No selection
       'editor.noSelection': 'Click a node or segment to view properties',
-      
+
       // Editor - Node
       'editor.node.sectionLabel': 'Node Properties',
       'editor.node.id': 'ID',
@@ -185,7 +225,7 @@ const I18N = {
       'editor.node.save': 'Save',
       'editor.node.cancel': 'Cancel',
       'editor.node.delete': 'Delete Node',
-      
+
       // Editor - Segment
       'editor.segment.sectionLabel': 'Segment Properties',
       'editor.segment.id': 'ID',
@@ -212,7 +252,7 @@ const I18N = {
       'editor.segment.cancel': 'Cancel',
       'editor.segment.mergeSelected': 'Merge Selected',
       'editor.segment.delete': 'Delete Segment',
-      
+
       // Toasts - General
       'toast.undoFailed': 'Undo failed',
       'toast.undoSuccess': 'Undone',
@@ -223,7 +263,7 @@ const I18N = {
       'toast.saveFailed': 'Save failed',
       'toast.deleteFailed': 'Delete failed',
       'toast.unknownError': 'Unknown error',
-      
+
       // Toasts - Node
       'toast.nodeSaved': 'Node saved',
       'toast.nodeDeleted': 'Node deleted',
@@ -232,13 +272,13 @@ const I18N = {
       'toast.nodeMerged': 'Nodes merged',
       'toast.nodeSoftDeleted': 'Node soft-deleted',
       'toast.endpointSoftDeleted': 'Endpoint soft-deleted',
-      
+
       // Toasts - Segment/Road
       'toast.segmentDeleted': 'Segment deleted',
       'toast.segmentMerged': 'Segments merged',
       'toast.segmentNotLinked': 'Segment not linked to a road',
       'toast.roadSaved': 'Road saved',
-      
+
       // Toasts - Conflict
       'toast.versionConflict': 'Version conflict',
       'toast.gameModified': 'Modified in game',
@@ -246,7 +286,7 @@ const I18N = {
       'toast.syncedFromGame': 'Synced latest data from game',
       'toast.acceptedGameVersion': 'Accepted game version',
       'toast.retrying': 'Retrying...',
-      
+
       // Toasts - Tools
       'toast.noSegmentNearby': 'No segment nearby, cannot insert orphan node',
       'toast.selectedNode': 'Selected node {id}, click target node to merge',
@@ -260,69 +300,109 @@ const I18N = {
       'toast.mergeFailed': 'Merge failed',
       'toast.insertFailed': 'Insert failed',
       'toast.intersectionInsertFailed': 'Intersection insert failed',
-      
+
       // Sheets - Node delete
       'sheet.deleteNode.title': 'Delete Node',
       'sheet.deleteNode.message': 'This will cascade and delete connected segments. Are you sure?',
       'sheet.deleteNode.cancel': 'Cancel',
       'sheet.deleteNode.confirm': 'Delete',
-      
+
       // Sheets - Segment delete
       'sheet.deleteSegment.title': 'Delete Segment',
       'sheet.deleteSegment.message': 'Are you sure you want to delete this segment?',
-      
+
       // Sheets - Merge
       'sheet.mergeNode.title': 'Merge Nodes',
       'sheet.mergeNode.message': 'Merging this node will delete all intermediate nodes. Continue?',
       'sheet.mergeNode.cancel': 'Cancel',
       'sheet.mergeNode.confirm': 'Merge',
-      
+
       // Sheets - Conflict
       'sheet.conflict.message': 'This {entityType} has been modified in game (version {serverVersion}).\nYour edit version is {clientVersion}.\n\nChoose how to handle:',
       'sheet.conflict.optionA': 'Enter [A] to accept game version (press A)',
       'sheet.conflict.optionR': 'Enter [R] to retry your edit (press R)',
-      
+
       // Entity types
       'entity.node': 'Node',
       'entity.segment': 'Segment',
-      'entity.road': 'Road'
+      'entity.road': 'Road',
+
+      // Navigation panel (C1)
+      'nav.title': 'Navigating',
+      'nav.empty': 'Tap "Navigate" and pick a destination',
+      'nav.destination': 'Destination',
+      'nav.eta': 'ETA',
+      'nav.remaining': 'Remaining',
+      'nav.next': 'Next',
+      'nav.turnLeft': 'Turn left',
+      'nav.turnRight': 'Turn right',
+      'nav.straight': 'Continue',
+      'nav.uturn': 'U-turn',
+      'nav.cancel': 'Cancel',
+      'nav.mode': 'Travel mode',
+      'nav.walk': 'Walk',
+      'nav.drive': 'Drive',
+      'nav.pickTitle': 'Choose destination',
+      'nav.pickOnMap': 'Pick on map',
+      'nav.enterCoords': 'Enter coordinates',
+      'nav.usePlayer': 'Use current position',
+      'nav.start': 'Start',
+      'nav.arrived': 'Arrived',
+      'nav.offRoute': 'Off route, rerouting…',
+      'nav.noRoute': 'No route found',
+      'nav.coordsPlaceholder': 'Dest X,Z (blank to pick)',
+      'nav.progress': 'Progress',
+      'nav.meters': 'm',
+      'nav.startPoint': 'Start',
+
+      // Performance indicator (C2)
+      'perf.rendered': 'Rendered {n} / {total}',
+      'perf.culled': 'Viewport cull',
+      'perf.simplified': 'Simplify',
+
+      // Editing — snap & batch (C3)
+      'edit.snap.title': 'Snap to grid',
+      'edit.snap.on': 'Snap on',
+      'edit.snap.off': 'Snap off',
+      'edit.deleteSelected': 'Delete {n}',
+      'edit.batchTitle': 'Batch'
     }
   },
-  
+
   // Initialize i18n
   init() {
     const saved = localStorage.getItem('wayfarer_lang');
     const browserLang = navigator.language.toLowerCase().startsWith('zh') ? 'zh-CN' : 'en';
     this.currentLang = saved || browserLang;
-    
+
     if (!this.translations[this.currentLang]) {
       this.currentLang = 'en';
     }
-    
+
     document.documentElement.lang = this.currentLang;
     document.title = this.t('page.title');
-    
+
     this.applyToDOM();
-    
+
     document.dispatchEvent(new CustomEvent('languagechange', {
       detail: { lang: this.currentLang }
     }));
   },
-  
+
   // Get translated string with optional interpolation
   t(key, params) {
     const dict = this.translations[this.currentLang] || this.translations['en'];
     let str = dict[key] || this.translations['en'][key] || key;
-    
+
     if (params && typeof params === 'object') {
       for (const [k, v] of Object.entries(params)) {
         str = str.replace(new RegExp('\\{' + k + '\\}', 'g'), String(v));
       }
     }
-    
+
     return str;
   },
-  
+
   // Apply i18n to all DOM elements with data-i18n attributes
   applyToDOM() {
     // Text content
@@ -330,29 +410,29 @@ const I18N = {
       const key = el.getAttribute('data-i18n');
       el.textContent = this.t(key);
     });
-    
+
     // Placeholder
     document.querySelectorAll('[data-i18n-placeholder]').forEach(el => {
       const key = el.getAttribute('data-i18n-placeholder');
       el.setAttribute('placeholder', this.t(key));
     });
-    
+
     // Title attribute
     document.querySelectorAll('[data-i18n-title]').forEach(el => {
       const key = el.getAttribute('data-i18n-title');
       el.setAttribute('title', this.t(key));
     });
-    
+
     // HTML content (preserves HTML structure)
     document.querySelectorAll('[data-i18n-html]').forEach(el => {
       const key = el.getAttribute('data-i18n-html');
       el.innerHTML = this.t(key);
     });
-    
+
     // Update page title
     document.title = this.t('page.title');
   },
-  
+
   // Set language
   setLanguage(lang) {
     if (!this.translations[lang]) return;
@@ -360,12 +440,12 @@ const I18N = {
     localStorage.setItem('wayfarer_lang', lang);
     document.documentElement.lang = lang;
     this.applyToDOM();
-    
+
     document.dispatchEvent(new CustomEvent('languagechange', {
       detail: { lang }
     }));
   },
-  
+
   // Toggle between languages
   toggleLanguage() {
     const nextLang = this.currentLang === 'zh-CN' ? 'en' : 'zh-CN';

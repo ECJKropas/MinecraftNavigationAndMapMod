@@ -80,19 +80,36 @@ public class WayfarerConfig {
         return WayfarerConfigs.Generic.SHOW_KEY_HINTS.getBooleanValue();
     }
 
-    public double getNavSnapRadius() { return WayfarerConfigs.Generic.NAV_SNAP_RADIUS.getDoubleValue(); }
-    public double getNavRerouteThreshold() { return WayfarerConfigs.Generic.NAV_REROUTE_THRESHOLD.getDoubleValue(); }
-    public double getNavArrivalRadius() { return WayfarerConfigs.Generic.NAV_ARRIVAL_RADIUS.getDoubleValue(); }
-    public double getNavDistanceGate() { return WayfarerConfigs.Generic.NAV_DISTANCE_GATE.getDoubleValue(); }
+    public double getNavSnapRadius() {
+        return WayfarerConfigs.Generic.NAV_SNAP_RADIUS.getDoubleValue();
+    }
+
+    public double getNavRerouteThreshold() {
+        return WayfarerConfigs.Generic.NAV_REROUTE_THRESHOLD.getDoubleValue();
+    }
+
+    public double getNavArrivalRadius() {
+        return WayfarerConfigs.Generic.NAV_ARRIVAL_RADIUS.getDoubleValue();
+    }
+
+    public double getNavDistanceGate() {
+        return WayfarerConfigs.Generic.NAV_DISTANCE_GATE.getDoubleValue();
+    }
 
     public double getNavigationSpeed(char classification) {
         switch (classification) {
-            case 'G': return WayfarerConfigs.Generic.NAV_SPEED_G.getDoubleValue();
-            case 'S': return WayfarerConfigs.Generic.NAV_SPEED_S.getDoubleValue();
-            case 'Y': return WayfarerConfigs.Generic.NAV_SPEED_Y.getDoubleValue();
-            case 'X': return WayfarerConfigs.Generic.NAV_SPEED_X.getDoubleValue();
-            case 'C': return WayfarerConfigs.Generic.NAV_SPEED_C.getDoubleValue();
-            default: return 4.3D;
+            case 'G':
+                return WayfarerConfigs.Generic.NAV_SPEED_G.getDoubleValue();
+            case 'S':
+                return WayfarerConfigs.Generic.NAV_SPEED_S.getDoubleValue();
+            case 'Y':
+                return WayfarerConfigs.Generic.NAV_SPEED_Y.getDoubleValue();
+            case 'X':
+                return WayfarerConfigs.Generic.NAV_SPEED_X.getDoubleValue();
+            case 'C':
+                return WayfarerConfigs.Generic.NAV_SPEED_C.getDoubleValue();
+            default:
+                return 4.3D;
         }
     }
 
@@ -127,6 +144,19 @@ public class WayfarerConfig {
                 return (float)WayfarerConfigs.Generic.C_WIDTH.getDoubleValue();
             default:
                 return 3.0f;
+        }
+    }
+
+    public boolean isXaeroClassificationVisible(String classification) {
+        if (classification == null || classification.isEmpty())
+            return WayfarerConfigs.Generic.XAERO_SHOW_UNCLASSIFIED.getBooleanValue();
+        switch (classification.charAt(0)) {
+            case 'G': return WayfarerConfigs.Generic.XAERO_SHOW_G.getBooleanValue();
+            case 'S': return WayfarerConfigs.Generic.XAERO_SHOW_S.getBooleanValue();
+            case 'X': return WayfarerConfigs.Generic.XAERO_SHOW_X.getBooleanValue();
+            case 'Y': return WayfarerConfigs.Generic.XAERO_SHOW_Y.getBooleanValue();
+            case 'C': return WayfarerConfigs.Generic.XAERO_SHOW_C.getBooleanValue();
+            default: return WayfarerConfigs.Generic.XAERO_SHOW_UNCLASSIFIED.getBooleanValue();
         }
     }
 

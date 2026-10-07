@@ -60,6 +60,12 @@ public class WayfarerConfig {
     public double navSpeedY = 4.5;
     public double navSpeedX = 4.0;
     public double navSpeedC = 3.5;
+    public boolean xaeroShowG = true;
+    public boolean xaeroShowS = true;
+    public boolean xaeroShowX = true;
+    public boolean xaeroShowY = true;
+    public boolean xaeroShowC = true;
+    public boolean xaeroShowUnclassified = true;
 
     public double gWidth = 6.0;
     public double sWidth = 4.5;
@@ -87,10 +93,22 @@ public class WayfarerConfig {
         return rdpEpsilon;
     }
 
-    public double getNavSnapRadius() { return navSnapRadius; }
-    public double getNavRerouteThreshold() { return navRerouteThreshold; }
-    public double getNavArrivalRadius() { return navArrivalRadius; }
-    public double getNavDistanceGate() { return navDistanceGate; }
+    public double getNavSnapRadius() {
+        return navSnapRadius;
+    }
+
+    public double getNavRerouteThreshold() {
+        return navRerouteThreshold;
+    }
+
+    public double getNavArrivalRadius() {
+        return navArrivalRadius;
+    }
+
+    public double getNavDistanceGate() {
+        return navDistanceGate;
+    }
+
     public double getNavigationSpeed(char classification) {
         return switch (classification) {
             case 'G' -> navSpeedG;
@@ -99,6 +117,18 @@ public class WayfarerConfig {
             case 'X' -> navSpeedX;
             case 'C' -> navSpeedC;
             default -> 4.3D;
+        };
+    }
+
+    public boolean isXaeroClassificationVisible(String classification) {
+        if (classification == null || classification.isEmpty()) return xaeroShowUnclassified;
+        return switch (classification.charAt(0)) {
+            case 'G' -> xaeroShowG;
+            case 'S' -> xaeroShowS;
+            case 'X' -> xaeroShowX;
+            case 'Y' -> xaeroShowY;
+            case 'C' -> xaeroShowC;
+            default -> xaeroShowUnclassified;
         };
     }
 

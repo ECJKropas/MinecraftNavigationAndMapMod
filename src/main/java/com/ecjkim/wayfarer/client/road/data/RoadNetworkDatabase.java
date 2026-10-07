@@ -68,6 +68,7 @@ public class RoadNetworkDatabase {
     private Path savePath;
     private String worldKey;
     private volatile boolean dirty;
+    private volatile long mutationStamp;
 
     private RoadNetworkDatabase() {
         savePath = FabricLoader.getInstance().getGameDir().resolve("wayfarer/roads.json");
@@ -564,6 +565,11 @@ public class RoadNetworkDatabase {
             existing.setVersion(existing.getVersion() + 1);
             existing.setModifiedAt(System.currentTimeMillis());
             maybeCleanupOrphans();
+            // The node list, the direction and the owning road have all just changed, and none of them is reflected in
+            // the node count -- so without this the mutation stamp would look unchanged to caches that derive drawing
+            // geometry from the network, and they would keep showing the segment as it used to be. MaybeCleanupOrphans
+            // may already have called markDirty; a second call only costs a counter increment.
+            markDirty();
         }
     }
 
@@ -816,10 +822,31 @@ public class RoadNetworkDatabase {
     // ---------- Helper queries ----------
 
     /**
-     * Returns an unmodifiable collection of all Nodes (snapshot).
+     * Returns a snapshot copy of all Nodes.
      */
     public java.util.Collection<Node> getAllNodes() {
         return new java.util.ArrayList<>(nodes.values());
+    }
+
+    /**
+     * Returns the number of nodes currently held. Constant time, so it is safe to call on every lookup.
+     */
+    public int getNodeCount() {
+        return nodes.size();
+    }
+
+    /**
+     * Returns a monotonic counter that every mutation of the road network advances.
+     *
+     * <p>
+     * Caches that derive data from the network (such as the spatial index behind {@code LocationSnapper}) use it as
+     * their validity token: a different value means the cached data must be rebuilt. Mutations are covered as follows —
+     * anything that adds or removes a node changes {@link #getNodeCount()}, and every path that modifies an already
+     * indexed element goes through {@code markDirty()}. A reload from disk bumps the counter explicitly.
+     * </p>
+     */
+    public long getMutationStamp() {
+        return mutationStamp;
     }
 
     /**
@@ -1233,8 +1260,13 @@ public class RoadNetworkDatabase {
 
     // ---------- Persistence ----------
 
+    /**
+     * Flags the network as unsaved and advances the mutation stamp that caches (see {@link #getMutationStamp()}) use to
+     * detect changes.
+     */
     private void markDirty() {
         this.dirty = true;
+        this.mutationStamp++;
     }
 
     /**
@@ -1406,6 +1438,7 @@ public class RoadNetworkDatabase {
                 }
             }
 
+            mutationStamp++;
             dirty = false;
             LOGGER.log(Level.INFO, "Loaded {0} nodes, {1} segments, {2} roads from {3}",
                 new Object[] {nodes.size(), segments.size(), roads.size(), savePath});

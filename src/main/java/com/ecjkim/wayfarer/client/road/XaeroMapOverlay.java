@@ -39,13 +39,24 @@ import com.ecjkim.wayfarer.client.road.data.RoadNetworkDatabase;
 import com.ecjkim.wayfarer.client.road.model.Node;
 import com.ecjkim.wayfarer.client.road.model.Road;
 import com.ecjkim.wayfarer.client.road.model.Segment;
+import com.ecjkim.wayfarer.client.road.xaero.XaeroLayer;
 
 import org.joml.Matrix4f;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
- * Renders Wayfarer road network as an overlay on Xaero World Map when the GuiMap screen is open.
+ * Legacy road overlay: draws the network in screen space on top of Xaero's map screen.
+ *
+ * <p>
+ * Superseded by {@link XaeroLayer}, which draws through Xaero's own element pipeline and therefore stays locked to the
+ * map while it is panned and zoomed. This class keeps a screen-space fallback for two cases the new layer cannot cover:
+ * Xaero is not installed at all, and Xaero is installed but the layer could not be registered.
+ *
+ * <p>
+ * It is deliberately left in place rather than deleted. Deleting it would make the new pipeline the only way the
+ * network is ever drawn, and the one situation that most needs a fallback is the one where the new pipeline silently
+ * fails to come up.
  */
 public final class XaeroMapOverlay {
     private static final Logger LOGGER = LoggerFactory.getLogger("Wayfarer|Overlay");
@@ -68,10 +79,16 @@ public final class XaeroMapOverlay {
             }
         });
         LOGGER.info("XaeroMapOverlay registered");
+        // The new layer is wired up from here so that the two paths that talk to Xaero sit in one place.
+        XaeroLayer.install();
     }
 
     private static void onAfterScreenRender(Screen screen, GuiGraphics graphics, int mouseX, int mouseY,
         float tickDelta) {
+        if (XaeroLayer.isActive()) {
+            // Xaero's own pipeline has the network; drawing it here as well would double every stroke.
+            return;
+        }
         RoadNetworkDatabase db = RoadNetworkDatabase.getInstance();
         Collection<Road> roads = db.getRoads();
         if (roads.isEmpty())

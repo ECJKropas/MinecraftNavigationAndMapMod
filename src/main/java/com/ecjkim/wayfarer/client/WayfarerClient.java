@@ -26,9 +26,9 @@ import net.fabricmc.api.ClientModInitializer;
 import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientLifecycleEvents;
 import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientTickEvents;
 
+import com.ecjkim.wayfarer.client.render.NavHudRenderer;
 import com.ecjkim.wayfarer.client.render.NodeIndicatorRenderer;
 import com.ecjkim.wayfarer.client.render.SurveyHud;
-import com.ecjkim.wayfarer.client.render.NavHudRenderer;
 import com.ecjkim.wayfarer.client.render.SurveyRenderer;
 import com.ecjkim.wayfarer.client.road.RoadMetadataScreen;
 import com.ecjkim.wayfarer.client.road.RoadRecordingManager;
@@ -62,7 +62,9 @@ public class WayfarerClient implements ClientModInitializer {
         return SURVEY_SESSION;
     }
 
-    public static NavigationSession getNavigationSession() { return NAVIGATION_SESSION; }
+    public static NavigationSession getNavigationSession() {
+        return NAVIGATION_SESSION;
+    }
 
     @Override
     public void onInitializeClient() {
@@ -192,7 +194,8 @@ public class WayfarerClient implements ClientModInitializer {
         for (WayfarerConfig.HotkeyBind bind : config.getHotkeysForAction("navigation")) {
             if (consumeHotkey(window, bind)) {
                 NAVIGATION_SESSION.stop();
-                if (client.player != null) client.player.displayClientMessage(Component.literal("导航已取消"), false);
+                if (client.player != null)
+                    client.player.displayClientMessage(Component.literal("导航已取消"), false);
                 break;
             }
         }
