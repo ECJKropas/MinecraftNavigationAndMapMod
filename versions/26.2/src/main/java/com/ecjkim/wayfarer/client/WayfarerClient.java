@@ -76,9 +76,10 @@ public class WayfarerClient implements ClientModInitializer {
         });
         ClientTickEvents.END_CLIENT_TICK.register(this::handleClientTick);
 
-        // Register scroll callback for Ctrl-scroll corner type switching
-        GLFW.glfwSetScrollCallback(Minecraft.getInstance().getWindow().handle(), (win, dx, dy) -> {
-            pendingScrollDelta = dy;
+        // The window does not exist during onInitializeClient (Minecraft.getWindow() is null there), so the
+        // Ctrl-scroll corner type switching callback must be installed once the client has started.
+        ClientLifecycleEvents.CLIENT_STARTED.register(client -> {
+            GLFW.glfwSetScrollCallback(client.getWindow().handle(), (win, dx, dy) -> pendingScrollDelta = dy);
         });
     }
 
