@@ -332,29 +332,61 @@ button.danger:active { background:#B3201A; }
 .nav-dest { font-size:11px; color:var(--text-tertiary); margin-bottom:12px; word-break:break-all; }
 .nav-dest b { color:var(--text-secondary); font-weight:600; }
 
-/* Nav destination picker */
-#nav-picker {
-  position:fixed; left:50%; top:50%; transform:translate(-50%,-46%) scale(0.97);
-  z-index:60; width:300px;
+/* Point-info popup (tap anywhere in navigation mode) */
+.wayfarer-popup .leaflet-popup-content-wrapper {
+  background:rgba(255,255,255,0.92); backdrop-filter:blur(32px) saturate(180%); -webkit-backdrop-filter:blur(32px) saturate(180%);
+  border-radius:18px; border:1px solid var(--glass-border); box-shadow:var(--glass-shadow), var(--glass-inset);
+}
+.wayfarer-popup .leaflet-popup-content { margin:14px 16px; font-family:var(--font); color:var(--text-primary); }
+.wayfarer-popup .leaflet-popup-tip { background:rgba(255,255,255,0.92); }
+.point-info { min-width:180px; }
+.point-info .pi-row { display:flex; justify-content:space-between; align-items:baseline; gap:14px; margin-bottom:8px; }
+.point-info .pi-k { font-size:12px; color:var(--text-secondary); }
+.point-info .pi-v { font-size:14px; font-weight:600; }
+.point-info .pi-roads { max-height:120px; overflow:auto; margin-bottom:10px; }
+.point-info .pi-road {
+  font-size:12px; padding:4px 8px; margin-bottom:4px; border-radius:8px;
+  background:rgba(0,122,255,0.08); color:var(--text-primary); white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
+}
+.point-info .pi-empty { font-size:12px; color:var(--text-tertiary); }
+.point-info .pi-go {
+  width:100%; padding:9px; border:none; border-radius:11px; cursor:pointer;
+  background:var(--blue); color:#fff; font-size:13px; font-weight:600; font-family:var(--font);
+  display:flex; align-items:center; justify-content:center; gap:6px; transition:filter 120ms ease, transform 80ms ease;
+}
+.point-info .pi-go:hover { filter:brightness(1.05); }
+.point-info .pi-go:active { transform:scale(0.98); }
+
+/* Route summary (after 到这去) */
+#route-summary {
+  position:fixed; left:50%; bottom:22px; transform:translate(-50%, 140%);
+  z-index:70; width:min(380px, 92vw);
   background:rgba(255,255,255,0.92); backdrop-filter:blur(32px) saturate(180%); -webkit-backdrop-filter:blur(32px) saturate(180%);
   border-radius:var(--radius-lg); border:1px solid var(--glass-border);
-  box-shadow:var(--glass-shadow), var(--glass-inset); padding:18px 18px 16px;
-  opacity:0; pointer-events:none; transition:opacity 200ms ease, transform 280ms cubic-bezier(0.22,1,0.36,1);
+  box-shadow:var(--glass-shadow), var(--glass-inset); padding:16px 18px 16px;
+  opacity:0; pointer-events:none; transition:transform 320ms cubic-bezier(0.22,1,0.36,1), opacity 220ms ease;
 }
-#nav-picker.visible { opacity:1; transform:translate(-50%,-50%) scale(1); pointer-events:auto; }
-#nav-picker h3 { font-size:15px; font-weight:590; margin-bottom:14px; letter-spacing:-0.01em; }
-#nav-picker .pick-row { display:flex; gap:8px; margin-bottom:10px; }
-#nav-picker .pick-row button {
-  flex:1; display:flex; flex-direction:column; align-items:center; gap:5px; padding:12px 6px;
-  background:rgba(0,0,0,0.04); border:none; border-radius:12px; cursor:pointer; color:var(--text-primary);
-  font-size:12px; font-weight:550; transition:background 120ms ease, transform 80ms ease;
+#route-summary.visible { opacity:1; transform:translate(-50%, 0); pointer-events:auto; }
+#route-summary .rs-head { display:flex; align-items:center; gap:9px; margin-bottom:12px; }
+#route-summary .rs-head i { color:var(--blue); font-size:16px; }
+#route-summary .rs-title { font-size:15px; font-weight:600; letter-spacing:-0.01em; }
+#route-summary .rs-stats { display:flex; gap:14px; margin-bottom:14px; }
+#route-summary .rs-stat { flex:1; background:rgba(0,0,0,0.04); border-radius:12px; padding:10px 12px; }
+#route-summary .rs-k { font-size:11px; color:var(--text-secondary); margin-bottom:3px; }
+#route-summary .rs-v { font-size:18px; font-weight:650; letter-spacing:-0.01em; }
+#route-summary .rs-actions { display:flex; gap:10px; }
+#route-summary .rs-start {
+  flex:1; display:flex; align-items:center; justify-content:center; gap:7px; padding:11px;
+  border:none; border-radius:13px; cursor:pointer; background:var(--blue); color:#fff;
+  font-size:14px; font-weight:600; font-family:var(--font); transition:filter 120ms ease, transform 80ms ease;
 }
-#nav-picker .pick-row button:hover { background:rgba(0,0,0,0.07); }
-#nav-picker .pick-row button:active { transform:scale(0.97); }
-#nav-picker .pick-row button i { font-size:18px; color:var(--blue); }
-#nav-picker .pick-coords { display:flex; gap:7px; }
-#nav-picker .pick-coords input { flex:1; width:auto; }
-#nav-picker .pick-coords button { background:var(--blue); color:#fff; }
+#route-summary .rs-start:hover { filter:brightness(1.05); }
+#route-summary .rs-start:active { transform:scale(0.98); }
+#route-summary .rs-cancel {
+  padding:11px 16px; border:1px solid var(--glass-border); border-radius:13px; cursor:pointer;
+  background:transparent; color:var(--text-secondary); font-size:13px; font-weight:550; font-family:var(--font);
+}
+#route-summary .rs-cancel:hover { background:rgba(0,0,0,0.04); }
 
 /* ============ Part C — Performance indicator (C2) ============ */
 #perf-chip {
@@ -386,49 +418,76 @@ button.danger:active { background:#B3201A; }
 #batch-bar button.danger { background:rgba(255,59,48,0.85); }
 #batch-bar button.danger:hover { background:var(--red); }
 
+/* ============ Persistent mode switch pill ============ */
+#mode-switch {
+  position:fixed; top:14px; left:50%; transform:translateX(-50%);
+  z-index:120; display:flex; align-items:center; gap:8px;
+  background:var(--glass-bg); backdrop-filter:var(--glass-blur); -webkit-backdrop-filter:var(--glass-blur);
+  border:1px solid var(--glass-border); border-radius:22px;
+  box-shadow:var(--glass-shadow), var(--glass-inset);
+  padding:7px 15px; cursor:pointer;
+  font-family:var(--font); font-size:13px; font-weight:590; color:var(--text-primary);
+  -webkit-user-select:none; user-select:none; outline:none;
+  transition:transform 180ms cubic-bezier(0.22,1,0.36,1), opacity 220ms ease, background 140ms ease;
+}
+#mode-switch:hover { transform:translateX(-50%) translateY(-1px); background:rgba(255,255,255,0.72); }
+#mode-switch:active { transform:translateX(-50%) scale(0.97); }
+#mode-switch.hidden { opacity:0; pointer-events:none; transform:translateX(-50%) translateY(-10px); }
+#mode-switch .ms-ico { width:18px; text-align:center; font-size:14px; }
+#mode-switch i.fa-chevron-down { font-size:10px; color:var(--text-tertiary); margin-left:2px; }
+
+/* ============ Edit-only tool visibility by mode ============ */
+#toolbar.mode-nav .edit-only,
+#toolbar.mode-nav .constrain-popup { display:none !important; }
+#toolbar.mode-nav .toolbar-divider { display:none; }
+
 </style>
 </head>
 <body>
 <div id="map"></div>
 
-<div id="toolbar" class="toolbar-compact">
-  <button class="tool-btn" id="tool-move" data-i18n-title="toolbar.move.title">
+<div id="toolbar" class="toolbar-compact mode-nav">
+  <button class="tool-btn edit-only" id="tool-move" data-i18n-title="toolbar.move.title">
     <i class="fa-solid fa-arrows-up-down-left-right"></i>
     <span class="tool-label" data-i18n="toolbar.move.label"></span>
   </button>
-  <div class="constrain-popup" id="constrain-popup">
+  <div class="constrain-popup edit-only" id="constrain-popup">
     <button class="constrain-btn active" id="constrain-btn" data-i18n-title="toolbar.constrain.extend">
       <i class="fa-solid fa-angle-up"></i>
     </button>
   </div>
-  <button class="tool-btn" id="tool-point" data-i18n-title="toolbar.point.title">
+  <button class="tool-btn edit-only" id="tool-point" data-i18n-title="toolbar.point.title">
     <i class="fa-solid fa-circle-plus"></i>
     <span class="tool-label" data-i18n="toolbar.point.label"></span>
   </button>
-  <button class="tool-btn" id="tool-merge" data-i18n-title="toolbar.merge.title">
+  <button class="tool-btn edit-only" id="tool-merge" data-i18n-title="toolbar.merge.title">
     <i class="fa-solid fa-object-group"></i>
     <span class="tool-label" data-i18n="toolbar.merge.label"></span>
   </button>
-  <button class="tool-btn" id="tool-fenhe" data-i18n-title="toolbar.fenhe.title">
+  <button class="tool-btn edit-only" id="tool-fenhe" data-i18n-title="toolbar.fenhe.title">
     <i class="fa-solid fa-code-branch"></i>
     <span class="tool-label" data-i18n="toolbar.fenhe.label"></span>
   </button>
-  <button class="tool-btn" id="tool-softdelete" data-i18n-title="toolbar.softdelete.title">
+  <button class="tool-btn edit-only" id="tool-softdelete" data-i18n-title="toolbar.softdelete.title">
     <i class="fa-solid fa-eraser"></i>
     <span class="tool-label" data-i18n="toolbar.softdelete.label"></span>
   </button>
-  <button class="tool-btn" id="tool-navigation" title="导航到地图位置">
-    <i class="fa-solid fa-route"></i><span class="tool-label">导航</span>
+  <button class="tool-btn edit-only" id="tool-merge-nearby" data-i18n-title="toolbar.mergeNearby.title">
+    <i class="fa-solid fa-compress"></i>
+    <span class="tool-label" data-i18n="toolbar.mergeNearby.label"></span>
+  </button>
+  <button class="tool-btn" id="tool-navigation" title="以当前地图中心为目的地">
+    <i class="fa-solid fa-location-crosshairs"></i><span class="tool-label" data-i18n="nav.markCenter">目的地</span>
   </button>
   <button class="tool-btn" id="tool-navigation-stop" title="取消导航">
     <i class="fa-solid fa-xmark"></i><span class="tool-label">取消导航</span>
   </button>
   <div class="toolbar-divider"></div>
-  <button class="tool-btn" id="tool-undo" data-i18n-title="toolbar.undo.title">
+  <button class="tool-btn edit-only" id="tool-undo" data-i18n-title="toolbar.undo.title">
     <i class="fa-solid fa-arrow-rotate-left"></i>
     <span class="tool-label" data-i18n="toolbar.undo.label"></span>
   </button>
-  <button class="tool-btn" id="tool-redo" data-i18n-title="toolbar.redo.title">
+  <button class="tool-btn edit-only" id="tool-redo" data-i18n-title="toolbar.redo.title">
     <i class="fa-solid fa-arrow-rotate-right"></i>
     <span class="tool-label" data-i18n="toolbar.redo.label"></span>
   </button>
@@ -531,15 +590,25 @@ button.danger:active { background:#B3201A; }
   </div>
 </div>
 
-<!-- Part C1 — Destination picker -->
-<div id="nav-picker">
-  <h3 data-i18n="nav.pickTitle"></h3>
-  <div class="pick-row">
-    <button id="pick-on-map"><i class="fa-solid fa-location-crosshairs"></i><span data-i18n="nav.pickOnMap"></span></button>
+<!-- Part C1 — Route summary (after 到这去 planning) -->
+<div id="route-summary">
+  <div class="rs-head">
+    <i class="fa-solid fa-route"></i>
+    <span class="rs-title" data-i18n="nav.routeTitle">路线预览</span>
   </div>
-  <div class="pick-coords">
-    <input type="text" id="pick-coords-input" data-i18n-placeholder="nav.coordsPlaceholder">
-    <button id="pick-coords-go"><i class="fa-solid fa-arrow-right"></i></button>
+  <div class="rs-stats">
+    <div class="rs-stat">
+      <div class="rs-k" data-i18n="nav.routeDistance"></div>
+      <div class="rs-v" id="rs-distance">—</div>
+    </div>
+    <div class="rs-stat">
+      <div class="rs-k" data-i18n="nav.routeEta"></div>
+      <div class="rs-v" id="rs-eta">—</div>
+    </div>
+  </div>
+  <div class="rs-actions">
+    <button class="rs-start" id="rs-start"><i class="fa-solid fa-play"></i> <span data-i18n="nav.startNav"></span></button>
+    <button class="rs-cancel" id="rs-cancel" data-i18n="nav.cancel"></button>
   </div>
 </div>
 
@@ -551,6 +620,13 @@ button.danger:active { background:#B3201A; }
   <span class="batch-title" data-i18n="edit.batchTitle"></span>
   <button id="batch-delete" class="danger"><i class="fa-solid fa-trash"></i> <span id="batch-del-label"></span></button>
 </div>
+
+<!-- Persistent mode switch pill -->
+<button id="mode-switch" class="hidden" title="">
+  <i class="fa-solid fa-route ms-ico" id="mode-switch-ico"></i>
+  <span id="mode-switch-label"></span>
+  <i class="fa-solid fa-chevron-down"></i>
+</button>
 
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script src="/static/i18n.js"></script>

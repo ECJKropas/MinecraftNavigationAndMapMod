@@ -25,6 +25,10 @@ const I18N = {
       'toolbar.undo.label': '撤销',
       'toolbar.redo.title': '重做 (Ctrl+Shift+Z)',
       'toolbar.redo.label': '重做',
+      'toolbar.mergeNearby.title': '合并重合路口节点（水平距离 < 1）',
+      'toolbar.mergeNearby.label': '合并近节点',
+      'toolbar.mergeNearby.working': '正在扫描并合并重合节点…',
+      'toolbar.mergeNearby.result': '合并 {merged} 个重合节点 · 当前 {components} 个连通块 · {isolated} 个孤立节点（共 {nodes} 个节点）',
       'toolbar.expand.title': '展开工具栏',
       'toolbar.expand.label': '展开',
       'toolbar.contract.label': '收起',
@@ -149,7 +153,7 @@ const I18N = {
 
       // Navigation panel (C1)
       'nav.title': '导航中',
-      'nav.empty': '点击「导航」选择终点开始',
+      'nav.empty': '在地图上点击任意点，查看直线距离与附近道路',
       'nav.destination': '终点',
       'nav.eta': '预计到达',
       'nav.remaining': '剩余路程',
@@ -173,6 +177,18 @@ const I18N = {
       'nav.coordsPlaceholder': '终点 X,Z（留空点选）',
       'nav.progress': '进度',
       'nav.meters': '米',
+      'nav.straightDist': '直线距离',
+      'nav.nearbyRoads': '附近道路',
+      'nav.goHere': '到这去',
+      'nav.noNearbyRoad': '附近暂无道路',
+      'nav.routeTitle': '路线预览',
+      'nav.routeDistance': '距离',
+      'nav.routeEta': '预计',
+      'nav.startNav': '开始导航',
+      'nav.planning': '规划中…',
+      'nav.planFailed': '规划失败',
+      'nav.unnamedRoad': '未命名道路',
+      'nav.markCenter': '目的地',
       'nav.startPoint': '起点',
 
       // Performance indicator (C2)
@@ -182,7 +198,18 @@ const I18N = {
 
       // Editing — batch (C3)
       'edit.deleteSelected': '删除选中 {n}',
-      'edit.batchTitle': '批量操作'
+      'edit.batchTitle': '批量操作',
+
+      // Mode picker (landing + switch)
+      'mode.brand': 'Wayfarer',
+      'mode.heading': '选择进入方式',
+      'mode.subtitle': '导航用于查看地图与路线引导；编辑用于修改路段、节点与道路属性。',
+      'mode.nav.title': '导航',
+      'mode.nav.desc': '查看地图，规划并跟随路线',
+      'mode.edit.title': '编辑',
+      'mode.edit.desc': '增删路段节点，编辑道路属性',
+      'mode.switchToNav': '切换到导航模式',
+      'mode.switchToEdit': '切换到编辑模式'
     },
 
     'en': {
@@ -206,6 +233,10 @@ const I18N = {
       'toolbar.undo.label': 'Undo',
       'toolbar.redo.title': 'Redo (Ctrl+Shift+Z)',
       'toolbar.redo.label': 'Redo',
+      'toolbar.mergeNearby.title': 'Merge coincident junction nodes (horizontal dist < 1)',
+      'toolbar.mergeNearby.label': 'Merge nearby',
+      'toolbar.mergeNearby.working': 'Scanning and merging coincident nodes…',
+      'toolbar.mergeNearby.result': 'Merged {merged} coincident nodes · {components} connected components · {isolated} isolated (of {nodes} nodes)',
       'toolbar.expand.title': 'Expand Toolbar',
       'toolbar.expand.label': 'Expand',
       'toolbar.contract.label': 'Collapse',
@@ -330,7 +361,7 @@ const I18N = {
 
       // Navigation panel (C1)
       'nav.title': 'Navigating',
-      'nav.empty': 'Tap "Navigate" and pick a destination',
+      'nav.empty': 'Tap any point on the map to see distance and nearby roads',
       'nav.destination': 'Destination',
       'nav.eta': 'ETA',
       'nav.remaining': 'Remaining',
@@ -354,6 +385,18 @@ const I18N = {
       'nav.coordsPlaceholder': 'Dest X,Z (blank to pick)',
       'nav.progress': 'Progress',
       'nav.meters': 'm',
+      'nav.straightDist': 'Straight-line',
+      'nav.nearbyRoads': 'Nearby roads',
+      'nav.goHere': 'Go here',
+      'nav.noNearbyRoad': 'No nearby roads',
+      'nav.routeTitle': 'Route preview',
+      'nav.routeDistance': 'Distance',
+      'nav.routeEta': 'ETA',
+      'nav.startNav': 'Start navigation',
+      'nav.planning': 'Planning…',
+      'nav.planFailed': 'Planning failed',
+      'nav.unnamedRoad': 'Unnamed road',
+      'nav.markCenter': 'Destination',
       'nav.startPoint': 'Start',
 
       // Performance indicator (C2)
@@ -363,7 +406,18 @@ const I18N = {
 
       // Editing — batch (C3)
       'edit.deleteSelected': 'Delete {n}',
-      'edit.batchTitle': 'Batch'
+      'edit.batchTitle': 'Batch',
+
+      // Mode picker (landing + switch)
+      'mode.brand': 'Wayfarer',
+      'mode.heading': 'Choose how to enter',
+      'mode.subtitle': 'Navigate to view the map and get route guidance; Edit to modify segments, nodes and road properties.',
+      'mode.nav.title': 'Navigate',
+      'mode.nav.desc': 'View the map, plan and follow routes',
+      'mode.edit.title': 'Edit',
+      'mode.edit.desc': 'Add or remove segments/nodes, edit road properties',
+      'mode.switchToNav': 'Switch to Navigate mode',
+      'mode.switchToEdit': 'Switch to Edit mode'
     }
   },
 

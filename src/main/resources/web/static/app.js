@@ -5,7 +5,11 @@ const SCALE = 128.0;
 let map, selectedSegments = new Set(), selectedNodeId = null, selectedSegmentId = null;
 let roadStore = { nodes:{}, segments:{}, roads:{} };
 let activeTool = null;          // 'move' | 'point' | 'merge' | 'fenhe' | 'softdelete' | null
-let navigationPickMode = false;
+let playerPos = null;             // {x,z} 玩家当前位置（来自 /api/nav/state），用于直线距离
+let pendingPoint = null;          // 当前信息卡对应的 MC 坐标 {x,z}
+let plannedDest = null;           // 已规划但未开始的目的地 {x,z}
+let plannedRouteLayer = null;     // 规划预览的路线图层
+let pointInfoPopup = null;        // Leaflet 点击信息弹窗
 let navigationLayer = null;
 let navMode = 'WALK';                 // 'WALK' | 'DRIVE' — sent to server (C1)
 let navMarkers = { start: null, end: null, player: null };
@@ -14,6 +18,7 @@ let viewportDirty = true;            // C2: re-cull only when needed
 let renderedSegmentCount = 0;       // C2: perf indicator
 let totalSegmentCount = 0;
 let toolbarMode = 'compact';   // 'compact' | 'detailed'
+let appMode = 'navigation';    // 'navigation' | 'edit' — top-level mode gate
 let mergeFirstNodeId = null;   // first node selected in merge tool
 const TOOL_TOLERANCE_PX = 12;  // pixel tolerance for point tool segment detection
 const INTERSECTION_SNAP_PX = 15;  // pixel tolerance for intersection snapping in point tool
@@ -842,7 +847,7 @@ function renderAll() {
     [edge, fill].forEach(line => {
       line.on('mouseover', () => { if (!isSelected) { edge.setStyle({ weight: 5.5, opacity: 0.7 }); fill.setStyle({ weight: 4 }); } });
       line.on('mouseout', () => { if (!isSelected) { edge.setStyle(eo); fill.setStyle(fo); } });
-      line.on('click', (e) => { L.DomEvent.stopPropagation(e); if (activeTool === 'point') { handlePointTool(e.latlng); return; } onSegmentClick(sid, e.originalEvent); });
+      line.on('click', (e) => { L.DomEvent.stopPropagation(e); if (appMode !== 'edit') { openPointInfo(e.latlng); return; } if (activeTool === 'point') { handlePointTool(e.latlng); return; } onSegmentClick(sid, e.originalEvent); });
     });
     segmentLines.set(sid, edge);
     segmentFills.set(sid, fill);
@@ -880,7 +885,7 @@ function renderAll() {
         const line = L.polyline(pts, opts).addTo(map);
         line.on('mouseover', () => { if (!isSelected) line.setStyle({ weight: styl.lineWeight + 1, opacity: 1 }); });
         line.on('mouseout', () => { if (!isSelected) line.setStyle({ weight: styl.lineWeight, opacity: 0.88 }); });
-        line.on('click', (e) => { L.DomEvent.stopPropagation(e); if (activeTool === 'point') { handlePointTool(e.latlng); return; } onSegmentClick(sid, e.originalEvent); });
+        line.on('click', (e) => { L.DomEvent.stopPropagation(e); if (appMode !== 'edit') { openPointInfo(e.latlng); return; } if (activeTool === 'point') { handlePointTool(e.latlng); return; } onSegmentClick(sid, e.originalEvent); });
         segmentLines.set(sid, line);
         renderDirectionArrows(sid, seg, pts);
       } else if (cls === 'C') {
@@ -893,7 +898,7 @@ function renderAll() {
         [edge, fill].forEach(line => {
           line.on('mouseover', () => { if (!isSelected) { edge.setStyle({ weight: cw ? cw.hover.edge : 5, opacity: 0.9 }); fill.setStyle({ weight: cw ? cw.hover.fill : 3.5, opacity: 0.95 }); } });
           line.on('mouseout', () => { if (!isSelected) { edge.setStyle(eo); fill.setStyle(fo); } });
-          line.on('click', (e) => { L.DomEvent.stopPropagation(e); if (activeTool === 'point') { handlePointTool(e.latlng); return; } onSegmentClick(sid, e.originalEvent); });
+          line.on('click', (e) => { L.DomEvent.stopPropagation(e); if (appMode !== 'edit') { openPointInfo(e.latlng); return; } if (activeTool === 'point') { handlePointTool(e.latlng); return; } onSegmentClick(sid, e.originalEvent); });
         });
         segmentLines.set(sid, edge);
         segmentFills.set(sid, fill);
@@ -907,7 +912,7 @@ function renderAll() {
         [edge, fill].forEach(line => {
           line.on('mouseover', () => { if (!isSelected) { edge.setStyle({ weight: cw ? cw.hover.edge : 5.5, opacity: 0.7 }); fill.setStyle({ weight: cw ? cw.hover.fill : 4 }); } });
           line.on('mouseout', () => { if (!isSelected) { edge.setStyle(eo); fill.setStyle(fo); } });
-          line.on('click', (e) => { L.DomEvent.stopPropagation(e); if (activeTool === 'point') { handlePointTool(e.latlng); return; } onSegmentClick(sid, e.originalEvent); });
+          line.on('click', (e) => { L.DomEvent.stopPropagation(e); if (appMode !== 'edit') { openPointInfo(e.latlng); return; } if (activeTool === 'point') { handlePointTool(e.latlng); return; } onSegmentClick(sid, e.originalEvent); });
         });
         segmentLines.set(sid, edge);
         segmentFills.set(sid, fill);
@@ -1008,6 +1013,7 @@ function renderAll() {
     marker.on('click', (e) => {
       L.DomEvent.stopPropagation(e);
       if (dragJustEnded) { dragJustEnded = false; return; }
+      if (appMode !== 'edit') { openPointInfo(e.latlng); return; }   // 导航模式：点节点也弹信息卡（查看/到这去）
       if (activeTool === 'point') { handlePointTool(e.latlng); return; }
       if (activeTool === 'merge') { handleMergeTool(nid); return; }
       if (activeTool === 'fenhe') { handleFenHeTool(nid); return; }
@@ -1023,36 +1029,184 @@ function renderAll() {
 
 // ——— Interactions ———
 function onMapClick(e) {
-  if (navigationPickMode) {
-    navigationPickMode = false;
-    startNavigation(e.latlng.lng * SCALE, e.latlng.lat * SCALE);
+  if (appMode === 'edit') {
+    // Editing mode: a tool may use the click (e.g. point tool); otherwise just clear.
+    if (activeTool === 'point') { handlePointTool(e.latlng); return; }
+    clearSelection();
     return;
   }
-  if (activeTool === 'point') {
-    handlePointTool(e.latlng);
-    return;
-  }
-  clearSelection();
+  // Navigation mode: tap anywhere to inspect the point (distance, nearby roads, 到这去).
+  openPointInfo(e.latlng);
 }
 
 // ——— Part C1: Navigation ———
-function openNavPicker() {
-  document.getElementById('nav-picker').classList.add('visible');
+function latlng2mc(latlng) {
+  return { x: latlng.lng * SCALE, z: latlng.lat * SCALE };
 }
-function closeNavPicker() {
-  document.getElementById('nav-picker').classList.remove('visible');
+
+// ——— 导航模式：点地图任意处 → 信息卡（直线距离 / 附近道路 / 到这去）———
+async function openPointInfo(latlng) {
+  const mc = latlng2mc(latlng);
+  pendingPoint = mc;
+
+  // 拉取玩家位置用于直线距离
+  try {
+    const st = await (await fetch('/api/nav/state')).json();
+    if (typeof st.playerX === 'number' && typeof st.playerZ === 'number') {
+      playerPos = { x: st.playerX, z: st.playerZ };
+    }
+  } catch (e) { /* 服务器可能未就绪 */ }
+
+  const straight = playerPos
+    ? formatDistance(Math.hypot(mc.x - playerPos.x, mc.z - playerPos.z)) + ' ' + I18N.t('nav.meters')
+    : '—';
+
+  const roads = nearbyRoads(mc.x, mc.z, 45);
+  const roadsHtml = roads.length
+    ? roads.map(r => '<div class="pi-road">' + escapeHtml(r) + '</div>').join('')
+    : '<div class="pi-empty">' + I18N.t('nav.noNearbyRoad') + '</div>';
+
+  const html =
+    '<div class="point-info">' +
+      '<div class="pi-row"><span class="pi-k">' + I18N.t('nav.straightDist') + '</span>' +
+        '<span class="pi-v">' + straight + '</span></div>' +
+      '<div class="pi-k" style="margin:2px 0 6px">' + I18N.t('nav.nearbyRoads') + '</div>' +
+      '<div class="pi-roads">' + roadsHtml + '</div>' +
+      '<button class="pi-go" id="pi-go-here"><i class="fa-solid fa-location-arrow"></i> ' + I18N.t('nav.goHere') + '</button>' +
+    '</div>';
+
+  if (!pointInfoPopup) pointInfoPopup = L.popup({ className: 'wayfarer-popup', closeButton: true, autoPan: true, maxWidth: 260 });
+  pointInfoPopup.setLatLng(latlng).setContent(html).openOn(map);
+}
+
+function closePointInfo() {
+  if (pointInfoPopup) { pointInfoPopup.remove(); pointInfoPopup = null; }
+  pendingPoint = null;
+}
+
+// 找出点附近一定半径内的道路（按到路段折线的距离），返回路名列表（最多 5 条）
+function nearbyRoads(x, z, radius) {
+  const found = [];
+  const seen = new Set();
+  for (const seg of Object.values(roadStore.segments)) {
+    if (!seg.nodeIds || seg.nodeIds.length < 2) continue;
+    let minD = Infinity;
+    let prev = null;
+    for (const nid of seg.nodeIds) {
+      const n = roadStore.nodes[nid];
+      if (!n) continue;
+      minD = Math.min(minD, Math.hypot(n.x - x, n.z - z));
+      if (prev) minD = Math.min(minD, distToSegment(x, z, prev.x, prev.z, n.x, n.z));
+      prev = n;
+    }
+    if (minD <= radius && seg.roadId && !seen.has(seg.roadId)) {
+      seen.add(seg.roadId);
+      const road = roadStore.roads[seg.roadId];
+      const name = road && (road.name || (road.classification + ' ' + (road.number || '')).trim());
+      found.push({ d: minD, name: name || I18N.t('nav.unnamedRoad') });
+    }
+  }
+  found.sort((a, b) => a.d - b.d);
+  return found.slice(0, 5).map(r => r.name);
+}
+
+function distToSegment(px, pz, ax, az, bx, bz) {
+  const dx = bx - ax, dz = bz - az;
+  const len2 = dx * dx + dz * dz;
+  if (len2 < 1e-9) return Math.hypot(px - ax, pz - az);
+  let t = ((px - ax) * dx + (pz - az) * dz) / len2;
+  t = Math.max(0, Math.min(1, t));
+  return Math.hypot(px - (ax + t * dx), pz - (az + t * dz));
+}
+
+function escapeHtml(s) {
+  return String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+}
+
+// ——— 规划路线（仅计算，不真正开始导航）———
+async function planRoute(x, z) {
+  try {
+    closePointInfo();
+    showToast(I18N.t('nav.planning'));
+    const res = await fetch('/api/nav/start', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ x, z, mode: navMode })
+    });
+    const data = await res.json();
+    // 规划后立刻复位后端会话，避免真正激活导航；等用户点「开始导航」再 start
+    fetch('/api/nav/stop', { method: 'POST' }).catch(() => {});
+    if (!res.ok || !data.ok) {
+      showToast(I18N.t('nav.planFailed') + '：' + routeErrorHint(data.error), 'error');
+      return;
+    }
+    plannedDest = { x, z };
+    renderPlannedRoute(data);
+    showRouteSummary(data);
+  } catch (e) { showToast('规划失败: ' + e.message, 'error'); }
+}
+
+function renderPlannedRoute(data) {
+  clearPlannedRoute();
+  const coords = (data.coordinates && data.coordinates.length > 1) ? data.coordinates : null;
+  if (!coords) return;
+  const pts = coords.map(c => mc2latlng(c[0], c[1]));
+  plannedRouteLayer = L.polyline(pts, {
+    color: '#007AFF', weight: 5, opacity: 0.55, dashArray: '2,10', lineCap: 'round', lineJoin: 'round'
+  }).addTo(map);
+  if (data.destination) {
+    plannedRouteLayer._destMarker = L.circleMarker(mc2latlng(data.destination.x, data.destination.z), {
+      radius: 7, color: '#fff', weight: 3, fillColor: '#FF3B30', fillOpacity: 1
+    }).addTo(map);
+  }
+}
+
+function clearPlannedRoute() {
+  if (plannedRouteLayer) {
+    if (plannedRouteLayer._destMarker) map.removeLayer(plannedRouteLayer._destMarker);
+    map.removeLayer(plannedRouteLayer);
+    plannedRouteLayer = null;
+  }
+}
+
+function showRouteSummary(data) {
+  let dist = 0;
+  const coords = data.coordinates || [];
+  for (let i = 1; i < coords.length; i++) {
+    dist += Math.hypot(coords[i][0] - coords[i - 1][0], coords[i][1] - coords[i - 1][1]);
+  }
+  document.getElementById('rs-distance').textContent = formatDistance(dist) + ' ' + I18N.t('nav.meters');
+  document.getElementById('rs-eta').textContent = formatDuration(data.etaSeconds || 0);
+  document.getElementById('route-summary').classList.add('visible');
+}
+
+function hideRouteSummary() {
+  document.getElementById('route-summary').classList.remove('visible');
+}
+
+// 把后端路由失败码翻译成人话，便于定位是「离道路太远」还是「路网不连通」
+function routeErrorHint(code) {
+  const map = {
+    DESTINATION_NOT_NEAR_ROAD: '终点不在道路附近，请点在道路线上',
+    START_NOT_NEAR_ROAD: '你当前位置离道路太远，走到路上再试',
+    NO_ROAD: '附近没有道路节点',
+    NO_ROUTE: '道路之间不连通（路口处节点未合并）',
+    INVALID_INPUT: '坐标无效'
+  };
+  return map[code] || (code || '未知错误');
 }
 
 async function startNavigation(x, z) {
   try {
-    closeNavPicker();
+    clearPlannedRoute();
+    hideRouteSummary();
+    setActiveTool(null);   // navigating must not keep an editing tool armed
     const res = await fetch('/api/nav/start', {
       method: 'POST', headers: {'Content-Type': 'application/json'},
       body: JSON.stringify({ x, z, mode: navMode })
     });
     const data = await res.json();
     if (!res.ok || !data.ok) {
-      showToast(I18N.t('nav.noRoute') + (data.error ? ': ' + data.error : ''), 'error');
+      showToast(I18N.t('nav.noRoute') + '：' + routeErrorHint(data.error), 'error');
       return;
     }
     navActive = true;
@@ -1188,15 +1342,20 @@ function cancelNavigation() {
   fetch('/api/nav/stop', { method: 'POST' }).then(() => {
     navActive = false; clearNavLayers(); hideNavPanel();
   }).catch(() => {});
+  clearPlannedRoute();
+  hideRouteSummary();
+  closePointInfo();
 }
 
 function onNodeClick(nid, event) {
+  if (appMode !== 'edit') { clearSelection(); return; }
   if (event.ctrlKey || event.metaKey) return;
   clearSelection();
   selectNode(nid);
 }
 
 function onSegmentClick(sid, event) {
+  if (appMode !== 'edit') { clearSelection(); return; }
   if (event.ctrlKey || event.metaKey) {
     if (selectedSegments.has(sid)) selectedSegments.delete(sid);
     else selectedSegments.add(sid);
@@ -1444,20 +1603,21 @@ function initToolbar() {
   document.getElementById('tool-merge').addEventListener('click', () => toggleTool('merge'));
   document.getElementById('tool-fenhe').addEventListener('click', () => toggleTool('fenhe'));
   document.getElementById('tool-softdelete').addEventListener('click', () => toggleTool('softdelete'));
-  document.getElementById('tool-navigation').addEventListener('click', () => openNavPicker());
-  document.getElementById('pick-on-map').addEventListener('click', () => {
-    closeNavPicker(); navigationPickMode = true; showToast('请在地图上点击目的地');
+  document.getElementById('tool-merge-nearby').addEventListener('click', mergeNearbyNodes);
+  // 导航模式：「目的地」按钮 → 以地图中心弹信息卡（主要流程是直接在地图上点任意处）
+  document.getElementById('tool-navigation').addEventListener('click', () => {
+    openPointInfo(map.getCenter());
   });
-  document.getElementById('pick-coords-go').addEventListener('click', () => {
-    const v = document.getElementById('pick-coords-input').value;
-    if (v && v.includes(',')) {
-      const p = v.split(',').map(Number);
-      if (p.length === 2 && p.every(Number.isFinite)) { startNavigation(p[0], p[1]); return; }
+  // 路线预览卡：开始导航 / 取消
+  document.getElementById('rs-start').addEventListener('click', () => {
+    if (plannedDest) startNavigation(plannedDest.x, plannedDest.z);
+  });
+  document.getElementById('rs-cancel').addEventListener('click', cancelNavigation);
+  // 「到这去」按钮在 Leaflet 弹窗内动态重建，用委托监听
+  document.addEventListener('click', (e) => {
+    if (e.target && e.target.closest && e.target.closest('#pi-go-here') && pendingPoint) {
+      planRoute(pendingPoint.x, pendingPoint.z);
     }
-    showToast('坐标格式有误（应为 X,Y）', 'error');
-  });
-  document.getElementById('pick-coords-input').addEventListener('keydown', e => {
-    if (e.key === 'Enter') document.getElementById('pick-coords-go').click();
   });
   document.getElementById('nav-cancel').addEventListener('click', cancelNavigation);
   document.querySelectorAll('#nav-mode button').forEach(b => {
@@ -1499,6 +1659,51 @@ function setActiveTool(tool) {
     map.dragging.enable();
   }
   renderAll();
+}
+
+// ——— App mode (navigation vs edit) ———
+// The mode gate controls whether editing tools / editor panel are reachable.
+// Exiting edit mode into navigation mode MUST deselect every active tool, otherwise a
+// leftover tool (e.g. 'point') would still fire when the user clicks a node/segment
+// while they only meant to navigate.
+function enterMode(mode) {
+  appMode = mode;
+  const tb = document.getElementById('toolbar');
+  tb.classList.remove('mode-nav', 'mode-edit');
+  tb.classList.add(mode === 'edit' ? 'mode-edit' : 'mode-nav');
+
+  if (mode === 'navigation') {
+    setActiveTool(null);   // 关键修复：退出编辑时取消所有工具选择
+    clearSelection();
+  }
+  updateModeSwitch();
+  try { if (map) map.invalidateSize(); } catch (e) {}
+}
+
+function toggleMode() {
+  enterMode(appMode === 'edit' ? 'navigation' : 'edit');
+}
+
+function updateModeSwitch() {
+  const pill = document.getElementById('mode-switch');
+  const ico = document.getElementById('mode-switch-ico');
+  const label = document.getElementById('mode-switch-label');
+  if (!pill) return;
+  pill.classList.remove('hidden');
+  // Pill always shows the mode you would switch INTO (the current action).
+  if (appMode === 'edit') {
+    ico.className = 'fa-solid fa-route ms-ico';
+    label.textContent = I18N.t('mode.nav.title');
+    pill.title = I18N.t('mode.switchToNav');
+  } else {
+    ico.className = 'fa-solid fa-pen-to-square ms-ico';
+    label.textContent = I18N.t('mode.edit.title');
+    pill.title = I18N.t('mode.switchToEdit');
+  }
+}
+
+function initModeUI() {
+  document.getElementById('mode-switch').addEventListener('click', toggleMode);
 }
 
 function toggleToolbarMode() {
@@ -1836,6 +2041,33 @@ async function handleSoftDeleteTool(nid) {
   }
 }
 
+// ——— 一键合并重合节点 + 连通块检查 ———
+async function mergeNearbyNodes() {
+  if (appMode !== 'edit') return;
+  showToast(I18N.t('toolbar.mergeNearby.working'));
+  try {
+    const res = await fetch('/api/nodes/merge-nearby', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ threshold: 1.0 })
+    });
+    if (!res.ok) {
+      showToast(I18N.t('toast.networkError'), 'error');
+      return;
+    }
+    const data = await res.json();
+    loadData();
+    showToast(I18N.t('toolbar.mergeNearby.result', {
+      merged: data.mergedNodes,
+      components: data.components,
+      isolated: data.isolated,
+      nodes: data.nodeCount
+    }), data.mergedNodes > 0 ? '' : 'info');
+  } catch (e) {
+    showToast(I18N.t('toast.networkError'), 'error');
+  }
+}
+
 // ——— 分合 tool ———
 function findRoadForSegment(segId) {
   for (const [rid, road] of Object.entries(roadStore.roads)) {
@@ -1915,12 +2147,17 @@ window.addEventListener('load', () => {
   I18N.init();
   initToolbar();
   initMap();
-  
+  initModeUI();
+
+  // 默认进入即导航视图：直接看到道路地图（类似导航软件），编辑工具隐藏。
+  // 想编辑时点顶部「编辑」胶囊即可切换；退出编辑会自动取消所有工具（见 enterMode）。
+  enterMode('navigation');
+
   // Language change handler
   document.getElementById('tool-language').addEventListener('click', () => {
     I18N.toggleLanguage();
   });
-  
+
   document.addEventListener('languagechange', () => {
     updateDynamicI18n();
   });
@@ -1945,6 +2182,9 @@ function updateDynamicI18n() {
   
   // Re-apply all data-i18n attributes
   I18N.applyToDOM();
+
+  // Mode switch pill label/icon are set imperatively — refresh them too.
+  updateModeSwitch();
 }
 
 document.addEventListener('keydown', e => {
