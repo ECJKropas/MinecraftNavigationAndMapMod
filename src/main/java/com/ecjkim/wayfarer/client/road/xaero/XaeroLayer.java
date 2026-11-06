@@ -43,7 +43,8 @@ public final class XaeroLayer {
     private static final String XAERO_MOD_ID = "xaeroworldmap";
 
     private static boolean installed;
-    private static boolean settled;
+    private static boolean worldMapSettled;
+    private static boolean minimapSettled;
     private static volatile boolean active;
 
     private XaeroLayer() {}
@@ -60,38 +61,42 @@ public final class XaeroLayer {
         }
         installed = true;
 
-        if (!FabricLoader.getInstance().isModLoaded(XAERO_MOD_ID)) {
-            settled = true;
-            LOGGER.info(
-                "Xaero's World Map is not installed; the road layer is off and the legacy overlay stays in charge.");
+        boolean worldMapLoaded = FabricLoader.getInstance().isModLoaded(XAERO_MOD_ID);
+        boolean minimapLoaded = FabricLoader.getInstance().isModLoaded("xaerominimap");
+        worldMapSettled = !worldMapLoaded;
+        minimapSettled = !minimapLoaded;
+        if (!worldMapLoaded && !minimapLoaded) {
+            LOGGER.info("Xaero's map mods are not installed; the legacy overlay stays in charge.");
             return;
         }
 
         // Might already be up if Xaero initialised first, in which case there is nothing to poll for.
         tryRegister();
-        if (!settled) {
+        if (!worldMapSettled || !minimapSettled) {
             ClientTickEvents.END_CLIENT_TICK.register(client -> tryRegister());
         }
     }
 
     private static void tryRegister() {
-        if (settled) {
+        if (worldMapSettled && minimapSettled) {
             return;
         }
         try {
-            if (!XaeroRegistration.attempt()) {
-                return; // Xaero has not finished initialising yet.
+            if (!worldMapSettled && XaeroRegistration.attempt()) {
+                worldMapSettled = true;
+                active = true;
+                LOGGER.info("Road layer registered with Xaero's World Map.");
             }
-            settled = true;
-            active = true;
-            LOGGER.info(
-                "Road layer registered with Xaero's World Map; the legacy screen-space overlay is standing down.");
+            if (!minimapSettled && XaeroMinimapRegistration.attempt()) {
+                minimapSettled = true;
+                active = true;
+                LOGGER.info("Route layer registered with Xaero's Minimap.");
+            }
         } catch (Throwable t) {
-            // A integration that cannot be set up must not take the game with it: give up once, and let the legacy
-            // overlay keep drawing.
-            settled = true;
-            LOGGER.error(
-                "Failed to register the road layer with Xaero's World Map; the legacy overlay stays in charge.", t);
+            // An optional integration must never take the game down. Leave the screen-space fallback available.
+            if (!worldMapSettled) worldMapSettled = true;
+            if (!minimapSettled) minimapSettled = true;
+            LOGGER.error("Failed to register a Wayfarer Xaero map layer; the legacy overlay stays in charge.", t);
         }
     }
 }

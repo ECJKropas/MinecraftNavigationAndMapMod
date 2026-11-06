@@ -140,6 +140,22 @@ dependencies {
     }
     autoCompileOnly(files(xaeroJar))
 
+    // Xaero's HUD minimap has a separate element pipeline from Xaero's World Map. Keep the
+    // integration compile-only and optional at runtime, just like the world-map integration.
+    val xaeroMinimapJarRelative = project.findProperty("xaeroMinimapJar")?.toString().orEmpty()
+    if (xaeroMinimapJarRelative.isEmpty()) {
+        error(
+            "Missing 'xaeroMinimapJar' in ${project.path}/gradle.properties. " +
+                "Add the Xaero's Minimap jar name, e.g. " +
+                "xaeroMinimapJar=ref/xaerominimap-fabric-1.20.1-26.6.0.jar",
+        )
+    }
+    val xaeroMinimapJar = rootProject.file(xaeroMinimapJarRelative)
+    if (!xaeroMinimapJar.isFile) {
+        error("Xaero's Minimap jar not found at ${xaeroMinimapJar.absolutePath}. Place it in ref/.")
+    }
+    autoCompileOnly(files(xaeroMinimapJar))
+
     // XaeroLib ships as a jar nested inside the world map jar (META-INF/jars/). It is only needed where Xaero's
     // element API exposes xaero.lib types in the signatures we override — on MC 26.2 the buffer parameter is
     // XaeroBufferProvider rather than vanilla's BufferSource. Versions whose Xaero still takes a vanilla buffer
